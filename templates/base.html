@@ -52,7 +52,7 @@
         <div class="sidebar-logo">
           <!-- Logo Header -->
           <div class="logo-header" data-background-color="dark">
-            <a href="{% url 'home' %}" class="logo" style='color:white'>
+            <a href="" class="logo" style='color:white'>
               <img
                 src="{% static 'assets/img/school-logo.jpg' %}"
                 alt="school-logo"
@@ -77,249 +77,150 @@
         </div>
         <div class="sidebar-wrapper scrollbar scrollbar-inner">
           <div class="sidebar-content">
-            <ul class="nav nav-secondary">
-              <li class="nav-it`em active">
-               {% comment %} Dashboard was here  {% endcomment %}
-                <div class="collapse" id="dashboard">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="../demo1/index.html">
-                        <span class="sub-item">Dashboard 1</span>
-                      </a>
-                    </li>
+           
+            <ul class="nav nav-secondary sidebar-menu">
+
+              <!-- SUPERADMIN MENU -->
+              {% if request.user.role == 'superadmin' %}
+                <li class="nav-item">
+                  <a href="{% url 'superadmin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-city"></i><p>Branches</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-users-cog"></i><p>All Users</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Staff Management</p>
+                  </a>
+                  <ul class="collapse" id="staffMenu">
+                    <li><a href="#">Add Staff</a></li>
+                    <li><a href="#">Staff List</a></li>
+                    <li><a href="#">Attendance</a></li>
                   </ul>
-                </div>
-              </li>
-              <li class="nav-section">
-                <span class="sidebar-mini-icon">
-                  <i class="fa fa-ellipsis-h"></i>
-                </span>
-                <h4 class="text-section">Components</h4>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#base">
-                  <i class="fas fa-layer-group"></i>
-                  <p>Base</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="base">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="components/avatars.html">
-                        <span class="sub-item">Avatars</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/buttons.html">
-                        <span class="sub-item">Buttons</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/gridsystem.html">
-                        <span class="sub-item">Grid System</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/panels.html">
-                        <span class="sub-item">Panels</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/notifications.html">
-                        <span class="sub-item">Notifications</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/sweetalert.html">
-                        <span class="sub-item">Sweet Alert</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/font-awesome-icons.html">
-                        <span class="sub-item">Font Awesome Icons</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/simple-line-icons.html">
-                        <span class="sub-item">Simple Line Icons</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="components/typography.html">
-                        <span class="sub-item">Typography</span>
-                      </a>
-                    </li>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
+                    <i class="fas fa-user-graduate"></i><p>Student Management</p>
+                  </a>
+                  <ul class="collapse" id="studentMenu">
+                    <li><a href="#">Add Student</a></li>
+                    <li><a href="#">Student List</a></li>
+                    <li><a href="#">Student Attendance</a></li>
+                    <li><a href="#">Student Reports</a></li>
                   </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#sidebarLayouts">
-                  <i class="fas fa-th-list"></i>
-                  <p>Sidebar Layouts</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="sidebarLayouts">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="sidebar-style-2.html">
-                        <span class="sub-item">Sidebar Style 2</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="icon-menu.html">
-                        <span class="sub-item">Icon Menu</span>
-                      </a>
-                    </li>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
+                </li>
+            
+              <!-- BRANCH ADMIN MENU -->
+              {% elif request.user.role == 'branch_admin' %}
+                <li class="nav-item">
+                  <a href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Manage Staff</p>
+                  </a>
+                  <ul class="collapse" id="staffMenu">
+                    <li><a href="#">Add Staff</a></li>
+                    <li><a href="#">Staff List</a></li>
                   </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#forms">
-                  <i class="fas fa-pen-square"></i>
-                  <p>Forms</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="forms">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="forms/forms.html">
-                        <span class="sub-item">Basic Form</span>
-                      </a>
-                    </li>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
+                    <i class="fas fa-user-graduate"></i><p>Manage Students</p>
+                  </a>
+                  <ul class="collapse" id="studentMenu">
+                    <li><a href="#">Add Student</a></li>
+                    <li><a href="#">Student List</a></li>
+                    <li><a href="#">Attendance</a></li>
                   </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#tables">
-                  <i class="fas fa-table"></i>
-                  <p>Tables</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="tables">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="tables/tables.html">
-                        <span class="sub-item">Basic Table</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="tables/datatables.html">
-                        <span class="sub-item">Datatables</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#maps">
-                  <i class="fas fa-map-marker-alt"></i>
-                  <p>Maps</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="maps">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="maps/googlemaps.html">
-                        <span class="sub-item">Google Maps</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="maps/jsvectormap.html">
-                        <span class="sub-item">Jsvectormap</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#charts">
-                  <i class="far fa-chart-bar"></i>
-                  <p>Charts</p>
-                  <span class="caret"></span>
-                </a>
-                <div class="collapse" id="charts">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a href="charts/charts.html">
-                        <span class="sub-item">Chart Js</span>
-                      </a>
-                    </li>
-                    <li>
-                      <a href="charts/sparkline.html">
-                        <span class="sub-item">Sparkline</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </li>
-              <li class="nav-item">
-                <a href="widgets.html">
-                  <i class="fas fa-desktop"></i>
-                  <p>Widgets</p>
-                  <span class="badge badge-success">4</span>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a href="../../documentation/index.html">
-                  <i class="fas fa-file"></i>
-                  <p>Documentation</p>
-                  <span class="badge badge-secondary">1</span>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Class Timetables</p></a>
+                </li>
+            
+              <!-- STAFF MENU -->
+              {% elif request.user.role == 'staff' %}
+                <li class="nav-item">
+                  <a href="{% url 'staff_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+            
+                {% if request.user.staff_type == 'teaching' or request.user.staff_type == 'both' %}
+                  <li class="nav-item">
+                    <a data-bs-toggle="collapse" href="#teachingMenu" role="button" aria-expanded="false" aria-controls="teachingMenu">
+                      <i class="fas fa-chalkboard-teacher"></i><p>Teaching</p>
+                    </a>
+                    <ul class="collapse" id="teachingMenu">
+                      <li><a href="#">My Classes</a></li>
+                      <li><a href="#">Attendance</a></li>
+                      <li><a href="#">Results</a></li>
+                    </ul>
+                  </li>
+                {% endif %}
+            
+                {% if request.user.staff_type == 'non_teaching' or request.user.staff_type == 'both' %}
+                  <li class="nav-item">
+                    <a data-bs-toggle="collapse" href="#nonTeachingMenu" role="button" aria-expanded="false" aria-controls="nonTeachingMenu">
+                      <i class="fas fa-tools"></i><p>Non-Teaching</p>
+                    </a>
+                    <ul class="collapse" id="nonTeachingMenu">
+                      <li><a href="#">Duties</a></li>
+                      <li><a href="#">Reports</a></li>
+                    </ul>
+                  </li>
+                {% endif %}
+              
+              <!-- STUDENT MENU -->
+              {% elif request.user.role == 'student' %}
+                <li class="nav-item">
+                  <a href="{% url 'student_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-book"></i><p>My Courses</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-clipboard-list"></i><p>Assignments</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-calendar-check"></i><p>Exam Schedules</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-cogs"></i><p>Settings</p></a>
+                </li>
+            
+              <!-- PARENT MENU -->
+              {% elif request.user.role == 'parent' %}
+                <li class="nav-item">
+                  <a href="{% url 'parent_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-user-graduate"></i><p>My Children</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Upcoming Events</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href="#"><i class="fas fa-bell"></i><p>Notifications</p></a>
+                </li>
+            
+              {% endif %}
+            
+              <!-- LOGOUT -->
+              <li class="nav-item mt-4">
+                <a class="dropdown-item btn btn-primary text-white" href="{% url 'logout' %}" onclick="return confirm('Are you sure you want to logout?');">
+                  <i class="fas fa-right-from-bracket"></i> Logout
                 </a>
               </li>
-              <li class="nav-item">
-                <a data-bs-toggle="collapse" href="#submenu">
-                  <i class="fas fa-bars"></i>
-                  <p>Menu Levels</p>
-                  <span class="caret"></span>
-                </a>
-                <hr>
-                <a class="nav-item"  href="{% url 'logout' %}" class="btn btn-danger"><i class="fas fa-right-from-bracket"></i>Logout</a>
-                <div class="collapse" id="submenu">
-                  <ul class="nav nav-collapse">
-                    <li>
-                      <a data-bs-toggle="collapse" href="#subnav1">
-                        <span class="sub-item">Level 1</span>
-                        <span class="caret"></span>
-                      </a>
-                      <div class="collapse" id="subnav1">
-                        <ul class="nav nav-collapse subnav">
-                          <li>
-                            <a href="#">
-                              <span class="sub-item">Level 2</span>
-                            </a>
-                          </li>
-                          <li>
-                            <a href="#">
-                              <span class="sub-item">Level 2</span>
-                            </a>
-                          </li>
-                        </ul>
-                      </div>
-                    </li>
-                    <li>
-                      <a data-bs-toggle="collapse" href="#subnav2">
-                        <span class="sub-item">Level 1</span>
-                        <span class="caret"></span>
-                      </a>
-                      <div class="collapse" id="subnav2">
-                        <ul class="nav nav-collapse subnav">
-                          <li>
-                            <a href="#">
-                              <span class="sub-item">Level 2</span>
-                            </a>
-                          </li>
-                        </ul>
-                      </div>
-                    </li>
-                    <li>
-                      <a href="#">
-                        <span class="sub-item">Level 1</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </li>
+            
             </ul>
+            
+            
+          
           </div>
         </div>
        
@@ -705,7 +606,12 @@
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="#">Account Setting</a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{% url 'logout' %}" class="btn btn-danger">Logout</a>
+                        <a class="dropdown-item btn btn-primary"
+                        href="{% url 'logout' %}"
+                        onclick="return confirm('Are you sure you want to logout?');">
+                        <i class="fas fa-right-from-bracket"></i>Logout
+                        </a>
+
                       </li>
                     </div>
                   </ul>
