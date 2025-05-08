@@ -43,7 +43,7 @@ def user_login(request):
         else:
             messages.error(request, 'Invalid credentials. Please try again.')
     
-    return render(request, 'login.html')  # Render login form if GET request
+    return render(request, 'registration/login.html')  # Render login form if GET request
 
 # Define the student dashboard
 @login_required
