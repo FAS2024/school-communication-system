@@ -3,6 +3,9 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout as auth_logout
+from .forms import UserRegistrationForm
+from .models import CustomUser, StudentProfile, ParentProfile, StaffProfile
+from django import forms
 
 
 def home(request):
@@ -75,3 +78,32 @@ def logout(request):
     auth_logout(request)
     messages.info(request, "You have successfully logged out.")
     return redirect('login')
+
+
+@login_required
+def register_user(request):
+    if request.method == 'POST':
+        form = UserRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            raw_password = form.cleaned_data.get('password')
+            user.set_password(raw_password)
+            user.save()
+
+            messages.success(request, f"{user.get_full_name()} registered successfully.")
+
+            # Redirect based on role
+            if user.role == 'staff':
+                return redirect('staff_list')    # Replace with actual staff list URL name
+            elif user.role == 'student':
+                return redirect('student_list')  # Replace with actual student list URL name
+            elif user.role == 'parent':
+                return redirect('parent_list')   # Replace with actual parent list URL name
+            else:
+                return redirect('default_dashboard')  # Optional fallback
+        else:
+            messages.error(request, 'There was an error in your form.')
+    else:
+        form = UserRegistrationForm()
+
+    return render(request, 'registration/register_user.html', {'form': form})

@@ -11,5 +11,11 @@ urlpatterns = [
     path('dashboard/staff/', views.staff_dashboard, name='staff_dashboard'),
     path('dashboard/branch_admin/', views.branch_admin_dashboard, name='branch_admin_dashboard'),
     path('dashboard/superadmin/', views.superadmin_dashboard, name='superadmin_dashboard'),
+    
+    
+    
+    path('register/user/', views.register_user, name='register_user'),
+    
+    
 ]
 

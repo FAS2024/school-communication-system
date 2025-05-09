@@ -113,7 +113,18 @@
                   </ul>
                 </li>
                 <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
+                  </a>
+                  <ul class="collapse" id="parentMenu">
+                    <li><a href="#">Add Parent</a></li>
+                    <li><a href="#">Parent List</a></li>
+                    <li><a href="#">Attendance</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
                   <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
+                  <a href="{% url 'register_user' %}"><i class="fas fa-clipboard-list"></i><p>Register User</p></a>
                 </li>
             
               <!-- BRANCH ADMIN MENU -->
@@ -137,6 +148,16 @@
                   <ul class="collapse" id="studentMenu">
                     <li><a href="#">Add Student</a></li>
                     <li><a href="#">Student List</a></li>
+                    <li><a href="#">Attendance</a></li>
+                  </ul>
+                </li>
+                 <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
+                  </a>
+                  <ul class="collapse" id="parentMenu">
+                    <li><a href="#">Add Parent</a></li>
+                    <li><a href="#">Parent List</a></li>
                     <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
