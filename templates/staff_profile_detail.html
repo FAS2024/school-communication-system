@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Profile of {{ user.get_full_name }}</h2>
+  <div>
+    <h3>User Information</h3>
+    <p><strong>Username:</strong> {{ user.username }}</p>
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Full Name:</strong> {{ user.get_full_name }}</p>
+    <p><strong>Role:</strong> {{ user.get_role_display }}</p>
+
+    <h3>Staff Profile Information</h3>
+    <p><strong>Phone Number:</strong> {{ staff_profile.phone_number }}</p>
+    <p><strong>Date of Birth:</strong> {{ staff_profile.date_of_birth }}</p>
+    <p><strong>Qualification:</strong> {{ staff_profile.qualification }}</p>
+    <p><strong>Years of Experience:</strong> {{ staff_profile.years_of_experience }}</p>
+    <p><strong>Address:</strong> {{ staff_profile.address }}</p>
+
+    {% if user == request.user or request.user.role == 'superadmin' %}
+      <a href="{% url 'update_staff_profile' user.id %}">Edit Profile</a>
+    {% endif %}
+  </div>
+{% endblock %}

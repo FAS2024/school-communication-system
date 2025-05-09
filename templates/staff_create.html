@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Create New Staff</h2>
+  <form method="post">
+    {% csrf_token %}
+    <h3>User Information</h3>
+    {{ user_form.as_p }}
+    <h3>Staff Profile Information</h3>
+    {{ profile_form.as_p }}
+    <button type="submit">Create Staff</button>
+  </form>
+{% endblock %}
+
+
+
+
+{% comment %} 
+{% extends 'base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block content %}
+  <div class="container mt-5">
+    <h2 class="text-center mb-4">Create New Staff</h2>
+
+    <form method="post" class="shadow p-4 rounded bg-light">
+      {% csrf_token %}
+      
+      <!-- User Information Section -->
+      <h3 class="mb-3">User Information</h3>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ user_form.email.id_for_label }}" class="form-label">Email:</label>
+            <input type="email" name="email" id="{{ user_form.email.id_for_label }}" class="form-control" value="{{ user_form.email.value }}">
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ user_form.username.id_for_label }}" class="form-label">Username:</label>
+            <input type="text" name="username" id="{{ user_form.username.id_for_label }}" class="form-control" value="{{ user_form.username.value }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ user_form.first_name.id_for_label }}" class="form-label">First Name:</label>
+            <input type="text" name="first_name" id="{{ user_form.first_name.id_for_label }}" class="form-control" value="{{ user_form.first_name.value }}">
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ user_form.last_name.id_for_label }}" class="form-label">Last Name:</label>
+            <input type="text" name="last_name" id="{{ user_form.last_name.id_for_label }}" class="form-control" value="{{ user_form.last_name.value }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ user_form.role.id_for_label }}" class="form-label">Role:</label>
+        <select name="role" id="{{ user_form.role.id_for_label }}" class="form-control">
+          <option value="{{ user_form.role.value }}">{{ user_form.role.value }}</option>
+          <!-- Add options here -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ user_form.staff_type.id_for_label }}" class="form-label">Staff Type:</label>
+        <select name="staff_type" id="{{ user_form.staff_type.id_for_label }}" class="form-control">
+          <option value="{{ user_form.staff_type.value }}">{{ user_form.staff_type.value }}</option>
+          <!-- Add options here -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ user_form.teaching_positions.id_for_label }}" class="form-label">Teaching Positions:</label>
+        <select name="teaching_positions" id="{{ user_form.teaching_positions.id_for_label }}" class="form-control">
+          <option value="{{ user_form.teaching_positions.value }}">{{ user_form.teaching_positions.value }}</option>
+          <!-- Add options here -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ user_form.non_teaching_positions.id_for_label }}" class="form-label">Non-Teaching Positions:</label>
+        <select name="non_teaching_positions" id="{{ user_form.non_teaching_positions.id_for_label }}" class="form-control">
+          <option value="{{ user_form.non_teaching_positions.value }}">{{ user_form.non_teaching_positions.value }}</option>
+          <!-- Add options here -->
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ user_form.branch.id_for_label }}" class="form-label">Branch:</label>
+        <input type="text" name="branch" id="{{ user_form.branch.id_for_label }}" class="form-control" value="{{ user_form.branch.value }}">
+      </div>
+
+      <!-- Staff Profile Information Section -->
+      <h3 class="mt-4 mb-3">Staff Profile Information</h3>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ profile_form.phone_number.id_for_label }}" class="form-label">Phone Number:</label>
+            <input type="text" name="phone_number" id="{{ profile_form.phone_number.id_for_label }}" class="form-control" value="{{ profile_form.phone_number.value }}">
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label for="{{ profile_form.date_of_birth.id_for_label }}" class="form-label">Date of Birth:</label>
+            <input type="date" name="date_of_birth" id="{{ profile_form.date_of_birth.id_for_label }}" class="form-control" value="{{ profile_form.date_of_birth.value }}">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="{{ profile_form.qualification.id_for_label }}" class="form-label">Qualification:</label>
+        <input type="text" name="qualification" id="{{ profile_form.qualification.id_for_label }}" class="form-control" value="{{ profile_form.qualification.value }}">
+      </div>
+
+      <div class="form-group">
+        <label for="{{ profile_form.years_of_experience.id_for_label }}" class="form-label">Years of Experience:</label>
+        <input type="number" name="years_of_experience" id="{{ profile_form.years_of_experience.id_for_label }}" class="form-control" value="{{ profile_form.years_of_experience.value }}">
+      </div>
+
+      <div class="form-group">
+        <label for="{{ profile_form.address.id_for_label }}" class="form-label">Address:</label>
+        <textarea name="address" id="{{ profile_form.address.id_for_label }}" class="form-control">{{ profile_form.address.value }}</textarea>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="text-center mt-4">
+        <button type="submit" class="btn btn-primary">Create Staff</button>
+      </div>
+    </form>
+  </div>
+{% endblock %} {% endcomment %}

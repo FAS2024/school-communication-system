@@ -96,11 +96,12 @@
                     <i class="fas fa-user-tie"></i><p>Staff Management</p>
                   </a>
                   <ul class="collapse" id="staffMenu">
-                    <li><a href="#">Add Staff</a></li>
-                    <li><a href="#">Staff List</a></li>
-                    <li><a href="#">Attendance</a></li>
+                    <li><a href="{% url 'staff_list' %}">Registered Staff</a></li>
+                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
+                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
                   </ul>
                 </li>
+                
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
                     <i class="fas fa-user-graduate"></i><p>Student Management</p>
@@ -134,11 +135,11 @@
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Manage Staff</p>
+                    <i class="fas fa-user-tie"></i><p>Staff Position</p>
                   </a>
                   <ul class="collapse" id="staffMenu">
-                    <li><a href="#">Add Staff</a></li>
-                    <li><a href="#">Staff List</a></li>
+                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
+                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
                   </ul>
                 </li>
                 <li class="nav-item">

@@ -149,8 +149,13 @@ class ParentProfile(models.Model):
         return self.children.filter(branch=self.user.branch)
 
 
+
 class StaffProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'staff'})
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']}
+    )
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
     qualification = models.CharField(max_length=200, blank=True, null=True)
