@@ -34,8 +34,8 @@ urlpatterns = [
     # Staff
     path('create-staff/', views.create_staff, name='create_staff'),
     path('staff/', views.staff_list, name='staff_list'),
-    path('update-staff/<int:user_id>/', views.update_staff_profile, name='update_staff_profile'),
-    path('staff/<int:user_id>/profile/', views.view_staff_profile, name='view_staff_profile'),
+    path('staff/<int:staff_id>/edit/', views.update_staff_profile, name='update_staff_profile'),
+    path('staff/<int:user_id>/profile/', views.staff_detail, name='staff_detail'),
     path('staff/<int:user_id>/delete/', views.delete_staff, name='delete_staff'),
 
 
