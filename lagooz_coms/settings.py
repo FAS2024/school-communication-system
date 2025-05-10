@@ -42,10 +42,13 @@ INSTALLED_APPS = [
     'accounts',
     'widget_tweaks',
     'crispy_forms',
+    'crispy_bootstrap4',
 ]
 
 
-CRISPY_TEMPLATE_PACK = 'bootstrap4'  # Or 'bootstrap5' if you want to use Bootstrap 5
+CRISPY_ALLOWED_TEMPLATE_PACKS = ["bootstrap4"]
+CRISPY_TEMPLATE_PACK = "bootstrap4"
+
 
 
 MIDDLEWARE = [

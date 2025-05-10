@@ -44,118 +44,74 @@ class NonTeachingPositionForm(forms.ModelForm):
             raise forms.ValidationError("This field is required.")
         return name
 
-
-# class StaffCreationForm(UserCreationForm):
-#     class Meta:
-#         model = CustomUser
-#         fields = [
-#             'email', 'username', 'first_name', 'last_name',
-#             'role', 'staff_type',
-#             'teaching_positions', 'non_teaching_positions', 'branch',
-#             'password1', 'password2',  # Explicitly include password fields
-#         ]
-
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop('user', None)  # The logged-in user
-#         super().__init__(*args, **kwargs)
-
-#         # If the user is not a superadmin, restrict available roles
-#         if user and user.role != 'superadmin':
-#             # Non-superadmins should only see "Branch Admin" and "Staff"
-#             self.fields['role'].choices = [
-#                 ('branch_admin', 'Branch Admin'),
-#                 ('staff', 'Staff'),
-#             ]
-#         else:
-#             # Superadmins can see all roles
-#             self.fields['role'].choices = [
-#                 ('superadmin', 'Super Admin'),
-#                 ('branch_admin', 'Branch Admin'),
-#                 ('staff', 'Staff'),
-#             ]
-
-#         # Branch admin can only select their own branch
-#         if user and user.role == 'branch_admin':
-#             self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
-#             self.fields['branch'].initial = user.branch
-#         else:
-#             self.fields['branch'].queryset = Branch.objects.all()
-
-#         # Set the queryset for teaching and non-teaching positions
-#         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
-#         self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
-
-#         # Use checkboxes to select multiple positions
-#         self.fields['teaching_positions'].widget = forms.CheckboxSelectMultiple()
-#         self.fields['non_teaching_positions'].widget = forms.CheckboxSelectMultiple()
-
-#         # Add helpful labels for teaching and non-teaching positions
-#         self.fields['teaching_positions'].label = "Select Teaching Positions"
-#         self.fields['non_teaching_positions'].label = "Select Non-Teaching Positions"
-
 class StaffCreationForm(UserCreationForm):
+    # Define the fields directly as class attributes
+    teaching_positions = forms.ModelMultipleChoiceField(
+        queryset=TeachingPosition.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Teaching Positions"
+    )
+    non_teaching_positions = forms.ModelMultipleChoiceField(
+        queryset=NonTeachingPosition.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Non-Teaching Positions"
+    )
+
     class Meta:
         model = CustomUser
         fields = [
             'email', 'username', 'first_name', 'last_name',
             'role', 'staff_type', 'teaching_positions', 'non_teaching_positions', 'branch',
-            'password1', 'password2',  # Explicitly include password fields
+            'password1', 'password2',
         ]
-    
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)  # The logged-in user
-        super().__init__(*args, **kwargs)
 
-        # Restrict available roles based on the current user's role
-        if user and user.role != 'superadmin':
-            # Non-superadmins should only see "Branch Admin" and "Staff"
-            self.fields['role'].choices = [
-                ('branch_admin', 'Branch Admin'),
-                ('staff', 'Staff'),
-            ]
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)  # current logged-in user
+        super(StaffCreationForm, self).__init__(*args, **kwargs)
+
+        # Control visibility of staff_type field
+        if user and user.role in ['superadmin', 'branch_admin']:
+            self.fields['staff_type'].widget = forms.Select(choices=CustomUser.STAFF_TYPE_CHOICES)
         else:
-            # Superadmins can see all roles
-            self.fields['role'].choices = [
-                ('superadmin', 'Super Admin'),
-                ('branch_admin', 'Branch Admin'),
-                ('staff', 'Staff'),
-            ]
-        
-        # Branch admin can only select their own branch
+            self.fields['staff_type'].widget = forms.HiddenInput()
+
+        # Role field visibility and choices
+        if user:
+            if user.role == 'superadmin':
+                self.fields['role'].choices = [
+                    ('superadmin', 'Super Admin'),
+                    ('branch_admin', 'Branch Admin'),
+                    ('staff', 'Staff'),
+                ]
+            elif user.role == 'branch_admin':
+                self.fields['role'].choices = [
+                    ('branch_admin', 'Branch Admin'),
+                    ('staff', 'Staff'),
+                ]
+            else:
+                self.fields['role'].widget = forms.HiddenInput()
+        else:
+            self.fields['role'].widget = forms.HiddenInput()
+
+        # Branch selection restriction
         if user and user.role == 'branch_admin':
             self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
             self.fields['branch'].initial = user.branch
         else:
             self.fields['branch'].queryset = Branch.objects.all()
 
-        # Set the queryset for teaching and non-teaching positions
-        self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
-        self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
+    def save(self, commit=True):
+        # Save the user instance
+        user = super(StaffCreationForm, self).save(commit=False)
 
-        # Use checkboxes to select multiple positions
-        self.fields['teaching_positions'].widget = forms.CheckboxSelectMultiple()
-        self.fields['non_teaching_positions'].widget = forms.CheckboxSelectMultiple()
+        # Save the ManyToMany relationships (Teaching and Non-Teaching Positions)
+        if commit:
+            user.save()  # Save the user instance to the database
+            self.save_m2m()  # Save the ManyToMany relationships
 
-        # Add helpful labels for teaching and non-teaching positions
-        self.fields['teaching_positions'].label = "Select Teaching Positions"
-        self.fields['non_teaching_positions'].label = "Select Non-Teaching Positions"
+        return user
 
-        # Optional: Customize the staff type field, assuming you have a specific implementation
-        # Ensure 'staff_type' field shows options only if the user is a staff member
-        if user and user.role == 'staff':
-            self.fields['staff_type'].widget = forms.Select(choices=[
-                ('full_time', 'Full Time'),
-                ('part_time', 'Part Time'),
-            ])
-        else:
-            # Admin users might not need the staff type field
-            self.fields['staff_type'].widget = forms.HiddenInput()
 
-        # Optional: Customize the labels and add placeholders for more clarity
-        self.fields['role'].label = "Role"
-        self.fields['role'].help_text = "Select the appropriate role for the staff member."
-        self.fields['branch'].label = "Branch"
-        self.fields['branch'].help_text = "Select the branch the staff member belongs to."
 
 
 class StaffProfileForm(forms.ModelForm):
