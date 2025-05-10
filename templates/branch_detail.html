@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-5">
+  <div class="card shadow-sm rounded">
+    <div class="card-header bg-primary text-white">
+      <h3 class="mb-0">{{ branch.name }}</h3>
+    </div>
+    <div class="card-body">
+      <p><strong>Address:</strong> {{ branch.address }}</p>
+      <p><strong>Phone:</strong> {{ branch.phone }}</p>
+      <p><strong>Email:</strong> {{ branch.email }}</p>
+      <p><strong>City:</strong> {{ branch.city }}</p>
+      <p><strong>State:</strong> {{ branch.state }}</p>
+      <p><strong>Country:</strong> {{ branch.country }}</p>
+
+      <div class="d-flex justify-content-between mt-4">
+        <a href="{% url 'branch_edit' branch.pk %}" class="btn btn-warning w-100">Edit</a>
+        <a href="{% url 'branch_delete' branch.pk %}" class="btn btn-danger w-100">Delete</a>
+        <a href="{% url 'branch_list' %}" class="btn btn-secondary w-100">Back to List</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

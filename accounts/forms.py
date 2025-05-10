@@ -2,6 +2,7 @@ from django import forms
 from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile
 from django.contrib.auth.forms import UserCreationForm
 
+
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
         model = CustomUser
@@ -18,8 +19,6 @@ class UserRegistrationForm(forms.ModelForm):
         if password != password_confirmation:
             raise forms.ValidationError("Passwords do not match")
         return cleaned_data
-
-
 
 
 class TeachingPositionForm(forms.ModelForm):
@@ -138,3 +137,9 @@ class StaffProfileForm(forms.ModelForm):
             self.fields['branch'].queryset = Branch.objects.all()
 
         # Additional initialization logic can go here
+
+
+class BranchForm(forms.ModelForm):
+    class Meta:
+        model = Branch
+        fields = '__all__'

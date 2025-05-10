@@ -1,7 +1,14 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
-from .forms import UserRegistrationForm,TeachingPositionForm, NonTeachingPositionForm, StaffCreationForm, StaffProfileForm
+from .forms import (
+        UserRegistrationForm,
+        TeachingPositionForm, 
+        NonTeachingPositionForm, 
+        StaffCreationForm, 
+        StaffProfileForm,
+        BranchForm
+    )
 from .models import (
         CustomUser, 
         StudentProfile, 
@@ -17,6 +24,9 @@ from django.http import HttpResponseForbidden
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.http import Http404
+
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
+from django.urls import reverse_lazy
 
 User = get_user_model()
 
@@ -435,6 +445,45 @@ def view_staff_profile(request, user_id):
         'staff_profile': staff_profile,
     })
 
+# class BranchListView(ListView):
+#     model = Branch
+#     template_name = 'branch_list.html'
+#     context_object_name = 'branches'
+#     paginate_by = 10
+
+
+
+def branch_list(request):
+    branch_list = Branch.objects.all()
+    paginator = Paginator(branch_list, 10)  # 10 per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'branch_list.html', {
+        'branches': page_obj,  # This is now a Page object
+    })
+
+class BranchCreateView(CreateView):
+    model = Branch
+    form_class = BranchForm
+    template_name = 'branch_form.html'
+    success_url = reverse_lazy('branch_list')
+
+class BranchUpdateView(UpdateView):
+    model = Branch
+    form_class = BranchForm
+    template_name = 'branch_form.html'
+    success_url = reverse_lazy('branch_list')
+
+class BranchDeleteView(DeleteView):
+    model = Branch
+    template_name = 'branch_confirm_delete.html'
+    success_url = reverse_lazy('branch_list')
+
+class BranchDetailView(DetailView):
+    model = Branch
+    template_name = 'branch_detail.html'
+    context_object_name = 'branch'
 
 
 
