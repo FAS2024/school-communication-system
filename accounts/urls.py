@@ -45,5 +45,14 @@ urlpatterns = [
     path('branches/<int:pk>/edit/', views.BranchUpdateView.as_view(), name='branch_edit'),
     path('branches/<int:pk>/delete/', views.BranchDeleteView.as_view(), name='branch_delete'),
     path('branches/<int:pk>/', views.BranchDetailView.as_view(), name='branch_detail'),
+    
+    
+    # Students
+    path('student/create/', views.StudentCreateView.as_view(), name='student_create'),
+    path('student/update/<int:pk>/', views.StudentUpdateView.as_view(), name='student_update'),
+    path('students/', views.StudentListView.as_view(), name='student_list'),
+    path('student/<int:pk>/', views.StudentDetailView.as_view(), name='student_detail'),
+    path('students/<int:pk>/delete/', views.StudentDeleteView.as_view(), name='student_delete'),
+
 ]
 

@@ -44,6 +44,47 @@
 
     <!-- CSS Just for demo purpose, don't include it in your project -->
     <link rel="stylesheet" href="{% static 'assets/css/demo.css' %}" />
+
+    {% comment %} New {% endcomment %}
+    <!-- Add in <head> -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+      <style>
+        #django-messages {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 9999;
+          width: auto;
+          max-width: 300px;
+        }
+
+        .django-message {
+          padding: 15px;
+          margin-bottom: 10px;
+          border-radius: 5px;
+          color: white;
+          font-weight: bold;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+          transition: opacity 1s ease-out;
+        }
+
+        .django-message.success {
+          background-color: #28a745; /* Green */
+        }
+
+        .django-message.error {
+          background-color: #dc3545; /* Red */
+        }
+
+        .django-message.warning {
+          background-color: #ff9800; /* Amber */
+        }
+
+        .django-message.info {
+          background-color: #17a2b8; /* Teal/Blue */
+        }
+      </style>
+
   </head>
   <body>
     <div class="wrapper">
@@ -109,8 +150,7 @@
                     <i class="fas fa-user-graduate"></i><p>Student Management</p>
                   </a>
                   <ul class="collapse" id="studentMenu">
-                    <li><a href="#">Add Student</a></li>
-                    <li><a href="#">Student List</a></li>
+                    <li><a href="{% url 'student_list' %}">Student List</a></li>
                     <li><a href="#">Student Attendance</a></li>
                     <li><a href="#">Student Reports</a></li>
                   </ul>
@@ -149,8 +189,7 @@
                     <i class="fas fa-user-graduate"></i><p>Manage Students</p>
                   </a>
                   <ul class="collapse" id="studentMenu">
-                    <li><a href="#">Add Student</a></li>
-                    <li><a href="#">Student List</a></li>
+                    <li><a href="{% url 'student_list' %}">Student List</a></li>
                     <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
@@ -754,5 +793,28 @@
         fillColor: "rgba(255, 165, 52, .14)",
       });
     </script>
+      {% if messages %}
+        <div id="django-messages">
+          {% for message in messages %}
+            <div class="django-message {{ message.tags }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+
+        <script>
+          setTimeout(function () {
+            const messageContainer = document.getElementById('django-messages');
+            if (messageContainer) {
+              messageContainer.style.opacity = '0';
+              setTimeout(() => {
+                messageContainer.remove();
+              }, 1000);
+            }
+          }, 5000);
+        </script>
+      {% endif %}
+
+
   </body>
 </html>

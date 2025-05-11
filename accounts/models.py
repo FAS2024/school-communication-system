@@ -53,6 +53,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
     profile_picture = models.ImageField(
         upload_to='profile_pictures/',
         null=True,
@@ -141,9 +142,9 @@ class StudentProfile(models.Model):
     admission_number = models.CharField(max_length=50, unique=True)
     current_class = models.CharField(max_length=100)
     date_of_birth = models.DateField(null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
     guardian_name = models.CharField(max_length=100)
     address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.admission_number}"
@@ -154,6 +155,7 @@ class ParentProfile(models.Model):
     phone_number = models.CharField(max_length=20)
     occupation = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     children = models.ManyToManyField(CustomUser, related_name='student_parents', limit_choices_to={'role': 'student'})
 
     def __str__(self):
@@ -178,3 +180,19 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return self.user.get_full_name()
+
+
+
+class StudentClass(models.Model):
+    name = models.CharField(max_length=100, unique=True)  # e.g., JSS One, SSS Two
+    arms = models.ManyToManyField('ClassArm', related_name='student_classes')  # A class can have many arms
+
+    def __str__(self):
+        return self.name
+
+
+class ClassArm(models.Model):
+    name = models.CharField(max_length=50)  # e.g., Alpha, Gold, Apex
+
+    def __str__(self):
+        return self.name
