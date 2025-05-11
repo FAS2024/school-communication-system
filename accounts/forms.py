@@ -49,97 +49,11 @@ class NonTeachingPositionForm(forms.ModelForm):
         return name
 
 
-# class StaffCreationForm(UserCreationForm):
-#     teaching_positions = forms.ModelMultipleChoiceField(
-#         queryset=TeachingPosition.objects.all(),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Select Teaching Positions",
-#         required=False
-#     )
-#     non_teaching_positions = forms.ModelMultipleChoiceField(
-#         queryset=NonTeachingPosition.objects.all(),
-#         widget=forms.CheckboxSelectMultiple,
-#         label="Select Non-Teaching Positions",
-#         required=False
-#     )
-
-#     email = forms.EmailField(
-#         required=True,
-#         validators=[EmailValidator(message="Enter a valid email address.")],
-#         widget=forms.EmailInput(attrs={'placeholder': 'Email'})
-#     )
-#     username = forms.CharField(
-#         max_length=150,
-#         required=True,
-#         widget=forms.TextInput(attrs={'placeholder': 'Username'})
-#     )
-
-#     class Meta:
-#         model = CustomUser
-#         fields = [
-#             'email', 'username', 'first_name', 'last_name',
-#             'role', 'staff_type', 'teaching_positions', 'non_teaching_positions',
-#             'branch', 'password1', 'password2'
-#         ]
-
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop('user', None)
-#         super().__init__(*args, **kwargs)
-
-#         # Conditional logic for role and staff_type
-#         if user:
-#             if user.role == 'superadmin':
-#                 self.fields['role'].choices = [
-#                     ('superadmin', 'Super Admin'),
-#                     ('branch_admin', 'Branch Admin'),
-#                     ('staff', 'Staff'),
-#                 ]
-#             elif user.role == 'branch_admin':
-#                 self.fields['role'].choices = [
-#                     ('branch_admin', 'Branch Admin'),
-#                     ('staff', 'Staff'),
-#                 ]
-#                 self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
-#                 self.fields['branch'].initial = user.branch
-#             else:
-#                 self.fields['role'].widget = forms.HiddenInput()
-#         else:
-#             self.fields['role'].widget = forms.HiddenInput()
-
-#     def clean_email(self):
-#         email = self.cleaned_data.get('email')
-#         if CustomUser.objects.filter(email=email).exists():
-#             raise ValidationError('This email is already in use.')
-#         return email
-
-#     def clean_username(self):
-#         username = self.cleaned_data.get('username')
-#         if CustomUser.objects.filter(username=username).exists():
-#             raise ValidationError('This username is already taken.')
-#         return username
-
-#     def save(self, commit=True):
-#         user = super().save(commit=False)
-#         if commit:
-#             user.save()
-#             self.save_m2m()
-#         return user
-
-
-# class StaffProfileForm(forms.ModelForm):
-#     class Meta:
-#         model = StaffProfile
-#         fields = ['phone_number', 'date_of_birth', 'qualification', 'years_of_experience', 'address']
-#         widgets = {
-#             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
-#             'phone_number': forms.TextInput(attrs={'placeholder': 'Phone Number'}),
-#         }
-
-
 class BranchForm(forms.ModelForm):
     class Meta:
         model = Branch
         fields = '__all__'
+
 
 
 # class StaffCreationForm(UserCreationForm):
@@ -155,11 +69,12 @@ class BranchForm(forms.ModelForm):
 #     )
 #     email = forms.EmailField(required=True)
 #     username = forms.CharField(required=True)
+#     profile_picture = forms.ImageField(required=False)
 
 #     class Meta:
 #         model = CustomUser
 #         fields = [
-#             'email', 'username', 'first_name', 'last_name',
+#             'email', 'profile_picture', 'username', 'first_name', 'last_name',
 #             'role', 'staff_type', 'teaching_positions', 'non_teaching_positions',
 #             'branch', 'password1', 'password2'
 #         ]
@@ -168,6 +83,16 @@ class BranchForm(forms.ModelForm):
 #         user = kwargs.pop('user', None)
 #         super().__init__(*args, **kwargs)
 
+#         # Make password optional if editing an existing user
+#         if self.instance and self.instance.pk:
+#             self.fields['password1'].required = False
+#             self.fields['password2'].required = False
+
+#             # Add placeholder text to password fields when editing
+#             self.fields['password1'].widget.attrs['placeholder'] = 'Enter password if you wish to change your password'
+#             self.fields['password2'].widget.attrs['placeholder'] = 'Confirm new password if you wish to change it'
+
+#         # Customize field access based on current user's role
 #         if user:
 #             if user.role == 'superadmin':
 #                 self.fields['role'].choices = [
@@ -176,7 +101,6 @@ class BranchForm(forms.ModelForm):
 #                     ('staff', 'Staff'),
 #                 ]
 #                 self.fields['branch'].queryset = Branch.objects.all()
-
 #             elif user.role == 'branch_admin':
 #                 self.fields['role'].choices = [
 #                     ('branch_admin', 'Branch Admin'),
@@ -184,29 +108,50 @@ class BranchForm(forms.ModelForm):
 #                 ]
 #                 self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
 #                 self.fields['branch'].initial = user.branch
-
 #         else:
 #             self.fields['role'].choices = [('staff', 'Staff')]
 #             self.fields['branch'].widget = forms.HiddenInput()
 
 #     def clean_email(self):
 #         email = self.cleaned_data.get('email')
-#         if CustomUser.objects.filter(email=email).exists():
+#         qs = CustomUser.objects.filter(email=email)
+#         if self.instance.pk:
+#             qs = qs.exclude(pk=self.instance.pk)
+#         if qs.exists():
 #             raise ValidationError("This email is already in use.")
 #         return email
 
 #     def clean_username(self):
 #         username = self.cleaned_data.get('username')
-#         if CustomUser.objects.filter(username=username).exists():
+#         qs = CustomUser.objects.filter(username=username)
+#         if self.instance.pk:
+#             qs = qs.exclude(pk=self.instance.pk)
+#         if qs.exists():
 #             raise ValidationError("This username is already taken.")
 #         return username
 
 #     def save(self, commit=True):
 #         user = super().save(commit=False)
+#         password1 = self.cleaned_data.get("password1")
+
+#         if password1:
+#             user.set_password(password1)
+#         elif self.instance and self.instance.pk:
+#             existing_user = CustomUser.objects.get(pk=self.instance.pk)
+#             user.password = existing_user.password
+
+#         # Save the profile picture
+#         if 'profile_picture' in self.cleaned_data:
+#             user.profile_picture = self.cleaned_data['profile_picture']
+#             print("Profile picture saved:", user.profile_picture)  # Debugging statement
+
 #         if commit:
 #             user.save()
 #             self.save_m2m()
+
 #         return user
+
+
 class StaffCreationForm(UserCreationForm):
     teaching_positions = forms.ModelMultipleChoiceField(
         queryset=TeachingPosition.objects.all(),
@@ -220,11 +165,12 @@ class StaffCreationForm(UserCreationForm):
     )
     email = forms.EmailField(required=True)
     username = forms.CharField(required=True)
+    profile_picture = forms.ImageField(required=False)
 
     class Meta:
         model = CustomUser
         fields = [
-            'email', 'username', 'first_name', 'last_name',
+            'email', 'profile_picture', 'username', 'first_name', 'last_name',
             'role', 'staff_type', 'teaching_positions', 'non_teaching_positions',
             'branch', 'password1', 'password2'
         ]
@@ -233,12 +179,12 @@ class StaffCreationForm(UserCreationForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Make password optional if editing an existing user
         if self.instance and self.instance.pk:
             self.fields['password1'].required = False
             self.fields['password2'].required = False
+            self.fields['password1'].widget.attrs['placeholder'] = 'Enter new password (optional)'
+            self.fields['password2'].widget.attrs['placeholder'] = 'Confirm new password'
 
-        # Customize field access based on current user's role
         if user:
             if user.role == 'superadmin':
                 self.fields['role'].choices = [
@@ -247,6 +193,7 @@ class StaffCreationForm(UserCreationForm):
                     ('staff', 'Staff'),
                 ]
                 self.fields['branch'].queryset = Branch.objects.all()
+
             elif user.role == 'branch_admin':
                 self.fields['role'].choices = [
                     ('branch_admin', 'Branch Admin'),
@@ -254,9 +201,16 @@ class StaffCreationForm(UserCreationForm):
                 ]
                 self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
                 self.fields['branch'].initial = user.branch
-        else:
-            self.fields['role'].choices = [('staff', 'Staff')]
-            self.fields['branch'].widget = forms.HiddenInput()
+
+            elif user.role == 'staff' and user == self.instance:
+                # Disable all fields not allowed for editing by staff
+                readonly_fields = [
+                    'role', 'staff_type', 'branch',
+                    'teaching_positions', 'non_teaching_positions'
+                ]
+                for field in readonly_fields:
+                    if field in self.fields:
+                        self.fields[field].disabled = True
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
@@ -283,17 +237,47 @@ class StaffCreationForm(UserCreationForm):
         if password1:
             user.set_password(password1)
         elif self.instance and self.instance.pk:
-            # Retrieve password from the database to retain it
             existing_user = CustomUser.objects.get(pk=self.instance.pk)
             user.password = existing_user.password
+
+        # Save the profile picture
+        if 'profile_picture' in self.cleaned_data:
+            user.profile_picture = self.cleaned_data['profile_picture']
+            print("Profile picture saved:", user.profile_picture)  # Debugging statement
 
         if commit:
             user.save()
             self.save_m2m()
+
         return user
 
 
+
+
+# class StaffProfileForm(forms.ModelForm):
+#     class Meta:
+#         model = StaffProfile
+#         fields = ['phone_number', 'date_of_birth', 'qualification', 'years_of_experience', 'address']
+#         widgets = {
+#             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
+#             'phone_number': forms.TextInput(attrs={'placeholder': 'Phone Number'}),
+#             'address': forms.Textarea(attrs={'rows': 2}),
+#         }
+
+
+
 class StaffProfileForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user and user.role == 'staff' and user == self.instance.user:
+            # Staff can only edit these fields
+            editable_fields = ['phone_number', 'qualification', 'years_of_experience', 'address']
+            for field_name in self.fields:
+                if field_name not in editable_fields:
+                    self.fields[field_name].disabled = True
+
     class Meta:
         model = StaffProfile
         fields = ['phone_number', 'date_of_birth', 'qualification', 'years_of_experience', 'address']

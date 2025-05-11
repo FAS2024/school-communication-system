@@ -300,7 +300,6 @@ def non_teaching_position_delete(request, pk):
 # def create_staff(request):
 #     current_user = request.user
 
-#     # Only allow superadmin and branch_admin
 #     if current_user.role not in ['superadmin', 'branch_admin']:
 #         messages.error(request, "You are not authorized to create users.")
 #         return redirect('home')
@@ -309,28 +308,35 @@ def non_teaching_position_delete(request, pk):
 #         user_form = StaffCreationForm(request.POST, user=current_user)
 #         profile_form = StaffProfileForm(request.POST)
 
+
 #         if user_form.is_valid() and profile_form.is_valid():
 #             new_user = user_form.save(commit=False)
 #             selected_role = user_form.cleaned_data['role']
 
-#             # Ensure branch admin only assigns their own branch
+#             # Branch admin can only assign their own branch
 #             if current_user.role == 'branch_admin':
 #                 new_user.branch = current_user.branch
 
 #             new_user.save()
 #             user_form.save_m2m()
 
-#             # Create StaffProfile for all roles
-#             profile = profile_form.save(commit=False)
-#             profile.user = new_user
-#             profile.save()
+#             # Now update the existing StaffProfile
+#             try:
+#                 staff_profile = StaffProfile.objects.get(user=new_user)
+#                 staff_profile.phone_number = profile_form.cleaned_data['phone_number']
+#                 staff_profile.date_of_birth = profile_form.cleaned_data['date_of_birth']
+#                 staff_profile.qualification = profile_form.cleaned_data['qualification']
+#                 staff_profile.years_of_experience = profile_form.cleaned_data['years_of_experience']
+#                 staff_profile.address = profile_form.cleaned_data['address']
+#                 staff_profile.save()
+#             except StaffProfile.DoesNotExist:
+#                 messages.error(request, "Staff profile was not created properly.")
+#                 return redirect('create_staff')
 
 #             messages.success(request, f"{selected_role.replace('_', ' ').title()} created successfully.")
 #             return redirect('staff_list')
-
 #         else:
 #             messages.error(request, "Please correct the errors in the form.")
-
 #     else:
 #         user_form = StaffCreationForm(user=current_user)
 #         profile_form = StaffProfileForm()
@@ -350,9 +356,8 @@ def create_staff(request):
         return redirect('home')
 
     if request.method == 'POST':
-        user_form = StaffCreationForm(request.POST, user=current_user)
+        user_form = StaffCreationForm(request.POST, request.FILES, user=current_user)
         profile_form = StaffProfileForm(request.POST)
-
 
         if user_form.is_valid() and profile_form.is_valid():
             new_user = user_form.save(commit=False)
@@ -392,22 +397,31 @@ def create_staff(request):
     })
 
 
+
 @login_required
 def staff_list(request):
     """
     View to list all staff users.
     - Superadmin sees all staff.
     - Branch admin sees staff in their own branch.
+    - Other users (including staff) are not authorized to view the list.
     """
-    if request.user.role == 'superadmin':
-        staff_users = CustomUser.objects.filter(role__in=['staff', 'branch_admin','superadmin'])
-    elif request.user.role == 'branch_admin':
+    current_user = request.user
+
+    # Check if the current user is a superadmin or branch admin
+    if current_user.role == 'superadmin':
+        # Superadmin sees all staff and branch admins
+        staff_users = CustomUser.objects.filter(role__in=['staff', 'branch_admin', 'superadmin'])
+    elif current_user.role == 'branch_admin':
+        # Branch admin sees only staff in their branch
         staff_users = CustomUser.objects.filter(
-            role__in=['staff', 'branch_admin','superadmin'],
-            branch=request.user.branch
+            role__in=['staff', 'branch_admin'],  # Branch admins should be able to see staff and other branch admins in their branch
+            branch=current_user.branch
         )
     else:
-        staff_users = CustomUser.objects.none()  # Regular staff have no access
+        # Redirect other users (including staff) with no access to the staff list
+        messages.error(request, "You do not have permission to view the staff list.")
+        return redirect('home')  # Or redirect to any other page (e.g., 'home')
 
     # Set up pagination: Show 10 staff per page
     paginator = Paginator(staff_users, 10)
@@ -420,52 +434,133 @@ def staff_list(request):
 
 
 
+# @login_required
+# def update_staff_profile(request, staff_id):
+#     current_user = request.user
+
+#     # Check if the user is trying to edit their own profile
+#     if current_user.id == staff_id:
+#         user_to_edit = current_user
+#     else:
+#         # If not, ensure they have the right permissions (superadmin or branch_admin)
+#         if current_user.role not in ['superadmin', 'branch_admin']:
+#             messages.error(request, "You are not authorized to edit users.")
+#             return redirect('home')
+
+#         user_to_edit = get_object_or_404(CustomUser, id=staff_id)
+
+#         # Branch admin can only edit users within their own branch
+#         if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
+#             messages.error(request, "You are not authorized to edit this user.")
+#             return redirect('staff_list')
+
+#     # Get or create profile
+#     profile, created = StaffProfile.objects.get_or_create(user=user_to_edit)
+
+#     if request.method == 'POST':
+#         user_form = StaffCreationForm(request.POST, request.FILES, instance=user_to_edit, user=current_user)
+#         profile_form = StaffProfileForm(request.POST, instance=profile)
+
+#         if user_form.is_valid() and profile_form.is_valid():
+#             edited_user = user_form.save(commit=False)
+
+#             # Enforce branch constraint for branch admins
+#             if current_user.role == 'branch_admin' and current_user != user_to_edit:
+#                 edited_user.branch = current_user.branch
+
+#             edited_user.save()
+#             user_form.save_m2m()  # Save the many-to-many relationships
+#             profile_form.save()  # Save the profile form
+
+#             messages.success(request, f"{edited_user.get_full_name()} updated successfully.")
+            
+#             # Redirect to the staff detail page after successful update
+#             return redirect('staff_detail', user_id=edited_user.id)
+#         else:
+#             messages.error(request, "Please correct the errors in the form.")
+#     else:
+#         user_form = StaffCreationForm(instance=user_to_edit, user=current_user)
+#         profile_form = StaffProfileForm(instance=profile)
+
+#     return render(request, 'staff_edit.html', {
+#         'user_form': user_form,
+#         'profile_form': profile_form,
+#         'user_to_edit': user_to_edit,
+#     })
+
+
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .forms import StaffCreationForm, StaffProfileForm
+from .models import CustomUser, StaffProfile
+
+
 @login_required
 def update_staff_profile(request, staff_id):
     current_user = request.user
 
-    if current_user.role not in ['superadmin', 'branch_admin']:
-        messages.error(request, "You are not authorized to edit users.")
-        return redirect('home')
+    # Check if the user is editing their own profile
+    if current_user.id == staff_id:
+        user_to_edit = current_user
+    else:
+        # Only superadmin or branch_admin can edit other users
+        if current_user.role not in ['superadmin', 'branch_admin']:
+            messages.error(request, "You are not authorized to edit other users.")
+            return redirect('home')
 
-    user_to_edit = get_object_or_404(CustomUser, id=staff_id)
+        user_to_edit = get_object_or_404(CustomUser, id=staff_id)
 
-    if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
-        messages.error(request, "You are not authorized to edit this user.")
-        return redirect('staff_list')
+        # Branch admin can only edit users within their own branch
+        if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
+            messages.error(request, "You are not authorized to edit this user.")
+            return redirect('staff_list')
 
-    # Get or create profile
+    # Get or create StaffProfile
     profile, created = StaffProfile.objects.get_or_create(user=user_to_edit)
 
     if request.method == 'POST':
-        user_form = StaffCreationForm(request.POST, instance=user_to_edit, user=current_user)
-        profile_form = StaffProfileForm(request.POST, instance=profile)
+        user_form = StaffCreationForm(
+            request.POST, request.FILES,
+            instance=user_to_edit,
+            user=current_user  # Pass the logged-in user for permission logic
+        )
+        profile_form = StaffProfileForm(
+            request.POST,
+            instance=profile,
+            user=current_user  # Pass current user here as well
+        )
 
         if user_form.is_valid() and profile_form.is_valid():
             edited_user = user_form.save(commit=False)
 
-            # Enforce branch constraint for branch admins
-            if current_user.role == 'branch_admin':
+            # Ensure branch consistency if edited by branch_admin
+            if current_user.role == 'branch_admin' and current_user != user_to_edit:
                 edited_user.branch = current_user.branch
 
             edited_user.save()
-            user_form.save_m2m()
+            user_form.save_m2m()  # Save many-to-many fields like positions
             profile_form.save()
 
             messages.success(request, f"{edited_user.get_full_name()} updated successfully.")
-            return redirect('staff_list')
+            return redirect('staff_detail', user_id=edited_user.id)
         else:
             messages.error(request, "Please correct the errors in the form.")
     else:
-        user_form = StaffCreationForm(instance=user_to_edit, user=current_user)
-        profile_form = StaffProfileForm(instance=profile)
+        user_form = StaffCreationForm(
+            instance=user_to_edit,
+            user=current_user  # still pass for GET
+        )
+        profile_form = StaffProfileForm(
+            instance=profile,
+            user=current_user
+        )
 
     return render(request, 'staff_edit.html', {
         'user_form': user_form,
         'profile_form': profile_form,
         'user_to_edit': user_to_edit,
     })
-
 
 
 @login_required

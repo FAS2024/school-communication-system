@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, PermissionsMixin
 from django.conf import settings
-
+from django.templatetags.static import static
 
 
 class CustomUserManager(BaseUserManager):
@@ -53,7 +53,14 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
-
+    profile_picture = models.ImageField(
+        upload_to='profile_pictures/',
+        null=True,
+        blank=True,
+        default='profile_pictures/default.png',
+        help_text="Upload a profile picture."
+    )
+    
     staff_type = models.CharField(
         max_length=20,
         choices=STAFF_TYPE_CHOICES,
@@ -78,6 +85,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
+    
 
     objects = CustomUserManager()
 
@@ -92,6 +100,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.first_name
+    
+    def get_profile_picture_url(self):
+        if self.profile_picture:
+            return self.profile_picture.url
+        # return static('assets/img/profile-pic.png')
+        return static('profile_pictures/default.png')
 
 
 class Branch(models.Model):
