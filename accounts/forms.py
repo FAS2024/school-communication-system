@@ -1,5 +1,5 @@
 from django import forms
-from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile,StudentProfile
+from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile,StudentProfile,StudentClass, ClassArm
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, RegexValidator
@@ -273,3 +273,38 @@ class StudentCreationForm(forms.ModelForm):
             profile.save()
 
         return user
+
+
+class StudentClassForm(forms.ModelForm):
+    arms = forms.ModelMultipleChoiceField(
+        queryset=ClassArm.objects.all(),
+        widget=forms.CheckboxSelectMultiple,  # Display checkboxes for selecting multiple arms
+        required=True
+    )
+
+    class Meta:
+        model = StudentClass
+        fields = ['name', 'arms']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        name = cleaned_data.get('name')
+        arms = cleaned_data.get('arms')
+
+        # Check if a StudentClass with the same name and arms already exists
+        if StudentClass.objects.filter(name=name, arms__in=arms).exists():
+            raise ValidationError("A class with the same name and arms already exists.")
+        
+        return cleaned_data
+
+
+class ClassArmForm(forms.ModelForm):
+    class Meta:
+        model = ClassArm
+        fields = ['name']  # Only the 'name' field for the ClassArm
+
+    def clean_name(self):
+        name = self.cleaned_data['name'].strip()  # Strip any unnecessary spaces
+        if ClassArm.objects.filter(name=name).exists():  # Check if the arm already exists
+            raise forms.ValidationError(f"The class arm '{name}' already exists.")
+        return name

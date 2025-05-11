@@ -53,6 +53,23 @@ urlpatterns = [
     path('students/', views.StudentListView.as_view(), name='student_list'),
     path('student/<int:pk>/', views.StudentDetailView.as_view(), name='student_detail'),
     path('students/<int:pk>/delete/', views.StudentDeleteView.as_view(), name='student_delete'),
+    
+    
+    
+    # Student Class
+    path('student_classes/', views.student_class_list, name='student_class_list'),
+    path('student_class/create/', views.student_class_create, name='student_class_create'),
+    path('student_class/<int:pk>/update/', views.student_class_update, name='student_class_update'),
+    path('student_class/<int:pk>/delete/', views.student_class_delete, name='student_class_delete'),
 
+
+
+    #  Class Arms
+    path('create/', views.create_class_arm, name='create_class_arm'),
+    path('update/<int:pk>/', views.update_class_arm, name='update_class_arm'),
+    path('delete/<int:pk>/', views.delete_class_arm, name='delete_class_arm'),
+    path('list/', views.class_arm_list, name='class_arm_list'),
+    
+    
 ]
 

@@ -8,7 +8,9 @@ from .forms import (
         StaffCreationForm, 
         StaffProfileForm,
         BranchForm,
-        StudentCreationForm
+        StudentCreationForm,
+        StudentClassForm,
+        ClassArmForm
     )
 from .models import (
         CustomUser, 
@@ -17,7 +19,9 @@ from .models import (
         StaffProfile,
         TeachingPosition,
         NonTeachingPosition,
-        Branch
+        Branch,
+        StudentClass,
+        ClassArm
         
     )
 from django.shortcuts import render, redirect, get_object_or_404
@@ -33,6 +37,7 @@ from django.db import IntegrityError
 from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views import View
+
 
 
 User = get_user_model()
@@ -784,3 +789,172 @@ class StudentDeleteView(DeleteView):
 
         messages.success(request, f"Student '{student.get_full_name()}' was successfully deleted.")
         return super().delete(request, *args, **kwargs)
+
+
+
+
+@login_required
+def student_class_create(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin':
+        # Restrict branch admins to only create classes for their branch
+        branch = request.user.branch
+    else:
+        branch = None  # Superadmins can create classes for any branch
+
+    if request.method == 'POST':
+        form = StudentClassForm(request.POST)
+        if form.is_valid():
+            student_class = form.save(commit=False)
+            if branch:
+                student_class.branch = branch  # Assign the branch if it's a branch_admin
+            student_class.save()
+            form.save_m2m()  # Save the ManyToManyField (arms)
+
+            messages.success(request, "Student Class created successfully!")
+            return redirect('student_class_list')
+
+    else:
+        form = StudentClassForm()
+
+    return render(request, 'student-class/student_class_form.html', {'form': form})
+
+
+
+@login_required
+def student_class_list(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin':
+        # Filter the classes by branch for branch admins
+        student_classes = StudentClass.objects.filter(branch=request.user.branch)
+    else:
+        student_classes = StudentClass.objects.all()
+
+    return render(request, 'student-class/student_class_list.html', {'student_classes': student_classes})
+
+
+
+@login_required
+def student_class_update(request, pk):
+    student_class = get_object_or_404(StudentClass, pk=pk)
+
+    # Restrict updates based on roles
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin' and student_class.branch != request.user.branch:
+        messages.error(request, "You cannot update classes from another branch.")
+        return redirect('student_class_list')
+
+    if request.method == 'POST':
+        form = StudentClassForm(request.POST, instance=student_class)
+        if form.is_valid():
+            form.save()
+            form.save_m2m()  # Save the ManyToManyField (arms)
+            messages.success(request, "Student Class updated successfully!")
+            return redirect('student_class_list')
+    else:
+        form = StudentClassForm(instance=student_class)
+
+    return render(request, 'student-class/student_class_form.html', {'form': form})
+
+
+
+@login_required
+def student_class_delete(request, pk):
+    student_class = get_object_or_404(StudentClass, pk=pk)
+
+    # Restrict delete based on roles
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin' and student_class.branch != request.user.branch:
+        messages.error(request, "You cannot delete classes from another branch.")
+        return redirect('student_class_list')
+
+    if request.method == 'POST':
+        student_class.delete()
+        messages.success(request, "Student Class deleted successfully!")
+        return redirect('student_class_list')
+
+    return render(request, 'student-class/student_class_confirm_delete.html', {'student_class': student_class})
+
+
+
+@login_required
+def create_class_arm(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to create a class arm.")
+        return redirect('dashboard')  # Redirect to the dashboard or any other view
+    
+    if request.method == 'POST':
+        form = ClassArmForm(request.POST)
+        if form.is_valid():
+            class_arm = form.save()
+            messages.success(request, f"Class arm '{class_arm.name}' created successfully!")
+            return redirect('class_arm_list')  # Redirect to a list view of class arms
+    else:
+        form = ClassArmForm()
+
+    return render(request, 'class-arms/create_class_arm.html', {'form': form})
+
+
+# views.py
+@login_required
+def class_arm_list(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to view class arms.")
+        return redirect('dashboard')  # Redirect to the dashboard
+    
+    arms = ClassArm.objects.all()
+    return render(request, 'class-arms/class_arm_list.html', {'arms': arms})
+
+
+# views.py
+@login_required
+def update_class_arm(request, pk):
+    try:
+        class_arm = ClassArm.objects.get(pk=pk)
+    except ClassArm.DoesNotExist:
+        messages.error(request, "Class arm not found.")
+        return redirect('class_arm_list')
+
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to update this class arm.")
+        return redirect('dashboard')  # Redirect to the dashboard or any other view
+    
+    if request.method == 'POST':
+        form = ClassArmForm(request.POST, instance=class_arm)
+        if form.is_valid():
+            class_arm = form.save()
+            messages.success(request, f"Class arm '{class_arm.name}' updated successfully!")
+            return redirect('class_arm_list')  # Redirect to the class arms list page
+    else:
+        form = ClassArmForm(instance=class_arm)
+
+    return render(request, 'class-arms/update_class_arm.html', {'form': form})
+
+
+
+@login_required
+def delete_class_arm(request, pk):
+    class_arm = get_object_or_404(ClassArm, pk=pk)
+
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to delete this class arm.")
+        return redirect('dashboard')
+
+    if class_arm.student_classes.exists():
+        messages.error(request, f"The class arm '{class_arm.name}' is in use and cannot be deleted.")
+        return redirect('class_arm_list')
+
+    if request.method == 'POST':
+        class_arm.delete()
+        messages.success(request, f"Class arm '{class_arm.name}' deleted successfully.")
+        return redirect('class_arm_list')
+
+    return render(request, 'CLASS-ARMS/confirm_delete_class_arm.html', {'class_arm': class_arm})

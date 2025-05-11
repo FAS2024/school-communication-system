@@ -1,0 +1,39 @@
+<!-- class_arm_list.html -->
+{% extends 'base.html' %}
+{% block content %}
+    <div class="container mt-5">
+        <!-- Create Button Positioned at Top Left -->
+        <div class="mb-4">
+            <a href="{% url 'create_class_arm' %}" class="btn btn-primary">
+                Create New Class Arm
+            </a>
+        </div>
+        
+        <h1 class="text-center mb-4">Class Arm List</h1>
+        
+        <!-- Table -->
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="thead-light">
+                    <tr>
+                        <th>S/N</th>
+                        <th>Class Arm Name</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for arm in arms %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td> <!-- Serial Number -->
+                            <td>{{ arm.name }}</td>
+                            <td>
+                                <a href="{% url 'update_class_arm' arm.pk %}" class="btn btn-warning btn-sm">Edit</a>
+                                <a href="{% url 'delete_class_arm' arm.pk %}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this arm?')">Delete</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

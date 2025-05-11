@@ -127,10 +127,10 @@
                   <a href="{% url 'superadmin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
                 </li>
                   <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
+                  <a data-bs-toggle="collapse" href="#branchMenu" role="button" aria-expanded="false" aria-controls="branchMenu">
                     <i class="fas fa-user-graduate"></i><p>Branch Management</p>
                   </a>
-                  <ul class="collapse" id="studentMenu">
+                  <ul class="collapse" id="branchMenu">
                     <li><a href="{% url 'branch_list' %}">Branch List</a></li>
                   </ul>
                 </li>
@@ -166,8 +166,16 @@
                   </ul>
                 </li>
                 <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#classandarmsMenu" role="button" aria-expanded="false" aria-controls="classandarmsMenu">
+                    <i class="fas fa-user-tie"></i><p>Class & Arms Management</p>
+                  </a>
+                  <ul class="collapse" id="classandarmsMenu">
+                    <li><a href="{% url 'class_arm_list' %}">Arms List</a></li>
+                    <li><a href="{% url 'student_class_list' %}">Class List</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
                   <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
-                  <a href="{% url 'register_user' %}"><i class="fas fa-clipboard-list"></i><p>Register User</p></a>
                 </li>
             
               <!-- BRANCH ADMIN MENU -->
@@ -177,7 +185,7 @@
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Staff Position</p>
+                    <i class="fas fabranchie"></i><p>Staff Position</p>
                   </a>
                   <ul class="collapse" id="staffMenu">
                     <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
@@ -186,21 +194,29 @@
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
-                    <i class="fas fa-user-graduate"></i><p>Manage Students</p>
+                    <i class="fas fa-user-tie"></i><p>Student Management</p>
                   </a>
                   <ul class="collapse" id="studentMenu">
                     <li><a href="{% url 'student_list' %}">Student List</a></li>
-                    <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
-                 <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="parentMenu">
                     <i class="fas fa-user-tie"></i><p>Parent Management</p>
                   </a>
                   <ul class="collapse" id="parentMenu">
                     <li><a href="#">Add Parent</a></li>
                     <li><a href="#">Parent List</a></li>
                     <li><a href="#">Attendance</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#classandarmsMenu" role="button" aria-expanded="false" aria-controls="classandarmsMenu">
+                    <i class="fas fa-user-tie"></i><p>Class & Arms Management</p>
+                  </a>
+                  <ul class="collapse" id="classandarmsMenu">
+                    <li><a href="#">Arms List</a></li>
+                    <li><a href="{% url 'student_class_list' %}">Class List</a></li>
                   </ul>
                 </li>
                 <li class="nav-item">

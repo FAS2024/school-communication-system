@@ -1,0 +1,32 @@
+<!-- student_class_list.html -->
+{% extends 'base.html' %}
+{% block content %}
+    <h2>Student Classes</h2>
+    <a href="{% url 'student_class_create' %}" class="btn btn-primary">Create Student Class</a>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Arms</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student_class in student_classes %}
+                <tr>
+                    <td>{{ student_class.name }}</td>
+                    <td>
+                        {% for arm in student_class.arms.all %}
+                            {{ arm.name }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        <a href="{% url 'student_class_update' pk=student_class.pk %}">Edit</a> | 
+                        <a href="{% url 'student_class_delete' pk=student_class.pk %}">Delete</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
