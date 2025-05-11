@@ -4,5 +4,5 @@ from .models import CustomUser, StaffProfile
 
 @receiver(post_save, sender=CustomUser)
 def create_staff_profile(sender, instance, created, **kwargs):
-    if created and instance.role in ['superadmin', 'branch_admin']:
-        StaffProfile.objects.get_or_create(user=instance)
+    if created and instance.role in ['superadmin', 'branch_admin', 'staff']:
+        StaffProfile.objects.create(user=instance)
