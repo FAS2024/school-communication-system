@@ -85,22 +85,25 @@
                 <li class="nav-item">
                   <a href="{% url 'superadmin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
                 </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-city"></i><p>Branches</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-users-cog"></i><p>All Users</p></a>
+                  <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
+                    <i class="fas fa-user-graduate"></i><p>Branch Management</p>
+                  </a>
+                  <ul class="collapse" id="studentMenu">
+                    <li><a href="{% url 'branch_list' %}">Branch List</a></li>
+                  </ul>
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
                     <i class="fas fa-user-tie"></i><p>Staff Management</p>
                   </a>
                   <ul class="collapse" id="staffMenu">
-                    <li><a href="#">Add Staff</a></li>
-                    <li><a href="#">Staff List</a></li>
-                    <li><a href="#">Attendance</a></li>
+                    <li><a href="{% url 'staff_list' %}">Registered Staff</a></li>
+                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
+                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
                   </ul>
                 </li>
+                
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
                     <i class="fas fa-user-graduate"></i><p>Student Management</p>
@@ -113,7 +116,18 @@
                   </ul>
                 </li>
                 <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
+                  </a>
+                  <ul class="collapse" id="parentMenu">
+                    <li><a href="#">Add Parent</a></li>
+                    <li><a href="#">Parent List</a></li>
+                    <li><a href="#">Attendance</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
                   <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
+                  <a href="{% url 'register_user' %}"><i class="fas fa-clipboard-list"></i><p>Register User</p></a>
                 </li>
             
               <!-- BRANCH ADMIN MENU -->
@@ -123,11 +137,11 @@
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Manage Staff</p>
+                    <i class="fas fa-user-tie"></i><p>Staff Position</p>
                   </a>
                   <ul class="collapse" id="staffMenu">
-                    <li><a href="#">Add Staff</a></li>
-                    <li><a href="#">Staff List</a></li>
+                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
+                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
                   </ul>
                 </li>
                 <li class="nav-item">
@@ -137,6 +151,16 @@
                   <ul class="collapse" id="studentMenu">
                     <li><a href="#">Add Student</a></li>
                     <li><a href="#">Student List</a></li>
+                    <li><a href="#">Attendance</a></li>
+                  </ul>
+                </li>
+                 <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
+                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
+                  </a>
+                  <ul class="collapse" id="parentMenu">
+                    <li><a href="#">Add Parent</a></li>
+                    <li><a href="#">Parent List</a></li>
                     <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
@@ -591,7 +615,7 @@
                             <h4>Hizrian</h4>
                             <p class="text-muted">hello@example.com</p>
                             <a
-                              href="profile.html"
+                              href="{% url 'staff_detail'  request.user.id %}"
                               class="btn btn-xs btn-secondary btn-sm"
                               >View Profile</a
                             >
@@ -600,7 +624,7 @@
                       </li>
                       <li>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#">My Profile</a>
+                  
                         <a class="dropdown-item" href="#">My Balance</a>
                         <a class="dropdown-item" href="#">Inbox</a>
                         <div class="dropdown-divider"></div>

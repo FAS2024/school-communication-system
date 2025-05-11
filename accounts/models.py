@@ -119,3 +119,48 @@ class Message(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+
+
+# models.py
+class StudentProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
+    admission_number = models.CharField(max_length=50, unique=True)
+    current_class = models.CharField(max_length=100)
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
+    guardian_name = models.CharField(max_length=100)
+    address = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.admission_number}"
+
+
+class ParentProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'parent'})
+    phone_number = models.CharField(max_length=20)
+    occupation = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    children = models.ManyToManyField(CustomUser, related_name='student_parents', limit_choices_to={'role': 'student'})
+
+    def __str__(self):
+        return self.user.get_full_name()
+    
+    def get_children_from_same_branch(self):
+        return self.children.filter(branch=self.user.branch)
+
+
+
+class StaffProfile(models.Model):
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']}
+    )
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    qualification = models.CharField(max_length=200, blank=True, null=True)
+    years_of_experience = models.PositiveIntegerField(default=0)
+    address = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.user.get_full_name()

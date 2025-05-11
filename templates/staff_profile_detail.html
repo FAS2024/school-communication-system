@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Staff Profile: {{ user.get_full_name }}</h2>
+    <hr>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Basic Information</strong>
+        </div>
+        <div class="card-body">
+            <p><strong>Email:</strong> {{ user.email }}</p>
+            <p><strong>Username:</strong> {{ user.username }}</p>
+            <p><strong>Role:</strong> {{ user.get_role_display }}</p>
+            <p><strong>Staff Type:</strong> {{ user.get_staff_type_display }}</p>
+            <p><strong>Branch:</strong>
+                {% if user.branch %}
+                    {{ user.branch.name }}
+                {% else %}
+                    N/A
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Profile Details</strong>
+        </div>
+        <div class="card-body">
+            <p><strong>Phone Number:</strong> {{ staff_profile.phone_number }}</p>
+            <p><strong>Date of Birth:</strong> {{ staff_profile.date_of_birth }}</p>
+            <p><strong>Qualification:</strong> {{ staff_profile.qualification }}</p>
+            <p><strong>Years of Experience:</strong> {{ staff_profile.years_of_experience }}</p>
+            <p><strong>Address:</strong> {{ staff_profile.address }}</p>
+        </div>
+    </div>
+
+    {% if user.teaching_positions.exists %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Teaching Positions</strong>
+        </div>
+        <div class="card-body">
+            <ul>
+                {% for position in user.teaching_positions.all %}
+                    <li>{{ position.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if user.non_teaching_positions.exists %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <strong>Non-Teaching Positions</strong>
+        </div>
+        <div class="card-body">
+            <ul>
+                {% for position in user.non_teaching_positions.all %}
+                    <li>{{ position.name }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+
+    <a href="{% url 'staff_list' %}" class="btn btn-primary">Back</a>
+    <a href="{% url 'update_staff_profile' user.id %}" class="btn btn-success">Edit</a>
+
+</div>
+{% endblock %}

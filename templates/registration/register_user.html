@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block content %}
+  <h2>Register User</h2>
+  <form method="post">
+    {% csrf_token %}
+
+    <!-- Basic Fields -->
+    <div class="mb-3">
+      {{ form.email.label_tag }} {{ form.email|add_class:"form-control" }}
+      {{ form.email.errors }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.username.label_tag }} {{ form.username|add_class:"form-control" }}
+      {{ form.username.errors }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.first_name.label_tag }} {{ form.first_name|add_class:"form-control" }}
+      {{ form.first_name.errors }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.last_name.label_tag }} {{ form.last_name|add_class:"form-control" }}
+      {{ form.last_name.errors }}
+    </div>
+
+    <!-- Role Selector -->
+    <div class="mb-3">
+      {{ form.role.label_tag }} {{ form.role|add_class:"form-control" }}
+      {{ form.role.errors }}
+    </div>
+
+    <!-- Staff Fields (Initially Hidden) -->
+    <div id="staff_fields" style="display: none;">
+      <div class="mb-3">
+        {{ form.staff_type.label_tag }} {{ form.staff_type|add_class:"form-control" }}
+        {{ form.staff_type.errors }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.teaching_positions.label_tag }} {{ form.teaching_positions|add_class:"form-control" }}
+        {{ form.teaching_positions.errors }}
+      </div>
+
+      <div class="mb-3">
+        {{ form.non_teaching_positions.label_tag }} {{ form.non_teaching_positions|add_class:"form-control" }}
+        {{ form.non_teaching_positions.errors }}
+      </div>
+    </div>
+
+    <!-- Branch Field (Always Visible if Role is Admin/Staff) -->
+    <div class="mb-3" id="branch_field" style="display: none;">
+      {{ form.branch.label_tag }} {{ form.branch|add_class:"form-control" }}
+      {{ form.branch.errors }}
+    </div>
+
+    <!-- Passwords -->
+    <div class="mb-3">
+      {{ form.password.label_tag }} {{ form.password|add_class:"form-control" }}
+      {{ form.password.errors }}
+    </div>
+
+    <div class="mb-3">
+      {{ form.password_confirmation.label_tag }} {{ form.password_confirmation|add_class:"form-control" }}
+      {{ form.password_confirmation.errors }}
+    </div>
+
+    <button type="submit" class="btn btn-primary">Register</button>
+  </form>
+
+  <script>
+    function toggleFields(role) {
+      const staffFields = document.getElementById('staff_fields');
+      const branchField = document.getElementById('branch_field');
+
+      // Hide or show staff and branch fields based on role
+      if (role === 'staff' || role === 'superadmin' || role === 'branch_admin') {
+        staffFields.style.display = 'block';
+        branchField.style.display = 'block';
+      } else {
+        staffFields.style.display = 'none';
+        branchField.style.display = 'none';
+      }
+    }
+
+    // Trigger field toggling on page load and when role changes
+    document.addEventListener('DOMContentLoaded', function () {
+      const roleField = document.querySelector('[name="role"]');
+      if (roleField) {
+        toggleFields(roleField.value);
+        roleField.addEventListener('change', function () {
+          toggleFields(this.value);
+        });
+      }
+    });
+  </script>
+{% endblock %}
