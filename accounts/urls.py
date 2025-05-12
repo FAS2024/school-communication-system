@@ -45,5 +45,31 @@ urlpatterns = [
     path('branches/<int:pk>/edit/', views.BranchUpdateView.as_view(), name='branch_edit'),
     path('branches/<int:pk>/delete/', views.BranchDeleteView.as_view(), name='branch_delete'),
     path('branches/<int:pk>/', views.BranchDetailView.as_view(), name='branch_detail'),
+    
+    
+    # Students
+    path('student/create/', views.StudentCreateView.as_view(), name='student_create'),
+    path('student/update/<int:pk>/', views.StudentUpdateView.as_view(), name='student_update'),
+    path('students/', views.StudentListView.as_view(), name='student_list'),
+    path('student/<int:pk>/', views.StudentDetailView.as_view(), name='student_detail'),
+    path('students/<int:pk>/delete/', views.StudentDeleteView.as_view(), name='student_delete'),
+    
+    
+    
+    # Student Class
+    path('student_classes/', views.student_class_list, name='student_class_list'),
+    path('student_class/create/', views.student_class_create, name='student_class_create'),
+    path('student_class/<int:pk>/update/', views.student_class_update, name='student_class_update'),
+    path('student_class/<int:pk>/delete/', views.student_class_delete, name='student_class_delete'),
+
+
+
+    #  Class Arms
+    path('create/', views.create_class_arm, name='create_class_arm'),
+    path('update/<int:pk>/', views.update_class_arm, name='update_class_arm'),
+    path('delete/<int:pk>/', views.delete_class_arm, name='delete_class_arm'),
+    path('list/', views.class_arm_list, name='class_arm_list'),
+    
+    
 ]
 

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h4>Confirm Deletion</h4>
+        </div>
+        <div class="card-body">
+            <p>Are you sure you want to delete the class arm: <strong>{{ class_arm.name }}</strong>?</p>
+            <form method="post">
+                {% csrf_token %}
+                <a href="{% url 'class_arm_list' %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-danger">Yes, Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

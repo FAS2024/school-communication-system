@@ -10,7 +10,7 @@
             <h3>Create New Staff</h3>
           </div>
           <div class="card-body" style="background-color: #fdfdfd;">
-            <form method="post">
+            <form method="POST" enctype="multipart/form-data">
               {% csrf_token %}
 
               <!-- User Information Section -->

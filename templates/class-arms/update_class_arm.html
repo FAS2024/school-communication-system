@@ -1,0 +1,10 @@
+<!-- update_class_arm.html -->
+{% extends 'base.html' %}
+{% block content %}
+    <h1>Update Class Arm</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Update Class Arm</button>
+    </form>
+{% endblock %}

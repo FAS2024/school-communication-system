@@ -2,12 +2,14 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from .forms import (
-        UserRegistrationForm,
         TeachingPositionForm, 
         NonTeachingPositionForm, 
         StaffCreationForm, 
         StaffProfileForm,
-        BranchForm
+        BranchForm,
+        StudentCreationForm,
+        StudentClassForm,
+        ClassArmForm
     )
 from .models import (
         CustomUser, 
@@ -16,7 +18,10 @@ from .models import (
         StaffProfile,
         TeachingPosition,
         NonTeachingPosition,
-        Branch
+        Branch,
+        StudentClass,
+        ClassArm
+        
     )
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -28,6 +33,11 @@ from django.http import Http404
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
 from django.db import IntegrityError
+from django.http import HttpResponseRedirect
+from django.utils.decorators import method_decorator
+from django.views import View
+
+
 
 User = get_user_model()
 
@@ -134,9 +144,12 @@ def register_user(request):
     return render(request, 'registration/register_user.html', {'form': form})
 
 
-# Check if user is superadmin or branch admin
+# # Check if user is superadmin or branch admin
+# def is_superadmin_or_branchadmin(user):
+#     return user.role in ['superadmin', 'branch_admin']
+
 def is_superadmin_or_branchadmin(user):
-    return user.role in ['superadmin', 'branch_admin']
+    return user.is_authenticated and user.role in ['superadmin', 'branch_admin']
 
 
 @login_required
@@ -300,7 +313,6 @@ def non_teaching_position_delete(request, pk):
 # def create_staff(request):
 #     current_user = request.user
 
-#     # Only allow superadmin and branch_admin
 #     if current_user.role not in ['superadmin', 'branch_admin']:
 #         messages.error(request, "You are not authorized to create users.")
 #         return redirect('home')
@@ -309,28 +321,35 @@ def non_teaching_position_delete(request, pk):
 #         user_form = StaffCreationForm(request.POST, user=current_user)
 #         profile_form = StaffProfileForm(request.POST)
 
+
 #         if user_form.is_valid() and profile_form.is_valid():
 #             new_user = user_form.save(commit=False)
 #             selected_role = user_form.cleaned_data['role']
 
-#             # Ensure branch admin only assigns their own branch
+#             # Branch admin can only assign their own branch
 #             if current_user.role == 'branch_admin':
 #                 new_user.branch = current_user.branch
 
 #             new_user.save()
 #             user_form.save_m2m()
 
-#             # Create StaffProfile for all roles
-#             profile = profile_form.save(commit=False)
-#             profile.user = new_user
-#             profile.save()
+#             # Now update the existing StaffProfile
+#             try:
+#                 staff_profile = StaffProfile.objects.get(user=new_user)
+#                 staff_profile.phone_number = profile_form.cleaned_data['phone_number']
+#                 staff_profile.date_of_birth = profile_form.cleaned_data['date_of_birth']
+#                 staff_profile.qualification = profile_form.cleaned_data['qualification']
+#                 staff_profile.years_of_experience = profile_form.cleaned_data['years_of_experience']
+#                 staff_profile.address = profile_form.cleaned_data['address']
+#                 staff_profile.save()
+#             except StaffProfile.DoesNotExist:
+#                 messages.error(request, "Staff profile was not created properly.")
+#                 return redirect('create_staff')
 
 #             messages.success(request, f"{selected_role.replace('_', ' ').title()} created successfully.")
 #             return redirect('staff_list')
-
 #         else:
 #             messages.error(request, "Please correct the errors in the form.")
-
 #     else:
 #         user_form = StaffCreationForm(user=current_user)
 #         profile_form = StaffProfileForm()
@@ -350,9 +369,8 @@ def create_staff(request):
         return redirect('home')
 
     if request.method == 'POST':
-        user_form = StaffCreationForm(request.POST, user=current_user)
+        user_form = StaffCreationForm(request.POST, request.FILES, user=current_user)
         profile_form = StaffProfileForm(request.POST)
-
 
         if user_form.is_valid() and profile_form.is_valid():
             new_user = user_form.save(commit=False)
@@ -392,22 +410,31 @@ def create_staff(request):
     })
 
 
+
 @login_required
 def staff_list(request):
     """
     View to list all staff users.
     - Superadmin sees all staff.
     - Branch admin sees staff in their own branch.
+    - Other users (including staff) are not authorized to view the list.
     """
-    if request.user.role == 'superadmin':
-        staff_users = CustomUser.objects.filter(role__in=['staff', 'branch_admin','superadmin'])
-    elif request.user.role == 'branch_admin':
+    current_user = request.user
+
+    # Check if the current user is a superadmin or branch admin
+    if current_user.role == 'superadmin':
+        # Superadmin sees all staff and branch admins
+        staff_users = CustomUser.objects.filter(role__in=['staff', 'branch_admin', 'superadmin'])
+    elif current_user.role == 'branch_admin':
+        # Branch admin sees only staff in their branch
         staff_users = CustomUser.objects.filter(
-            role__in=['staff', 'branch_admin','superadmin'],
-            branch=request.user.branch
+            role__in=['staff', 'branch_admin'],  # Branch admins should be able to see staff and other branch admins in their branch
+            branch=current_user.branch
         )
     else:
-        staff_users = CustomUser.objects.none()  # Regular staff have no access
+        # Redirect other users (including staff) with no access to the staff list
+        messages.error(request, "You do not have permission to view the staff list.")
+        return redirect('home')  # Or redirect to any other page (e.g., 'home')
 
     # Set up pagination: Show 10 staff per page
     paginator = Paginator(staff_users, 10)
@@ -417,55 +444,73 @@ def staff_list(request):
     return render(request, 'staff_list.html', {
         'page_obj': page_obj
     })
-
-
-
+    
+    
 @login_required
 def update_staff_profile(request, staff_id):
     current_user = request.user
 
-    if current_user.role not in ['superadmin', 'branch_admin']:
-        messages.error(request, "You are not authorized to edit users.")
-        return redirect('home')
+    # Check if the user is editing their own profile
+    if current_user.id == staff_id:
+        user_to_edit = current_user
+    else:
+        # Only superadmin or branch_admin can edit other users
+        if current_user.role not in ['superadmin', 'branch_admin']:
+            messages.error(request, "You are not authorized to edit other users.")
+            return redirect('home')
 
-    user_to_edit = get_object_or_404(CustomUser, id=staff_id)
+        user_to_edit = get_object_or_404(CustomUser, id=staff_id)
 
-    if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
-        messages.error(request, "You are not authorized to edit this user.")
-        return redirect('staff_list')
+        # Branch admin can only edit users within their own branch
+        if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
+            messages.error(request, "You are not authorized to edit this user.")
+            return redirect('staff_list')
 
-    # Get or create profile
+    # Get or create StaffProfile
     profile, created = StaffProfile.objects.get_or_create(user=user_to_edit)
 
     if request.method == 'POST':
-        user_form = StaffCreationForm(request.POST, instance=user_to_edit, user=current_user)
-        profile_form = StaffProfileForm(request.POST, instance=profile)
+        user_form = StaffCreationForm(
+            request.POST, request.FILES,
+            instance=user_to_edit,
+            user=current_user  # Pass the logged-in user for permission logic
+        )
+        profile_form = StaffProfileForm(
+            request.POST,
+            instance=profile,
+            user=current_user  # Pass current user here as well
+        )
 
         if user_form.is_valid() and profile_form.is_valid():
             edited_user = user_form.save(commit=False)
 
-            # Enforce branch constraint for branch admins
-            if current_user.role == 'branch_admin':
+            # Ensure branch consistency if edited by branch_admin
+            if current_user.role == 'branch_admin' and current_user != user_to_edit:
                 edited_user.branch = current_user.branch
 
             edited_user.save()
-            user_form.save_m2m()
+            user_form.save_m2m()  # Save many-to-many fields like positions
             profile_form.save()
 
             messages.success(request, f"{edited_user.get_full_name()} updated successfully.")
-            return redirect('staff_list')
+            return redirect('staff_detail', user_id=edited_user.id)
         else:
             messages.error(request, "Please correct the errors in the form.")
     else:
-        user_form = StaffCreationForm(instance=user_to_edit, user=current_user)
-        profile_form = StaffProfileForm(instance=profile)
+        user_form = StaffCreationForm(
+            instance=user_to_edit,
+            user=current_user  # still pass for GET
+        )
+        profile_form = StaffProfileForm(
+            instance=profile,
+            user=current_user
+        )
 
     return render(request, 'staff_edit.html', {
         'user_form': user_form,
         'profile_form': profile_form,
         'user_to_edit': user_to_edit,
     })
-
 
 
 @login_required
@@ -522,16 +567,18 @@ def staff_detail(request, user_id):
     })
 
 
-
 def branch_list(request):
-    branch_list = Branch.objects.all()
-    paginator = Paginator(branch_list, 10)  # 10 per page
+    branches = Branch.objects.all().order_by('id')
+    paginator = Paginator(branches, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    return render(request, 'branch_list.html', {'page_obj': page_obj})
 
-    return render(request, 'branch_list.html', {
-        'branches': page_obj,  # This is now a Page object
-    })
+
+class BranchDetailView(DetailView):
+    model = Branch
+    template_name = 'branch_detail.html'
+    context_object_name = 'branch'
 
 class BranchCreateView(CreateView):
     model = Branch
@@ -539,22 +586,368 @@ class BranchCreateView(CreateView):
     template_name = 'branch_form.html'
     success_url = reverse_lazy('branch_list')
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Branch '{self.object.name}' was created successfully.")
+        return response
+
+
 class BranchUpdateView(UpdateView):
     model = Branch
     form_class = BranchForm
     template_name = 'branch_form.html'
     success_url = reverse_lazy('branch_list')
 
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, f"Branch '{self.object.name}' was updated successfully.")
+        return response
+
+
+
 class BranchDeleteView(DeleteView):
     model = Branch
     template_name = 'branch_confirm_delete.html'
     success_url = reverse_lazy('branch_list')
 
-class BranchDetailView(DetailView):
-    model = Branch
-    template_name = 'branch_detail.html'
-    context_object_name = 'branch'
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        branch_name = self.object.name
+        self.object.delete()
+        messages.warning(request, f"Branch '{branch_name}' was deleted.")
+        return HttpResponseRedirect(self.success_url)
+
+
+def is_student(user):
+    return user.is_authenticated and user.role == 'student'
+
+
+# Create Student View
+@method_decorator([login_required, user_passes_test(is_superadmin_or_branchadmin)], name='dispatch')
+class StudentCreateView(View):
+    def get(self, request):
+        form = StudentCreationForm(request=request)
+        return render(request, 'student_form.html', {'form': form})
+
+    def post(self, request):
+        form = StudentCreationForm(request.POST, request.FILES, request=request)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Student created successfully.")
+            return redirect('student_list')  # Change to your desired success URL
+        messages.error(request, "Please correct the errors below.")
+        return render(request, 'student_form.html', {'form': form})
+
+
+# Update Student View
+@method_decorator(login_required, name='dispatch')
+class StudentUpdateView(View):
+    def get(self, request, pk):
+        user = get_object_or_404(CustomUser, pk=pk, role='student')
+
+        # Access control for branch_admin: ensure they only edit students from their branch
+        if request.user.role == 'branch_admin' and user.branch != request.user.branch:
+            messages.error(request, "You do not have permission to edit this student.")
+            return redirect('student_list')
+
+        # Access control for regular students: they can only edit their own profile
+        if request.user.role == 'student' and request.user.pk != user.pk:
+            messages.error(request, "You can only edit your own profile.")
+            return redirect('dashboard')
+
+        # Populate the form with existing data for editing
+        form = StudentCreationForm(instance=user, request=request, initial={
+            'admission_number': getattr(user.studentprofile, 'admission_number', ''),
+            'current_class': getattr(user.studentprofile, 'current_class', ''),
+            'date_of_birth': getattr(user.studentprofile, 'date_of_birth', ''),
+            'gender': getattr(user.studentprofile, 'gender', ''),  # Gender already in CustomUser
+            'guardian_name': getattr(user.studentprofile, 'guardian_name', ''),
+            'address': getattr(user.studentprofile, 'address', ''),
+            'phone_number': getattr(user.studentprofile, 'phone_number', ''),  # Ensure phone number is populated
+        })
+        return render(request, 'student_form.html', {'form': form, 'is_update': True})
+
+    def post(self, request, pk):
+        user = get_object_or_404(CustomUser, pk=pk, role='student')
+
+        # Access control for branch_admin: ensure they only edit students from their branch
+        if request.user.role == 'branch_admin' and user.branch != request.user.branch:
+            messages.error(request, "You do not have permission to edit this student.")
+            return redirect('student_list')
+
+        # Access control for regular students: they can only edit their own profile
+        if request.user.role == 'student' and request.user.pk != user.pk:
+            messages.error(request, "You can only edit your own profile.")
+            return redirect('dashboard')
+
+        form = StudentCreationForm(request.POST, request.FILES, instance=user, request=request)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Student profile updated successfully.")
+            return redirect('student_detail', pk=user.pk)  # Adjust this URL to match your detail view
+        messages.error(request, "Please correct the errors below.")
+        return render(request, 'student_form.html', {'form': form, 'is_update': True})
+
+
+@method_decorator(login_required, name='dispatch')  # Ensures that the user must be logged in
+class StudentListView(ListView):
+    model = CustomUser
+    template_name = 'student_list.html'  
+    context_object_name = 'students'
+    paginate_by = 10 
+
+    def get_queryset(self):
+        # Ensure that only 'student' role users are shown in the list
+        return CustomUser.objects.filter(role='student')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
+
+    def dispatch(self, request, *args, **kwargs):
+        # Ensure the user has the correct role (either 'superadmin' or 'branch_admin')
+        if request.user.role not in ['superadmin', 'branch_admin']:
+            messages.error(request, "You do not have permission to view this page.")
+            return redirect('student_dashboard')  # Redirect to the dashboard if not authorized
+
+        return super().dispatch(request, *args, **kwargs)
+
+
+class StudentDetailView(DetailView):
+    model = CustomUser
+    template_name = 'student_detail.html'  # Customize the template as needed
+    context_object_name = 'student'
+
+    def get_object(self, queryset=None):
+        # Retrieve the student object by primary key (pk)
+        student = get_object_or_404(CustomUser, pk=self.kwargs['pk'], role='student')
+
+        # Access control logic:
+        if self.request.user.role == 'branch_admin' and student.branch != self.request.user.branch:
+            messages.error(self.request, "You do not have permission to view this student's details.")
+            return None  # Or you can redirect to a different page
+        elif self.request.user.role == 'student' and self.request.user.pk != student.pk:
+            messages.error(self.request, "You can only view your own profile.")
+            return None  # Or you can redirect to a different page
+
+        return student
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.error(request, "You need to be logged in to view student details.")
+            return redirect('login')  # Redirect to login if not authenticated
+        elif request.user.role not in ['superadmin', 'branch_admin', 'student']:
+            messages.error(request, "You do not have permission to view this page.")
+            return redirect('dashboard')  # Redirect to the dashboard if not authorized
+
+        return super().dispatch(request, *args, **kwargs)
+
+
+@method_decorator(login_required, name='dispatch')
+class StudentDeleteView(DeleteView):
+    model = CustomUser
+    template_name = 'student_confirm_delete.html'
+    context_object_name = 'student'
+    success_url = reverse_lazy('student_list')
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+
+        # Only superadmin and branch_admin can delete students
+        if user.role not in ['superadmin', 'branch_admin']:
+            messages.error(request, "Access denied. Only superadmins and branch admins can delete students.")
+            return redirect('student_list')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self, queryset=None):
+        student = get_object_or_404(CustomUser, pk=self.kwargs['pk'], role='student')
+
+        # Branch admin can only delete students in their branch
+        if self.request.user.role == 'branch_admin' and student.branch != self.request.user.branch:
+            messages.error(self.request, "You are not authorized to delete this student.")
+            return None
+
+        return student
+
+    def delete(self, request, *args, **kwargs):
+        student = self.get_object()
+
+        if not student:
+            return redirect('student_list')
+
+        messages.success(request, f"Student '{student.get_full_name()}' was successfully deleted.")
+        return super().delete(request, *args, **kwargs)
 
 
 
 
+@login_required
+def student_class_create(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin':
+        # Restrict branch admins to only create classes for their branch
+        branch = request.user.branch
+    else:
+        branch = None  # Superadmins can create classes for any branch
+
+    if request.method == 'POST':
+        form = StudentClassForm(request.POST)
+        if form.is_valid():
+            student_class = form.save(commit=False)
+            if branch:
+                student_class.branch = branch  # Assign the branch if it's a branch_admin
+            student_class.save()
+            form.save_m2m()  # Save the ManyToManyField (arms)
+
+            messages.success(request, "Student Class created successfully!")
+            return redirect('student_class_list')
+
+    else:
+        form = StudentClassForm()
+
+    return render(request, 'student-class/student_class_form.html', {'form': form})
+
+
+
+@login_required
+def student_class_list(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin':
+        # Filter the classes by branch for branch admins
+        student_classes = StudentClass.objects.filter(branch=request.user.branch)
+    else:
+        student_classes = StudentClass.objects.all()
+
+    return render(request, 'student-class/student_class_list.html', {'student_classes': student_classes})
+
+
+
+def student_class_update(request, pk):
+    student_class = get_object_or_404(StudentClass, pk=pk)
+    
+    if request.method == 'POST':
+        form = StudentClassForm(request.POST, instance=student_class)
+        if form.is_valid():
+            # Save the StudentClass instance (but don't save the ManyToMany field yet)
+            student_class = form.save(commit=False)
+            student_class.save()
+
+            # Save the many-to-many field separately
+            form.save_m2m()
+
+            # Adding a success message after successful update
+            messages.success(request, f"Student Class '{student_class.name}' was updated successfully!")
+
+            # Redirect to the class list after saving
+            return redirect('student_class_list')
+
+        # Adding an error message if the form is not valid
+        else:
+            messages.error(request, "There was an error updating the Student Class. Please try again.")
+
+    else:
+        form = StudentClassForm(instance=student_class)
+
+    return render(request, 'student-class/student_class_form.html', {'form': form})
+
+
+
+@login_required
+def student_class_delete(request, pk):
+    student_class = get_object_or_404(StudentClass, pk=pk)
+
+    # Restrict delete based on roles
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        return HttpResponseForbidden("You do not have permission to view this page.")
+
+    if request.user.role == 'branch_admin' and student_class.branch != request.user.branch:
+        messages.error(request, "You cannot delete classes from another branch.")
+        return redirect('student_class_list')
+
+    if request.method == 'POST':
+        student_class.delete()
+        messages.success(request, "Student Class deleted successfully!")
+        return redirect('student_class_list')
+
+    return render(request, 'student-class/student_class_confirm_delete.html', {'student_class': student_class})
+
+
+
+@login_required
+def create_class_arm(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to create a class arm.")
+        return redirect('dashboard')  # Redirect to the dashboard or any other view
+    
+    if request.method == 'POST':
+        form = ClassArmForm(request.POST)
+        if form.is_valid():
+            class_arm = form.save()
+            messages.success(request, f"Class arm '{class_arm.name}' created successfully!")
+            return redirect('class_arm_list')  # Redirect to a list view of class arms
+    else:
+        form = ClassArmForm()
+
+    return render(request, 'class-arms/create_class_arm.html', {'form': form})
+
+
+# views.py
+@login_required
+def class_arm_list(request):
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to view class arms.")
+        return redirect('dashboard')  # Redirect to the dashboard
+    
+    arms = ClassArm.objects.all()
+    return render(request, 'class-arms/class_arm_list.html', {'arms': arms})
+
+
+# views.py
+@login_required
+def update_class_arm(request, pk):
+    try:
+        class_arm = ClassArm.objects.get(pk=pk)
+    except ClassArm.DoesNotExist:
+        messages.error(request, "Class arm not found.")
+        return redirect('class_arm_list')
+
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to update this class arm.")
+        return redirect('dashboard')  # Redirect to the dashboard or any other view
+    
+    if request.method == 'POST':
+        form = ClassArmForm(request.POST, instance=class_arm)
+        if form.is_valid():
+            class_arm = form.save()
+            messages.success(request, f"Class arm '{class_arm.name}' updated successfully!")
+            return redirect('class_arm_list')  # Redirect to the class arms list page
+    else:
+        form = ClassArmForm(instance=class_arm)
+
+    return render(request, 'class-arms/update_class_arm.html', {'form': form})
+
+
+
+@login_required
+def delete_class_arm(request, pk):
+    class_arm = get_object_or_404(ClassArm, pk=pk)
+
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        messages.error(request, "You do not have permission to delete this class arm.")
+        return redirect('dashboard')
+
+    if class_arm.student_classes.exists():
+        messages.error(request, f"The class arm '{class_arm.name}' is in use and cannot be deleted.")
+        return redirect('class_arm_list')
+
+    if request.method == 'POST':
+        class_arm.delete()
+        messages.success(request, f"Class arm '{class_arm.name}' deleted successfully.")
+        return redirect('class_arm_list')
+
+    return render(request, 'CLASS-ARMS/confirm_delete_class_arm.html', {'class_arm': class_arm})

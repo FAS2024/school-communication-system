@@ -1,6 +1,24 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, PermissionsMixin
 from django.conf import settings
+from django.templatetags.static import static
+
+
+
+
+class StudentClass(models.Model):
+    name = models.CharField(max_length=100, unique=True)  # e.g., JSS One, SSS Two
+    arms = models.ManyToManyField('ClassArm', related_name='student_classes')  # A class can have many arms
+
+    def __str__(self):
+        return self.name
+
+
+class ClassArm(models.Model):
+    name = models.CharField(max_length=50)  # e.g., Alpha, Gold, Apex
+
+    def __str__(self):
+        return self.name
 
 
 
@@ -53,7 +71,15 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
-
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
+    profile_picture = models.ImageField(
+        upload_to='profile_pictures/',
+        null=True,
+        blank=True,
+        default='profile_pictures/default.png',
+        help_text="Upload a profile picture."
+    )
+    
     staff_type = models.CharField(
         max_length=20,
         choices=STAFF_TYPE_CHOICES,
@@ -78,6 +104,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
+    
 
     objects = CustomUserManager()
 
@@ -92,6 +119,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.first_name
+    
+    def get_profile_picture_url(self):
+        if self.profile_picture:
+            return self.profile_picture.url
+        # return static('assets/img/profile-pic.png')
+        return static('profile_pictures/default.png')
 
 
 class Branch(models.Model):
@@ -123,16 +156,23 @@ class Message(models.Model):
 
 # models.py
 class StudentProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
+    user = models.OneToOneField(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        limit_choices_to={'role': 'student'},
+        related_name='studentprofile'
+    )
     admission_number = models.CharField(max_length=50, unique=True)
-    current_class = models.CharField(max_length=100)
+    current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
+    current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
-    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
     guardian_name = models.CharField(max_length=100)
     address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.admission_number}"
+
 
 
 class ParentProfile(models.Model):
@@ -140,6 +180,7 @@ class ParentProfile(models.Model):
     phone_number = models.CharField(max_length=20)
     occupation = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True, null=True)
     children = models.ManyToManyField(CustomUser, related_name='student_parents', limit_choices_to={'role': 'student'})
 
     def __str__(self):
@@ -164,3 +205,5 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return self.user.get_full_name()
+
+

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-5 px-3">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <!-- Card -->
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-gradient" style="background: #007bff; color: white;">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-plus-circle me-1"></i> Create Class Arm
+                    </h5>
+                </div>
+                <div class="card-body bg-light">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <!-- Name Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label text-muted">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.help_text %}
+                                <div class="form-text text-muted">{{ form.name.help_text }}</div>
+                            {% endif %}
+                            {% for error in form.name.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Arms Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.arms.id_for_label }}" class="form-label text-muted">{{ form.arms.label }}</label>
+                            {{ form.arms }}
+                            {% if form.arms.help_text %}
+                                <div class="form-text text-muted">{{ form.arms.help_text }}</div>
+                            {% endif %}
+                            {% for error in form.arms.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save me-1"></i> Save Class Arm
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Back Link -->
+            <div class="text-center mt-4">
+                <a href="{% url 'class_arm_list' %}" class="text-decoration-none" style="color: #007bff;">
+                    <i class="bi bi-arrow-left-circle"></i> Back to Class Arm List
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
