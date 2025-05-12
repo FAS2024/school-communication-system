@@ -669,11 +669,26 @@
                           <div class="u-text">
                             <h4>{{request.user.last_name}}</h4>
                             <p class="text-muted">{{request.user.email}}</p>
-                            <a
-                              href="{% url 'staff_detail'  request.user.id %}"
-                              class="btn btn-xs btn-secondary btn-sm"
-                              >View Profile</a
-                            >
+                            {% if request.user.role == 'staff' or request.user.role == 'branchadmin' or request.user.role == 'superadmin'%}
+                              <a
+                                href="{% url 'staff_detail'  request.user.id %}"
+                                class="btn btn-xs btn-secondary btn-sm"
+                                >View Profile</a
+                              >
+                            {% elif request.user.role == 'student' %}
+                              <a
+                                href="{% url 'student_detail'  request.user.id %}"
+                                class="btn btn-xs btn-secondary btn-sm"
+                                >View Profile</a
+                              >
+                            {% else %}
+                              <a
+                                href=""
+                                class="btn btn-xs btn-secondary btn-sm"
+                                >View Profile</a
+                              >
+                            {% endif %}
+                            
                           </div>
                         </div>
                       </li>

@@ -5,14 +5,6 @@
 <div class="student-detail-container">
     <h2>Student Profile</h2>
 
-    {% if messages %}
-        <div class="messages">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-            {% endfor %}
-        </div>
-    {% endif %}
-
     <div class="student-profile-card" style="display: flex; align-items: center; gap: 2rem; margin-top: 2rem;">
         <!-- Profile Picture -->
         <div class="profile-pic-container">
@@ -29,9 +21,11 @@
         <div class="student-info">
             <p><strong>Full Name:</strong> {{ student.first_name }} {{ student.last_name }}</p>
             <p><strong>Email:</strong> {{ student.email }}</p>
+            <p><strong>Phone Number:</strong> {{ student.studentprofile.phone_number }}</p>
             <p><strong>Branch:</strong> {{ student.branch.name }}</p>
             <p><strong>Admission Number:</strong> {{ student.studentprofile.admission_number }}</p>
             <p><strong>Class:</strong> {{ student.studentprofile.current_class }}</p>
+            <p><strong>Class:</strong> {{ student.studentprofile.current_class_arm }}</p>
             <p><strong>Date of Birth:</strong> {{ student.studentprofile.date_of_birth }}</p>
             <p><strong>Gender:</strong> {{ student.get_gender_display }}</p>
             <p><strong>Guardian's Name:</strong> {{ student.studentprofile.guardian_name }}</p>

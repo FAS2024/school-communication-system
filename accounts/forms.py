@@ -31,6 +31,9 @@ class TeachingPositionForm(forms.ModelForm):
         model = TeachingPosition
         fields = ['name']
 
+    name = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position name'})
+    )
     def clean_name(self):
         name = self.cleaned_data.get('name')
         if not name:
@@ -42,6 +45,10 @@ class NonTeachingPositionForm(forms.ModelForm):
         model = NonTeachingPosition
         fields = ['name']
 
+    name = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position name'})
+    )
+        
     def clean_name(self):
         name = self.cleaned_data.get('name')
         if not name:
@@ -178,23 +185,32 @@ class StaffProfileForm(forms.ModelForm):
             'address': forms.Textarea(attrs={'rows': 2}),
         }
         
+        
+        
 class StudentCreationForm(forms.ModelForm):
-    # For password entry
-    password = forms.CharField(
+    password1 = forms.CharField(
         label='Password',
-        widget=forms.PasswordInput,
+        widget=forms.PasswordInput(attrs={'placeholder':'Enter password'}),
         required=False,
-        help_text="Leave blank to keep existing password."
     )
 
-    confirm_password = forms.CharField(
+    password2 = forms.CharField(
         label='Confirm Password',
-        widget=forms.PasswordInput,
+        widget=forms.PasswordInput(attrs={'placeholder':'Confirm password'}),
         required=False
     )
-
+    
     admission_number = forms.CharField(max_length=50)
-    current_class = forms.CharField(max_length=100)
+    current_class = forms.ModelChoiceField(
+        queryset=StudentClass.objects.all(),
+        required=False,
+        empty_label="Select a class"
+    )
+    current_class_arm = forms.ModelChoiceField(
+        queryset=ClassArm.objects.all(),
+        required=False,
+        empty_label="Select a class arm"
+    )
     date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
     guardian_name = forms.CharField(max_length=100)
     address = forms.CharField(widget=forms.Textarea, required=False)
@@ -205,7 +221,7 @@ class StudentCreationForm(forms.ModelForm):
         model = CustomUser
         fields = [
             'email', 'username', 'first_name', 'last_name', 'profile_picture',
-            'branch', 'password', 'phone_number', 'gender'
+            'branch', 'password1', 'password2', 'phone_number', 'gender'
         ]
         widgets = {
             'email': forms.EmailInput(),
@@ -214,7 +230,25 @@ class StudentCreationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop('request', None)  # Capture request user
+        user = self.request.user
         super().__init__(*args, **kwargs)
+
+        # If the user is a student, make certain fields read-only
+        if user and user.role == 'student' and user == self.instance:
+            readonly_fields = [
+                'role',
+                'admission_number',
+                'current_class',
+                'current_class_arm',
+                'date_of_birth',
+            ]
+            for field in readonly_fields:
+                if field in self.fields:
+                    self.fields[field].disabled = True  # Disable the fields for students
+                    self.fields[field].required = False  # Make them not required
+
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'
 
         # Force role to student only and hide it from form
         self.instance.role = 'student'
@@ -223,56 +257,93 @@ class StudentCreationForm(forms.ModelForm):
         if self.request and not self.request.user.is_superuser and hasattr(self.request.user, 'role') and self.request.user.role == 'branch_admin':
             self.fields['branch'].queryset = self.fields['branch'].queryset.filter(id=self.request.user.branch.id)
 
-        if self.instance and self.instance.pk:  # Editing
-            self.fields['password'].help_text = "Leave blank to keep the current password."
-        else:
-            self.fields['password'].required = True
-            self.fields['confirm_password'].required = True
+        # Pre-fill fields for update if the instance is an existing student
+        if self.instance and self.instance.pk:
+            self.fields['password1'].required = False
+            self.fields['password2'].required = False
+            self.fields['password1'].widget.attrs['placeholder'] = 'Enter new password (optional)'
+            self.fields['password2'].widget.attrs['placeholder'] = 'Confirm new password'
+
+            try:
+                profile = self.instance.studentprofile
+                self.fields['current_class_arm'].initial = profile.current_class_arm
+                self.fields['admission_number'].initial = profile.admission_number
+                self.fields['current_class'].initial = profile.current_class
+                self.fields['date_of_birth'].initial = profile.date_of_birth
+            except StudentProfile.DoesNotExist:
+                pass
+
+        # Set branch choices based on user role
+        if user:
+            if user.role == 'superadmin':
+                self.fields['branch'].queryset = Branch.objects.all()
+
+            elif user.role == 'branch_admin':
+                self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
+                self.fields['branch'].initial = user.branch
+
+            if user.role == 'student' and user == self.instance:
+                readonly_fields = [
+                    'role',
+                    'branch',
+                    'gender',
+                    'admission_number',
+                    'current_class',
+                    'current_class_arm',
+                    'date_of_birth',
+                ]
+                for field in readonly_fields:
+                    if field in self.fields:
+                        self.fields[field].disabled = True  # Disable the fields for students
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and CustomUser.objects.exclude(pk=self.instance.pk).filter(email=email).exists():
-            raise ValidationError("This email is already taken.")
+        qs = CustomUser.objects.filter(email=email)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError("This email is already in use.")
         return email
 
-    def clean(self):
-        cleaned_data = super().clean()
-        password = cleaned_data.get("password")
-        confirm_password = cleaned_data.get("confirm_password")
-
-        if password:
-            if password != confirm_password:
-                self.add_error('confirm_password', "Passwords do not match.")
-            validate_password(password)
-
-        return cleaned_data
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        qs = CustomUser.objects.filter(username=username)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError("This username is already taken.")
+        return username
 
     def save(self, commit=True):
         user = super().save(commit=False)
         user.role = 'student'
-
-        # Save the phone number and gender directly on CustomUser
-        user.phone_number = self.cleaned_data.get('phone_number')
         user.gender = self.cleaned_data.get('gender')
+        
+        password1 = self.cleaned_data.get("password1")
+        if password1:
+            user.set_password(password1)
+        elif self.instance and self.instance.pk:
+            existing_user = CustomUser.objects.get(pk=self.instance.pk)
+            user.password = existing_user.password
 
-        if self.cleaned_data.get('password'):
-            user.set_password(self.cleaned_data['password'])
-        elif self.instance.pk:
-            user.password = self.instance.password
+        if 'profile_picture' in self.cleaned_data:
+            user.profile_picture = self.cleaned_data['profile_picture']
+            print("Profile picture saved:", user.profile_picture)
 
         if commit:
             user.save()
-
-            # Save or update StudentProfile (if required for additional fields)
             profile, created = StudentProfile.objects.get_or_create(user=user)
             profile.admission_number = self.cleaned_data['admission_number']
             profile.current_class = self.cleaned_data['current_class']
+            profile.current_class_arm = self.cleaned_data['current_class_arm']
             profile.date_of_birth = self.cleaned_data['date_of_birth']
             profile.guardian_name = self.cleaned_data['guardian_name']
             profile.address = self.cleaned_data['address']
+            profile.phone_number = self.cleaned_data['phone_number']
             profile.save()
-
+            
         return user
+
 
 
 class StudentClassForm(forms.ModelForm):
@@ -291,11 +362,18 @@ class StudentClassForm(forms.ModelForm):
         name = cleaned_data.get('name')
         arms = cleaned_data.get('arms')
 
-        # Check if a StudentClass with the same name and arms already exists
-        if StudentClass.objects.filter(name=name, arms__in=arms).exists():
-            raise ValidationError("A class with the same name and arms already exists.")
+        # Check if the form is for an update
+        if self.instance.pk:
+            # During an update, exclude the current instance from the check
+            if StudentClass.objects.filter(name=name, arms__in=arms).exclude(pk=self.instance.pk).exists():
+                raise ValidationError("A class with the same name and arms already exists.")
+        else:
+            # During creation, ensure the combination doesn't already exist
+            if StudentClass.objects.filter(name=name, arms__in=arms).exists():
+                raise ValidationError("A class with the same name and arms already exists.")
         
         return cleaned_data
+
 
 
 class ClassArmForm(forms.ModelForm):

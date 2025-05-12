@@ -2,7 +2,6 @@ from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from .forms import (
-        UserRegistrationForm,
         TeachingPositionForm, 
         NonTeachingPositionForm, 
         StaffCreationForm, 
@@ -447,10 +446,6 @@ def staff_list(request):
     })
     
     
-    
-    
-
-
 @login_required
 def update_staff_profile(request, staff_id):
     current_user = request.user
@@ -572,16 +567,12 @@ def staff_detail(request, user_id):
     })
 
 
-
 def branch_list(request):
-    branch_list = Branch.objects.all()
-    paginator = Paginator(branch_list, 10)  # 10 per page
+    branches = Branch.objects.all().order_by('id')
+    paginator = Paginator(branches, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-
-    return render(request, 'branch_list.html', {
-        'branches': page_obj,  # This is now a Page object
-    })
+    return render(request, 'branch_list.html', {'page_obj': page_obj})
 
 
 class BranchDetailView(DetailView):
@@ -696,13 +687,14 @@ class StudentUpdateView(View):
             return redirect('student_detail', pk=user.pk)  # Adjust this URL to match your detail view
         messages.error(request, "Please correct the errors below.")
         return render(request, 'student_form.html', {'form': form, 'is_update': True})
-    
 
 
+@method_decorator(login_required, name='dispatch')  # Ensures that the user must be logged in
 class StudentListView(ListView):
     model = CustomUser
-    template_name = 'student_list.html'  # Customize the template as needed
+    template_name = 'student_list.html'  
     context_object_name = 'students'
+    paginate_by = 10 
 
     def get_queryset(self):
         # Ensure that only 'student' role users are shown in the list
@@ -713,15 +705,12 @@ class StudentListView(ListView):
         return context
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            messages.error(request, "You need to be logged in to view the student list.")
-            return redirect('login')  # Redirect to login if not authenticated
-        elif request.user.role not in ['superadmin', 'branch_admin']:
+        # Ensure the user has the correct role (either 'superadmin' or 'branch_admin')
+        if request.user.role not in ['superadmin', 'branch_admin']:
             messages.error(request, "You do not have permission to view this page.")
-            return redirect('dashboard')  # Redirect to the dashboard if not authorized
+            return redirect('student_dashboard')  # Redirect to the dashboard if not authorized
 
         return super().dispatch(request, *args, **kwargs)
-
 
 
 class StudentDetailView(DetailView):
@@ -838,25 +827,29 @@ def student_class_list(request):
 
 
 
-@login_required
 def student_class_update(request, pk):
     student_class = get_object_or_404(StudentClass, pk=pk)
-
-    # Restrict updates based on roles
-    if request.user.role not in ['superadmin', 'branch_admin']:
-        return HttpResponseForbidden("You do not have permission to view this page.")
-
-    if request.user.role == 'branch_admin' and student_class.branch != request.user.branch:
-        messages.error(request, "You cannot update classes from another branch.")
-        return redirect('student_class_list')
-
+    
     if request.method == 'POST':
         form = StudentClassForm(request.POST, instance=student_class)
         if form.is_valid():
-            form.save()
-            form.save_m2m()  # Save the ManyToManyField (arms)
-            messages.success(request, "Student Class updated successfully!")
+            # Save the StudentClass instance (but don't save the ManyToMany field yet)
+            student_class = form.save(commit=False)
+            student_class.save()
+
+            # Save the many-to-many field separately
+            form.save_m2m()
+
+            # Adding a success message after successful update
+            messages.success(request, f"Student Class '{student_class.name}' was updated successfully!")
+
+            # Redirect to the class list after saving
             return redirect('student_class_list')
+
+        # Adding an error message if the form is not valid
+        else:
+            messages.error(request, "There was an error updating the Student Class. Please try again.")
+
     else:
         form = StudentClassForm(instance=student_class)
 

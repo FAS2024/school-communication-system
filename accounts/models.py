@@ -4,6 +4,24 @@ from django.conf import settings
 from django.templatetags.static import static
 
 
+
+
+class StudentClass(models.Model):
+    name = models.CharField(max_length=100, unique=True)  # e.g., JSS One, SSS Two
+    arms = models.ManyToManyField('ClassArm', related_name='student_classes')  # A class can have many arms
+
+    def __str__(self):
+        return self.name
+
+
+class ClassArm(models.Model):
+    name = models.CharField(max_length=50)  # e.g., Alpha, Gold, Apex
+
+    def __str__(self):
+        return self.name
+
+
+
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra_fields):
         if not email:
@@ -138,9 +156,15 @@ class Message(models.Model):
 
 # models.py
 class StudentProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'student'})
+    user = models.OneToOneField(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        limit_choices_to={'role': 'student'},
+        related_name='studentprofile'
+    )
     admission_number = models.CharField(max_length=50, unique=True)
-    current_class = models.CharField(max_length=100)
+    current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
+    current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     guardian_name = models.CharField(max_length=100)
     address = models.TextField(blank=True, null=True)
@@ -148,6 +172,7 @@ class StudentProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.admission_number}"
+
 
 
 class ParentProfile(models.Model):
@@ -182,17 +207,3 @@ class StaffProfile(models.Model):
         return self.user.get_full_name()
 
 
-
-class StudentClass(models.Model):
-    name = models.CharField(max_length=100, unique=True)  # e.g., JSS One, SSS Two
-    arms = models.ManyToManyField('ClassArm', related_name='student_classes')  # A class can have many arms
-
-    def __str__(self):
-        return self.name
-
-
-class ClassArm(models.Model):
-    name = models.CharField(max_length=50)  # e.g., Alpha, Gold, Apex
-
-    def __str__(self):
-        return self.name

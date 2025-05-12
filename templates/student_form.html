@@ -1,13 +1,26 @@
 {% extends 'base.html' %}
 
 {% block content %}
-  <h2>{% if is_update %}Update Student{% else %}Create Student{% endif %}</h2>
+<div class="container mt-4">
+  <h2 class="mb-4">
+    {% if is_update %}
+      Update Student
+    {% else %}
+      Create Student
+    {% endif %}
+  </h2>
 
-  <form method="post" enctype="multipart/form-data">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">{% if is_update %}Update Student{% else %}Create Student{% endif %}</button>
-  </form>
-
-  <a href="{% url 'student_list' %}">Back to Student List</a>
+  <div class="card">
+    <div class="card-body">
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">
+          {% if is_update %}Update{% else %}Create{% endif %} Student
+        </button>
+        <a href="{% url 'student_list' %}" class="btn btn-secondary ms-2">Back to Student List</a>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}

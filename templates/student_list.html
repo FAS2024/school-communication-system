@@ -21,7 +21,7 @@
         </tr>
     </thead>
     <tbody>
-        {% for student in students %}
+        {% for student in page_obj %}
         <tr style="border-bottom: 1px solid #dee2e6;">
             <td style="padding: 10px;">{{ forloop.counter }}</td>
             <td style="padding: 10px;">
@@ -50,4 +50,55 @@
         {% endfor %}
     </tbody>
 </table>
+
+<!-- Stylish Pagination -->
+<div class="d-flex justify-content-center mt-4">
+  <nav aria-label="Student pagination">
+    <ul class="pagination pagination-rounded">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1" aria-label="First">
+            <i class="fas fa-angle-double-left"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+            <i class="fas fa-chevron-left"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-left"></i></span></li>
+        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>
+      {% endif %}
+
+      <!-- Page number links with active state -->
+      {% for num in page_obj.paginator.page_range %}
+        {% if num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+          {% if page_obj.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+          {% else %}
+            <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+            <i class="fas fa-chevron-right"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+            <i class="fas fa-angle-double-right"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>
+        <li class="page-item disabled"><span class="page-link"><i class="fas fa-angle-double-right"></i></span></li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+
 {% endblock %}

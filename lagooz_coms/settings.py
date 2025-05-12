@@ -75,7 +75,7 @@ WSGI_APPLICATION = 'lagooz_coms.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'lagooz_coms_db',
+        'NAME': 'coms_db',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
