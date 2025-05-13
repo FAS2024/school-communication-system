@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="parent-detail-container">
+    <h2>Parent Profile</h2>
+
+    <div class="parent-profile-card" style="display: flex; align-items: center; gap: 2rem; margin-top: 2rem;">
+        <!-- Profile Picture -->
+        <div class="profile-pic-container">
+            {% if parent.profile_picture %}
+                <img src="{{ parent.profile_picture.url }}" alt="{{ parent.first_name }}'s Profile Picture"
+                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
+            {% else %}
+                <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile"
+                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
+            {% endif %}
+        </div>
+
+        <!-- Parent Details -->
+        <div class="parent-info">
+            <p><strong>Full Name:</strong> {{ parent.first_name }} {{ parent.last_name }}</p>
+            <p><strong>Email:</strong> {{ parent.email }}</p>
+            <p><strong>Phone Number:</strong> {{ parent.parentprofile.phone_number }}</p>
+            <p><strong>Preferred Contact Method:</strong> {{ parent.parentprofile.preferred_contact_method }}</p>
+            <p><strong>Date of Birth:</strong> {{ parent.parentprofile.date_of_birth }}</p>
+            <p><strong>Gender:</strong> {{ parent.get_gender_display }}</p>
+            <p><strong>Occupation:</strong> {{ parent.parentprofile.occupation }}</p>
+            <p><strong>Relationship:</strong> {{ parent.parentprofile.relationship_to_student }}</p>
+            <p><strong>Branch:</strong> {{ parent.branch.name }}</p>
+            <p><strong>Nationality:</strong> {{ parent.parentprofile.nationality }}</p>
+            <p><strong>State:</strong> {{ parent.parentprofile.state }}</p>
+            <p><strong>Address:</strong> {{ parent.parentprofile.address }}</p>
+        </div>
+    </div>
+
+
+    <div style="margin-top: 2rem;">
+        <a href="{% url 'parent_update' pk=parent.pk %}" class="btn btn-primary" style="margin-right: 10px;">Edit Parent</a>
+        <a href="{% url 'parent_list' %}" class="btn btn-secondary">Back to Parent List</a>
+    </div>
+
+</div>
+{% endblock %}

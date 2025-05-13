@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, PermissionsMixin
 from django.conf import settings
 from django.templatetags.static import static
+import datetime
 
 
 
@@ -71,7 +72,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='staff')
-    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female')])
+    gender = models.CharField(max_length=10, choices=[('male', 'Male'), ('female', 'Female'),('others', 'Others')])
     profile_picture = models.ImageField(
         upload_to='profile_pictures/',
         null=True,
@@ -148,13 +149,32 @@ class Message(models.Model):
     is_read = models.BooleanField(default=False)
 
     def __str__(self):
+
         return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
 
     class Meta:
         ordering = ['-timestamp']
 
 
-# models.py
+class ParentProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'parent'},related_name='parentprofile')
+    phone_number = models.CharField(max_length=20)
+    occupation = models.CharField(max_length=100, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    relationship_to_student = models.CharField(max_length=50)
+    date_of_birth = models.DateField(null=True, blank=True)
+    preferred_contact_method = models.CharField(max_length=20, choices=[
+        ('phone', 'Phone'),
+        ('email', 'Email'),
+        ('sms', 'SMS')
+    ])
+    nationality = models.CharField(max_length=50, default="Nigeria")
+    state = models.CharField(max_length=50, default="Lagos")
+    
+
+    def __str__(self):
+        return self.user.get_full_name()
+    
 class StudentProfile(models.Model):
     user = models.OneToOneField(
         CustomUser, 
@@ -165,30 +185,15 @@ class StudentProfile(models.Model):
     admission_number = models.CharField(max_length=50, unique=True)
     current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
     current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
-    date_of_birth = models.DateField(null=True, blank=True)
-    guardian_name = models.CharField(max_length=100)
+    date_of_birth = models.DateField(null=False, blank=False,default='2025-05-05')
     address = models.TextField(blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
+    parent = models.ForeignKey(ParentProfile, on_delete=models.CASCADE, related_name='students')
+    guardian_name = models.CharField(max_length=100,blank=True, null=True)
+    
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.admission_number}"
-
-
-
-class ParentProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'parent'})
-    phone_number = models.CharField(max_length=20)
-    occupation = models.CharField(max_length=100, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
-    children = models.ManyToManyField(CustomUser, related_name='student_parents', limit_choices_to={'role': 'student'})
-
-    def __str__(self):
-        return self.user.get_full_name()
-    
-    def get_children_from_same_branch(self):
-        return self.children.filter(branch=self.user.branch)
-
 
 
 class StaffProfile(models.Model):

@@ -1,10 +1,11 @@
 from django import forms
-from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile,StudentProfile,StudentClass, ClassArm
+from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile,StudentProfile,StudentClass, ClassArm, ParentProfile
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, RegexValidator
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 
 
 
@@ -77,7 +78,7 @@ class StaffCreationForm(UserCreationForm):
     username = forms.CharField(required=True)
     profile_picture = forms.ImageField(required=False)
     gender = forms.ChoiceField(
-        choices=[('male', 'Male'), ('female', 'Female')],
+        choices=[('male', 'Male'), ('female', 'Female'),('others', 'Others')],
         required=True
     )
 
@@ -211,11 +212,16 @@ class StudentCreationForm(forms.ModelForm):
         required=False,
         empty_label="Select a class arm"
     )
+    parent = forms.ModelChoiceField(
+        queryset=ParentProfile.objects.all(),
+        required=True,
+        empty_label="Select a Parent"
+    )
     date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
-    guardian_name = forms.CharField(max_length=100)
+    guardian_name = forms.CharField(max_length=100,required=False, label="Guardian/Child Handler")
     address = forms.CharField(widget=forms.Textarea, required=False)
     phone_number = forms.CharField(max_length=15, required=False, label="Phone Number", help_text="Optional: Include country code.")
-    gender = forms.ChoiceField(choices=[('male', 'Male'), ('female', 'Female')], required=False, label="Gender")
+    gender = forms.ChoiceField(choices=[('male', 'Male'), ('female', 'Female'),('others', 'Others')],required=False, label="Gender")
 
     class Meta:
         model = CustomUser
@@ -232,20 +238,6 @@ class StudentCreationForm(forms.ModelForm):
         self.request = kwargs.pop('request', None)  # Capture request user
         user = self.request.user
         super().__init__(*args, **kwargs)
-
-        # If the user is a student, make certain fields read-only
-        if user and user.role == 'student' and user == self.instance:
-            readonly_fields = [
-                'role',
-                'admission_number',
-                'current_class',
-                'current_class_arm',
-                'date_of_birth',
-            ]
-            for field in readonly_fields:
-                if field in self.fields:
-                    self.fields[field].disabled = True  # Disable the fields for students
-                    self.fields[field].required = False  # Make them not required
 
         for field in self.fields.values():
             field.widget.attrs['class'] = 'form-control'
@@ -270,6 +262,8 @@ class StudentCreationForm(forms.ModelForm):
                 self.fields['admission_number'].initial = profile.admission_number
                 self.fields['current_class'].initial = profile.current_class
                 self.fields['date_of_birth'].initial = profile.date_of_birth
+                self.fields['parent'].initial = profile.parent
+                self.fields['guardian_name'].initial = profile.guardian_name
             except StudentProfile.DoesNotExist:
                 pass
 
@@ -291,10 +285,13 @@ class StudentCreationForm(forms.ModelForm):
                     'current_class',
                     'current_class_arm',
                     'date_of_birth',
+                    'parent',
+                    'guardian_name'
                 ]
                 for field in readonly_fields:
                     if field in self.fields:
                         self.fields[field].disabled = True  # Disable the fields for students
+                        self.fields[field].required = False  # Make them not required
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
@@ -315,23 +312,48 @@ class StudentCreationForm(forms.ModelForm):
         return username
 
     def save(self, commit=True):
-        user = super().save(commit=False)
-        user.role = 'student'
-        user.gender = self.cleaned_data.get('gender')
-        
-        password1 = self.cleaned_data.get("password1")
-        if password1:
-            user.set_password(password1)
-        elif self.instance and self.instance.pk:
-            existing_user = CustomUser.objects.get(pk=self.instance.pk)
-            user.password = existing_user.password
+        with transaction.atomic():
+            # Save the user without committing to DB yet
+            user = super().save(commit=False)
+            user.role = 'student'
+            user.gender = self.cleaned_data.get('gender')
 
-        if 'profile_picture' in self.cleaned_data:
-            user.profile_picture = self.cleaned_data['profile_picture']
-            print("Profile picture saved:", user.profile_picture)
+            # Handle password
+            password1 = self.cleaned_data.get("password1")
+            if password1:
+                user.set_password(password1)
+            elif self.instance and self.instance.pk:
+                existing_user = CustomUser.objects.get(pk=self.instance.pk)
+                user.password = existing_user.password
 
-        if commit:
+            # Handle profile picture
+            if 'profile_picture' in self.cleaned_data:
+                user.profile_picture = self.cleaned_data['profile_picture']
+
+            if not commit:
+                return user
+
+            # Save the user
             user.save()
+
+            # Define the required student profile fields
+            required_fields = [
+                'admission_number', 'current_class', 'current_class_arm',
+                'date_of_birth', 'guardian_name', 'parent',
+                'phone_number', 'address'
+            ]
+
+            # Check for any missing required fields
+            missing_fields = [f for f in required_fields if not self.cleaned_data.get(f)]
+            if missing_fields:
+                raise ValidationError(f"Please fill out all required student profile fields: {', '.join(missing_fields)}")
+
+            # Ensure 'parent' field is provided
+            parent = self.cleaned_data.get('parent')
+            if not parent:
+                raise ValidationError("Parent is a required field and cannot be null.")
+
+            # Get or create the StudentProfile and assign required fields
             profile, created = StudentProfile.objects.get_or_create(user=user)
             profile.admission_number = self.cleaned_data['admission_number']
             profile.current_class = self.cleaned_data['current_class']
@@ -340,10 +362,10 @@ class StudentCreationForm(forms.ModelForm):
             profile.guardian_name = self.cleaned_data['guardian_name']
             profile.address = self.cleaned_data['address']
             profile.phone_number = self.cleaned_data['phone_number']
+            profile.parent = parent  # Make sure parent is assigned properly
             profile.save()
-            
-        return user
 
+            return user
 
 
 class StudentClassForm(forms.ModelForm):
@@ -386,3 +408,149 @@ class ClassArmForm(forms.ModelForm):
         if ClassArm.objects.filter(name=name).exists():  # Check if the arm already exists
             raise forms.ValidationError(f"The class arm '{name}' already exists.")
         return name
+
+
+
+class ParentCreationForm(forms.ModelForm):
+    password1 = forms.CharField(
+        label='Password',
+        widget=forms.PasswordInput(attrs={'placeholder':'Enter password'}),
+        required=False,
+    )
+
+    password2 = forms.CharField(
+        label='Confirm Password',
+        widget=forms.PasswordInput(attrs={'placeholder':'Confirm password'}),
+        required=False
+    )
+    
+    occupation = forms.CharField(max_length=50)
+    date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
+    address = forms.CharField(widget=forms.Textarea, required=False)
+    phone_number = forms.CharField(max_length=15, required=False, label="Phone Number", help_text="Optional: Include country code.")
+    nationality = forms.CharField(max_length=30,label="Country")
+    state = forms.CharField(max_length=30,label="State")
+    relationship_to_student = forms.CharField(max_length=15,  label="Relationship to Student")
+    date_of_birth = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
+    gender = forms.ChoiceField(choices=[('male', 'Male'), ('female', 'Female'),('others', 'Others')],required=False, label="Gender")
+    preferred_contact_method =  forms.ChoiceField(choices=[
+        ('phone', 'Phone'),
+        ('email', 'Email'),
+        ('sms', 'SMS')
+    ])
+    
+    class Meta:
+        model = CustomUser
+        fields = [
+            'email', 'username', 'first_name', 'last_name', 'profile_picture',
+            'branch', 'password1', 'password2', 'phone_number', 'gender'
+        ]
+        widgets = {
+            'email': forms.EmailInput(),
+            'username': forms.TextInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop('request', None)  # Capture request user
+        user = self.request.user
+        super().__init__(*args, **kwargs)
+        
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'
+
+        # Force role to student only and hide it from form
+        self.instance.role = 'parent'
+
+        # Field filtering based on user role
+        if self.request and not self.request.user.is_superuser and hasattr(self.request.user, 'role') and self.request.user.role == 'branch_admin':
+            self.fields['branch'].queryset = self.fields['branch'].queryset.filter(id=self.request.user.branch.id)
+
+        # Pre-fill fields for update if the instance is an existing parent
+        if self.instance and self.instance.pk:
+            self.fields['password1'].required = False
+            self.fields['password2'].required = False
+            self.fields['password1'].widget.attrs['placeholder'] = 'Enter new password (optional)'
+            self.fields['password2'].widget.attrs['placeholder'] = 'Confirm new password'
+
+            try:
+                profile = self.instance.parentprofile
+                self.fields['relationship_to_student'].initial = profile.relationship_to_student
+                self.fields['date_of_birth'].initial = profile.date_of_birth
+                self.fields['nationality'].initial = profile.nationality
+                self.fields['state'].initial = profile.state
+                
+                
+                
+            except ParentProfile.DoesNotExist:
+                pass
+
+        # Set branch choices based on user role
+        if user:
+            if user.role == 'superadmin':
+                self.fields['branch'].queryset = Branch.objects.all()
+
+            elif user.role == 'branch_admin':
+                self.fields['branch'].queryset = Branch.objects.filter(id=user.branch_id)
+                self.fields['branch'].initial = user.branch
+
+            if user.role == 'parent' and user == self.instance:
+                readonly_fields = [
+                    'role',
+                    'branch',
+                    'gender',
+                    'relationship_to_student',
+                    'date_of_birth',
+                ]
+                for field in readonly_fields:
+                    if field in self.fields:
+                        self.fields[field].disabled = True  # Disable the fields for students
+                        self.fields[field].required = False  # Make them not required
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        qs = CustomUser.objects.filter(email=email)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError("This email is already in use.")
+        return email
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        qs = CustomUser.objects.filter(username=username)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise ValidationError("This username is already taken.")
+        return username
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.role = 'parent'
+        user.gender = self.cleaned_data.get('gender')
+        
+        password1 = self.cleaned_data.get("password1")
+        if password1:
+            user.set_password(password1)
+        elif self.instance and self.instance.pk:
+            existing_user = CustomUser.objects.get(pk=self.instance.pk)
+            user.password = existing_user.password
+
+        if 'profile_picture' in self.cleaned_data:
+            user.profile_picture = self.cleaned_data['profile_picture']
+            print("Profile picture saved:", user.profile_picture)
+
+        if commit:
+            user.save()
+            profile, created = ParentProfile.objects.get_or_create(user=user)
+            profile.date_of_birth = self.cleaned_data['date_of_birth']
+            profile.address = self.cleaned_data['address']
+            profile.phone_number = self.cleaned_data['phone_number']
+            profile.occupation = self.cleaned_data['occupation']
+            profile.preferred_contact_method = self.cleaned_data['preferred_contact_method']
+            profile.relationship_to_student = self.cleaned_data['relationship_to_student']
+            profile.nationality = self.cleaned_data['nationality']
+            profile.state = self.cleaned_data['state']
+            profile.save()
+            
+        return user
