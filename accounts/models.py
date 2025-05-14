@@ -3,6 +3,7 @@ from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, Permiss
 from django.conf import settings
 from django.templatetags.static import static
 import datetime
+from datetime import date
 
 
 
@@ -175,9 +176,10 @@ class ParentProfile(models.Model):
     def __str__(self):
         return self.user.get_full_name()
     
+
 class StudentProfile(models.Model):
     user = models.OneToOneField(
-        CustomUser, 
+        'CustomUser', 
         on_delete=models.CASCADE, 
         limit_choices_to={'role': 'student'},
         related_name='studentprofile'
@@ -185,17 +187,15 @@ class StudentProfile(models.Model):
     admission_number = models.CharField(max_length=50, unique=True)
     current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
     current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
-    date_of_birth = models.DateField(null=False, blank=False,default='2025-05-05')
+    date_of_birth = models.DateField(null=False, blank=False, default=date(2025, 5, 5))
     address = models.TextField(blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
-    parent = models.ForeignKey(ParentProfile, on_delete=models.CASCADE, related_name='students')
-    guardian_name = models.CharField(max_length=100,blank=True, null=True)
-    
+    parent = models.ForeignKey('ParentProfile', on_delete=models.CASCADE, related_name='students')
+    guardian_name = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.admission_number}"
-
-
+        return self.admission_number
+    
 class StaffProfile(models.Model):
     user = models.OneToOneField(
         CustomUser,
