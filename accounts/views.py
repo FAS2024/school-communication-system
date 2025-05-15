@@ -10,7 +10,8 @@ from .forms import (
         StudentCreationForm,
         StudentClassForm,
         ClassArmForm,
-        ParentCreationForm
+        ParentCreationForm,
+        StudentProfileForm,
     )
 from .models import (
         CustomUser, 
@@ -37,7 +38,9 @@ from django.http import HttpResponseRedirect
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-
+from . import utility
+from django.db import transaction
+from django.core.exceptions import PermissionDenied
 
 User = get_user_model()
 
@@ -535,169 +538,139 @@ class BranchDeleteView(DeleteView):
         return HttpResponseRedirect(self.success_url)
 
 
-def is_student(user):
-    return user.is_authenticated and user.role == 'student'
-
-
-# class StudentCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-#     model = CustomUser
-#     form_class = StudentCreationForm
-#     template_name = 'student_form.html'  # Update with your actual template
-#     success_url = reverse_lazy('student_list')  # Update with your URL name
-
-#     def test_func(self):
-#         return self.request.user.role in ['superadmin', 'branch_admin']
-
-#     def get_form_kwargs(self):
-#         kwargs = super().get_form_kwargs()
-#         kwargs['request'] = self.request  # Pass request to the form for access to user and branch
-#         return kwargs
-
-#     def form_valid(self, form):
-#         response = super().form_valid(form)
-#         messages.success(self.request, "Student created successfully.")
-#         return response
-
-#     def form_invalid(self, form):
-#         messages.error(self.request, "There was an error creating the student. Please check the form.")
-#         return super().form_invalid(form)
-
-
-# @method_decorator(login_required, name='dispatch')
-# class StudentUpdateView(View):
-#     def get(self, request, pk):
-#         user = get_object_or_404(CustomUser, pk=pk, role='student')
-
-#         # Access control for branch_admin: ensure they only edit students from their branch
-#         if request.user.role == 'branch_admin' and user.branch != request.user.branch:
-#             messages.error(request, "You do not have permission to edit this student.")
-#             return redirect('student_list')
-
-#         # Access control for regular students: they can only edit their own profile
-#         if request.user.role == 'student' and request.user.pk != user.pk:
-#             messages.error(request, "You can only edit your own profile.")
-#             return redirect('student_dashboard')
-
-#         # Populate the form with existing data for editing
-#         form = StudentCreationForm(instance=user, request=request, initial={
-#             'admission_number': getattr(user.studentprofile, 'admission_number', ''),
-#             'current_class': getattr(user.studentprofile, 'current_class', ''),
-#             'date_of_birth': getattr(user.studentprofile, 'date_of_birth', ''),
-#             'gender': getattr(user.studentprofile, 'gender', ''),  # Gender already in CustomUser
-#             'guardian_name': getattr(user.studentprofile, 'guardian_name', ''),
-#             'address': getattr(user.studentprofile, 'address', ''),
-#             'phone_number': getattr(user.studentprofile, 'phone_number', ''), 
-#             'parent': getattr(user.studentprofile, 'parent', ''), 
-#         })
-#         return render(request, 'student_form.html', {'form': form, 'is_update': True})
-
-#     def post(self, request, pk):
-#         user = get_object_or_404(CustomUser, pk=pk, role='student')
-
-#         # Access control for branch_admin: ensure they only edit students from their branch
-#         if request.user.role == 'branch_admin' and user.branch != request.user.branch:
-#             messages.error(request, "You do not have permission to edit this student.")
-#             return redirect('student_list')
-
-#         # Access control for regular students: they can only edit their own profile
-#         if request.user.role == 'student' and request.user.pk != user.pk:
-#             messages.error(request, "You can only edit your own profile.")
-#             return redirect('student_dashboard')
-
-#         form = StudentCreationForm(request.POST, request.FILES, instance=user, request=request)
+# @login_required
+# @user_passes_test(utility.is_branchadmin_or_superadmin)
+# def create_student(request):
+#     if request.method == 'POST':
+#         form = StudentCreationForm(request.POST, request.FILES, request=request)
 #         if form.is_valid():
-#             student = form.save()
-#             full_name = f"{student.first_name} {student.last_name}"
-#             messages.success(request, f"Student '{full_name}' profile updated successfully.")
-#             return redirect('student_detail', pk=user.pk)
-#         messages.error(request, "Please correct the errors below.")
-#         return render(request, 'student_form.html', {'form': form, 'is_update': True})
+#             form.save()
+#             messages.success(request, "Student created successfully.")
+#             return redirect('student_list')
+#         else:
+#             messages.error(request, "Please correct the errors below.")
+#     else:
+#         form = StudentCreationForm(request=request)
+
+#     context = {
+#         'form': form,
+#         'title': 'Create New Student'
+#     }
+#     return render(request, 'student_form.html', context)
 
 
 
-# Custom decorator to check if the user is either a branchadmin or superadmin
-def is_branchadmin_or_superadmin(user):
-    return user.role in ['branchadmin', 'superadmin']
+# @login_required
+# @user_passes_test(utility.is_branchadmin_or_superadmin)
+# def update_student(request, student_id):
+#     student = get_object_or_404(StudentProfile, id=student_id)
+
+#     if request.user.role == 'branch_admin' and student.user.branch != request.user.branch:
+#         messages.error(request, "You do not have permission to edit this student.")
+#         return redirect('student_list')
+
+#     if request.method == 'POST':
+#         form = StudentCreationForm(request.POST, request.FILES, instance=student, request=request)
+#         if form.is_valid():
+#             form.save()
+#             messages.success(request, "Student updated successfully.")
+#             return redirect('student_list')
+#         else:
+#             messages.error(request, "Please correct the errors below.")
+#     else:
+#         form = StudentCreationForm(instance=student, request=request)
+
+#     context = {
+#         'form': form,
+#         'title': 'Update Student'
+#     }
+#     return render(request, 'student_form.html', context)
 
 
 
+@login_required
+@transaction.atomic
+def create_student(request):
+    # Only superadmin and branch_admin can create students
+    if request.user.role not in ['superadmin', 'branch_admin']:
+        raise PermissionDenied("You do not have permission to create students.")
 
-class StudentCreateView(LoginRequiredMixin, CreateView):
-    """
-    View to create a new student's profile. Only accessible to superadmin or branchadmin.
-    """
-    model = StudentProfile
-    form_class = StudentCreationForm
-    template_name = 'student_form.html'
-    
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.role not in ['superadmin', 'branchadmin']:
-            return HttpResponseForbidden("You do not have permission to create students.")
-        return super().dispatch(request, *args, **kwargs)
+    if request.method == 'POST':
+        user_form = StudentCreationForm(request.POST, request.FILES, user=request.user)
+        profile_form = StudentProfileForm(request.POST, user=request.user)
 
-    def get_form_kwargs(self):
-        """
-        Add the current user to the form to filter data based on the user's role.
-        """
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
+        if user_form.is_valid() and profile_form.is_valid():
+            user = user_form.save(commit=False)
+            parent = profile_form.cleaned_data['parent']
+            user.branch = parent.user.branch  # Set branch from parent's branch
+            user.save()
 
-    def form_valid(self, form):
-        """
-        Handle successful form submission for create.
-        """
-        messages.success(self.request, 'Student created successfully.')
-        return super().form_valid(form)
+            profile = profile_form.save(commit=False)
+            profile.user = user
+            profile.save()
 
-    def get_success_url(self):
-        """
-        Redirect to the student's detail page after successful creation.
-        """
-        return reverse_lazy('student_detail', kwargs={'student_id': self.object.id})
+            return redirect('student_list')
+    else:
+        user_form = StudentCreationForm(user=request.user)
+        profile_form = StudentProfileForm(user=request.user)
+
+    return render(request, 'student_form.html', {
+        'user_form': user_form,
+        'profile_form': profile_form,
+    })
 
 
-class StudentUpdateView(LoginRequiredMixin, UpdateView):
-    """
-    View to update a student's profile. Only accessible to superadmin, branchadmin, or the student themselves.
-    """
-    model = StudentProfile
-    form_class = StudentCreationForm
-    template_name = 'student_form.html'
-    
-    def dispatch(self, request, *args, **kwargs):
-        """
-        Ensure that only superadmin, branchadmin, or the student themselves can update their profile.
-        """
-        student = self.get_object()
-        if request.user.role not in ['superadmin', 'branchadmin'] and request.user != student.user:
-            return HttpResponseForbidden("You do not have permission to update this student's profile.")
-        return super().dispatch(request, *args, **kwargs)
+@login_required
+@transaction.atomic
+def update_student(request, student_id):
+    user_instance = get_object_or_404(CustomUser, pk=student_id, role='student')
+    profile_instance = get_object_or_404(StudentProfile, user=user_instance)
 
-    def get_form_kwargs(self):
-        """
-        Add the current user to the form to filter data based on the user's role.
-        """
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        return kwargs
+    # Permissions:
+    if request.user.role in ['superadmin', 'branch_admin']:
+        # Admins can update any student (with branch filtering if needed)
+        pass
+    elif request.user.role == 'student':
+        # Students can only update their own profile
+        if request.user != user_instance:
+            raise PermissionDenied("You cannot edit other students.")
+    else:
+        raise PermissionDenied("You do not have permission to update students.")
 
-    def form_valid(self, form):
-        """
-        Handle successful form submission for update.
-        """
-        messages.success(self.request, 'Student profile updated successfully.')
-        return super().form_valid(form)
+    if request.method == 'POST':
+        user_form = StudentCreationForm(
+            request.POST, request.FILES,
+            instance=user_instance,
+            user=request.user
+        )
+        profile_form = StudentProfileForm(
+            request.POST,
+            instance=profile_instance,
+            user=request.user
+        )
 
-    def get_success_url(self):
-        """
-        Redirect to the student's detail page after successful update.
-        """
-        return reverse_lazy('student_detail', kwargs={'student_id': self.object.id})
-    
-    
+        if user_form.is_valid() and profile_form.is_valid():
+            user = user_form.save(commit=False)
+            parent = profile_form.cleaned_data['parent']
+            user.branch = parent.user.branch  # Always update branch from parent
+            user.save()
 
-@method_decorator([login_required, user_passes_test(is_branchadmin_or_superadmin)], name='dispatch')
+            profile = profile_form.save(commit=False)
+            profile.user = user
+            profile.save()
+
+            return redirect('student_detail', student_id=user.pk)
+    else:
+        user_form = StudentCreationForm(instance=user_instance, user=request.user)
+        profile_form = StudentProfileForm(instance=profile_instance, user=request.user)
+
+    return render(request, 'student_form.html', {
+        'user_form': user_form,
+        'profile_form': profile_form,
+    })
+
+
+@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
 class StudentListView(ListView):
     model = StudentProfile
     template_name = 'student_list.html'
@@ -713,7 +686,7 @@ class StudentListView(ListView):
     
     
 
-@method_decorator([login_required, user_passes_test(is_branchadmin_or_superadmin)], name='dispatch')
+@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
 class StudentDetailView(DetailView):
     model = StudentProfile
     template_name = 'student_detail.html'
@@ -726,7 +699,7 @@ class StudentDetailView(DetailView):
         return StudentProfile.objects.get(id=self.kwargs['pk'])
 
 
-@method_decorator([login_required, user_passes_test(is_branchadmin_or_superadmin)], name='dispatch')
+@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
 class StudentDeleteView(DeleteView):
     model = StudentProfile
     template_name = 'student_confirm_delete.html'

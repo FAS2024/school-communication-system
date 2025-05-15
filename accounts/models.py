@@ -187,7 +187,7 @@ class StudentProfile(models.Model):
     admission_number = models.CharField(max_length=50, unique=True)
     current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
     current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
-    date_of_birth = models.DateField(null=False, blank=False, default=date(2025, 5, 5))
+    date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     parent = models.ForeignKey('ParentProfile', on_delete=models.CASCADE, related_name='students')

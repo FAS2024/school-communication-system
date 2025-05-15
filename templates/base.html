@@ -196,7 +196,7 @@
               <!-- BRANCH ADMIN MENU -->
               {% elif request.user.role == 'branch_admin' %}
                 <li class="nav-item">
-                  <a href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                  <a href="{% url 'branch_admin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
