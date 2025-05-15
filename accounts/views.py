@@ -588,6 +588,11 @@ class BranchDeleteView(DeleteView):
 
 
 
+def is_branch_or_superadmin(user):
+    return user.is_authenticated and (user.role == 'superadmin' or user.role == 'branch_admin')
+
+
+
 @login_required
 @transaction.atomic
 def create_student(request):
@@ -670,48 +675,57 @@ def update_student(request, student_id):
     })
 
 
-@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
-class StudentListView(ListView):
-    model = StudentProfile
-    template_name = 'student_list.html'
-    context_object_name = 'students'
-
-    def get_queryset(self):
-        """
-        Filter students based on the branch of the user.
-        """
-        if self.request.user.role == 'branchadmin':
-            return StudentProfile.objects.filter(user__branch=self.request.user.branch)
-        return StudentProfile.objects.all()  # Superadmin can view all students
-    
-    
-
-@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
-class StudentDetailView(DetailView):
-    model = StudentProfile
-    template_name = 'student_detail.html'
-    context_object_name = 'student'
-
-    def get_object(self, queryset=None):
-        """
-        Get the student profile based on the primary key (pk).
-        """
-        return StudentProfile.objects.get(id=self.kwargs['pk'])
+@login_required
+@user_passes_test(is_branch_or_superadmin)
+def student_list(request):
+    user = request.user
+    if user.role == 'superadmin':
+        students = CustomUser.objects.filter(role='student')
+    else:  # branch_admin
+        students = CustomUser.objects.filter(role='student', branch=user.branch)
+    return render(request, 'student_list.html', {'students': students})
 
 
-@method_decorator([login_required, user_passes_test(utility.is_branchadmin_or_superadmin)], name='dispatch')
-class StudentDeleteView(DeleteView):
-    model = StudentProfile
-    template_name = 'student_confirm_delete.html'
-    context_object_name = 'student'
-    success_url = reverse_lazy('student_list')
+@login_required
+def student_detail(request, pk):
+    user = request.user
+    student = get_object_or_404(CustomUser, pk=pk, role='student')
 
-    def get_object(self, queryset=None):
-        """
-        Get the student profile to be deleted.
-        """
-        return StudentProfile.objects.get(id=self.kwargs['pk'])
-    
+    # Access control
+    if user.role == 'superadmin':
+        pass  # can view all
+    elif user.role == 'branch_admin':
+        if student.branch != user.branch:
+            return HttpResponseForbidden("You do not have permission to view this student.")
+    elif user.role == 'student':
+        if user != student:
+            return HttpResponseForbidden("You can only view your own profile.")
+    else:
+        return HttpResponseForbidden("You do not have permission to view this student.")
+
+    return render(request, 'student_detail.html', {'student': student})
+
+
+
+@login_required
+@user_passes_test(is_branch_or_superadmin)
+def student_delete(request, pk):
+    user = request.user
+    student = get_object_or_404(CustomUser, pk=pk, role='student')
+
+    # branch_admin can only delete students in their branch
+    if user.role == 'branch_admin' and student.branch != user.branch:
+        messages.error(request, "You don't have permission to delete this student.")
+        return redirect('student_list')
+
+    if request.method == 'POST':
+        student.delete()
+        messages.success(request, "Student deleted successfully.")
+        return redirect('student_list')
+
+    return render(request, 'student_confirm_delete.html', {'student': student})
+
+
 
 @login_required
 def student_class_create(request):
