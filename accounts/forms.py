@@ -651,11 +651,6 @@ class ClassArmForm(forms.ModelForm):
 #                         self.fields[field].disabled = True
 
 
-from django import forms
-from django.contrib.auth.forms import UserCreationForm
-from django.core.exceptions import ValidationError
-from .models import CustomUser, StudentProfile, ParentProfile, Branch
-
 class StudentCreationForm(UserCreationForm):
     password1 = forms.CharField(
         widget=forms.PasswordInput(),
@@ -742,6 +737,7 @@ class StudentCreationForm(UserCreationForm):
 
 
 class StudentProfileForm(forms.ModelForm):
+    parent = forms.ModelChoiceField(queryset=ParentProfile.objects.none(), required=True)
     class Meta:
         model = StudentProfile
         fields = [
@@ -761,11 +757,11 @@ class StudentProfileForm(forms.ModelForm):
 
         if user:
             if user.role == 'branch_admin':
-                # Show only parents from this branch
                 self.fields['parent'].queryset = ParentProfile.objects.filter(user__branch=user.branch)
             elif user.role == 'superadmin':
-                # Show all parents
                 self.fields['parent'].queryset = ParentProfile.objects.all()
+            else:
+                self.fields['parent'].queryset = ParentProfile.objects.none()
 
         if user and user.role == 'student' and user == getattr(self.instance, 'user', None):
             readonly_fields = [
