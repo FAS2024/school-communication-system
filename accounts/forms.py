@@ -1,5 +1,4 @@
 from django import forms
-from .models import CustomUser, TeachingPosition, NonTeachingPosition, Branch, StaffProfile,StudentProfile,StudentClass, ClassArm, ParentProfile
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, RegexValidator
@@ -8,6 +7,22 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from django.contrib.auth import password_validation
 from django.contrib.auth import get_user_model
+
+
+from django.forms import inlineformset_factory
+from .models import (
+    Communication, CommunicationAttachment,
+    CommunicationRecipient, CommunicationTargetGroup,
+    CustomUser, TeachingPosition, NonTeachingPosition, 
+    Branch, StaffProfile,StudentProfile,StudentClass, 
+    ClassArm, ParentProfile, CommunicationComment
+)
+        
+from django.forms.widgets import ClearableFileInput
+
+from django.contrib.auth import get_user_model
+
+
 
 
 class UserRegistrationForm(forms.ModelForm):
@@ -686,3 +701,101 @@ class StudentProfileForm(forms.ModelForm):
             for field in readonly_fields:
                 if field in self.fields:
                     self.fields[field].disabled = True
+
+
+
+
+CustomUser = get_user_model()
+class CommentForm(forms.ModelForm):
+    class Meta:
+        model = CommunicationComment
+        fields = ['comment']
+
+
+
+class CommunicationForm(forms.ModelForm):
+    class Meta:
+        model = Communication
+        fields = ['message_type', 'title', 'body', 'is_draft', 'scheduled_time']
+        widgets = {
+            'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        }
+        
+class MultiFileInput(ClearableFileInput):
+    allow_multiple_selected = True
+
+    def value_from_datadict(self, data, files, name):
+        # Return a list of uploaded files (if any)
+        upload = files.getlist(name)
+        return upload
+
+class CommunicationAttachmentForm(forms.Form):
+    files = forms.FileField(
+        widget=MultiFileInput(attrs={'multiple': True}),
+        required=False,
+        label='Attach files'
+    )
+
+
+class CommunicationRecipientForm(forms.ModelForm):
+    class Meta:
+        model = CommunicationRecipient
+        fields = ['recipient']
+
+
+
+from django.forms.widgets import CheckboxSelectMultiple
+class CommunicationTargetGroupForm(forms.ModelForm):
+    class Meta:
+        model = CommunicationTargetGroup
+        fields = [
+            'role',
+            'branch',
+            'staff_type',
+            'teaching_positions',
+            'non_teaching_positions',
+            'student_class',
+            'class_arm',
+        ]
+        widgets = {
+            'teaching_positions': CheckboxSelectMultiple(),
+            'non_teaching_positions': CheckboxSelectMultiple(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['staff_type'].widget.attrs.update({'class': 'staff-field'})
+        
+        # Initially hide both positions with a CSS class 'hidden'
+        self.fields['teaching_positions'].widget.attrs.update({'class': 'staff-field hidden'})
+        self.fields['non_teaching_positions'].widget.attrs.update({'class': 'staff-field hidden'})
+        
+        self.fields['student_class'].widget.attrs.update({'class': 'student-field'})
+        self.fields['class_arm'].widget.attrs.update({'class': 'student-field'})
+
+        self.fields['role'].label = "User Role"
+        self.fields['branch'].label = "Branch (Required)"
+
+        self.fields['teaching_positions'].queryset = TeachingPosition.objects.all().order_by('name')
+        self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all().order_by('name')
+        self.fields['student_class'].queryset = StudentClass.objects.all().order_by('name')
+        self.fields['class_arm'].queryset = ClassArm.objects.all().order_by('name')
+
+
+# IMPORTANT: inlineformset_factory expects a ModelForm, not a regular Form.
+# Since CommunicationAttachmentForm is a plain Form (to handle multiple files),
+# inlineformset_factory cannot use it directly.
+# So, if you want to use inline formsets for attachments, define a ModelForm for CommunicationAttachment like this:
+
+class CommunicationAttachmentModelForm(forms.ModelForm):
+    class Meta:
+        model = CommunicationAttachment
+        fields = ['file']
+
+AttachmentFormSet = inlineformset_factory(
+    Communication,
+    CommunicationAttachment,
+    form=CommunicationAttachmentModelForm,
+    extra=2,
+    can_delete=True
+)

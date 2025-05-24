@@ -76,5 +76,18 @@ urlpatterns = [
     path('list/', views.class_arm_list, name='class_arm_list'),
     
     
+    
+    # Communication
+    # path('communications/create/', views.CommunicationCreateView.as_view(), name='communication-create'),
+    # path('communications/create/ajax/', views.CommunicationCreateAjaxView.as_view(), name='communication-create-ajax'),
+    
+    path('inbox/', views.inbox, name='inbox'),
+    path('sent/', views.sent_messages, name='sent_messages'),
+    path('message/<int:pk>/', views.message_detail, name='message_detail'),
+    path('send-message/', views.send_message, name='send_message'),
+    path('ajax/get-target-users/', views.get_target_users, name='get_target_users'),
+    path('message/<int:pk>/comment/', views.add_comment, name='add_comment'),
+    path('message/<int:pk>/delete_received/', views.delete_received_message, name='delete_received_message'),
+    path('message/<int:pk>/delete_sent/', views.delete_sent_message, name='delete_sent_message'),
 ]
 

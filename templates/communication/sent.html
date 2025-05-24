@@ -1,0 +1,14 @@
+<h1>Sent Messages</h1>
+<ul>
+  {% for msg in sent_messages %}
+    <li>
+      <a href="{% url 'messaging:message_detail' msg.id %}">{{ msg.title }}</a> - {{ msg.created_at }}
+      <form method="post" action="{% url 'messaging:delete_sent_message' msg.id %}">
+        {% csrf_token %}
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+  {% empty %}
+    <li>No sent messages.</li>
+  {% endfor %}
+</ul>
