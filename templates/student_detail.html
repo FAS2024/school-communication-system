@@ -1,24 +1,41 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-  <h2>Student Profile</h2>
+<div class="student-detail-container">
+    <h2>Student Profile</h2>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+    <div class="student-profile-card" style="display: flex; align-items: center; gap: 2rem; margin-top: 2rem;">
+        <!-- Profile Picture -->
+        <div class="profile-pic-container">
+            {% if student.profile_picture %}
+                <img src="{{ student.profile_picture.url }}" alt="{{ student.first_name }}'s Profile Picture"
+                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
+            {% else %}
+                <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile"
+                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
+            {% endif %}
+        </div>
 
-  <ul class="list-group">
-    <li class="list-group-item"><strong>Full Name:</strong> {{ student.get_full_name }}</li>
-    <li class="list-group-item"><strong>Admission Number:</strong> {{ student.admission_number }}</li>
-    <li class="list-group-item"><strong>Date of Birth:</strong> {{ student.date_of_birth }}</li>
-    <li class="list-group-item"><strong>Class:</strong> {{ student.current_class }} {{ student.current_class_arm }}</li>
-    <li class="list-group-item"><strong>Branch:</strong> {{ student.branch }}</li>
-    <li class="list-group-item"><strong>Guardian Name:</strong> {{ student.guardian_name }}</li>
-    <li class="list-group-item"><strong>Parent:</strong> {{ student.parent }}</li>
-    <li class="list-group-item"><strong>Email:</strong> {{ student.email }}</li>
-  </ul>
+        <!-- Student Details -->
+        <div class="student-info">
+            <p><strong>Full Name:</strong> {{ student.first_name }} {{ student.last_name }}</p>
+            <p><strong>Email:</strong> {{ student.email }}</p>
+            <p><strong>Phone Number:</strong> {{ student.studentprofile.phone_number }}</p>
+            <p><strong>Date of Birth:</strong> {{ student.studentprofile.date_of_birth }}</p>
+            <p><strong>Gender:</strong> {{ student.get_gender_display }}</p>
+            <p><strong>Admission Number:</strong> {{ student.studentprofile.admission_number }}</p>
+            <p><strong>Class:</strong> {{ student.studentprofile.current_class }}</p>
+            <p><strong>Branch:</strong> {{ student.branch.name }}</p>
+            <p><strong>Nationality:</strong> {{ student.studentprofile.nationality }}</p>
+            <p><strong>State:</strong> {{ student.studentprofile.state }}</p>
+            <p><strong>Address:</strong> {{ student.studentprofile.address }}</p>
+        </div>
+    </div>
 
-  <a href="{% url 'student_list' %}" class="btn btn-secondary mt-3">Back to List</a>
+    <div style="margin-top: 2rem;">
+        <a href="{% url 'student_update' pk=student.pk %}" class="btn btn-primary" style="margin-right: 10px;">Edit Student</a>
+        <a href="{% url 'student_list' %}" class="btn btn-secondary">Back to Student List</a>
+    </div>
+</div>
 {% endblock %}

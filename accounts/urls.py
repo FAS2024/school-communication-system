@@ -39,8 +39,9 @@ urlpatterns = [
     
     # Students
     path('student/create/', views.create_student, name='student_create'),
+    # path('student/update/<int:student_id>/', views.update_student, name='student_update'),
     path('student/update/<int:pk>/', views.update_student, name='student_update'),
-    path('students/', views.student_list, name='student_list'),
+    path('students/', views.StudentListView.as_view(), name='student_list'),
     path('students/<int:pk>/', views.student_detail, name='student_detail'),
     path('students/<int:pk>/delete/', views.student_delete, name='student_delete'),
     

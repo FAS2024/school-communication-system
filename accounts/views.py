@@ -538,55 +538,6 @@ class BranchDeleteView(DeleteView):
         return HttpResponseRedirect(self.success_url)
 
 
-# @login_required
-# @user_passes_test(utility.is_branchadmin_or_superadmin)
-# def create_student(request):
-#     if request.method == 'POST':
-#         form = StudentCreationForm(request.POST, request.FILES, request=request)
-#         if form.is_valid():
-#             form.save()
-#             messages.success(request, "Student created successfully.")
-#             return redirect('student_list')
-#         else:
-#             messages.error(request, "Please correct the errors below.")
-#     else:
-#         form = StudentCreationForm(request=request)
-
-#     context = {
-#         'form': form,
-#         'title': 'Create New Student'
-#     }
-#     return render(request, 'student_form.html', context)
-
-
-
-# @login_required
-# @user_passes_test(utility.is_branchadmin_or_superadmin)
-# def update_student(request, student_id):
-#     student = get_object_or_404(StudentProfile, id=student_id)
-
-#     if request.user.role == 'branch_admin' and student.user.branch != request.user.branch:
-#         messages.error(request, "You do not have permission to edit this student.")
-#         return redirect('student_list')
-
-#     if request.method == 'POST':
-#         form = StudentCreationForm(request.POST, request.FILES, instance=student, request=request)
-#         if form.is_valid():
-#             form.save()
-#             messages.success(request, "Student updated successfully.")
-#             return redirect('student_list')
-#         else:
-#             messages.error(request, "Please correct the errors below.")
-#     else:
-#         form = StudentCreationForm(instance=student, request=request)
-
-#     context = {
-#         'form': form,
-#         'title': 'Update Student'
-#     }
-#     return render(request, 'student_form.html', context)
-
-
 
 def is_branch_or_superadmin(user):
     return user.is_authenticated and (user.role == 'superadmin' or user.role == 'branch_admin')
@@ -627,8 +578,8 @@ def create_student(request):
 
 @login_required
 @transaction.atomic
-def update_student(request, student_id):
-    user_instance = get_object_or_404(CustomUser, pk=student_id, role='student')
+def update_student(request, pk):
+    user_instance = get_object_or_404(CustomUser, pk=pk, role='student')
     profile_instance = get_object_or_404(StudentProfile, user=user_instance)
 
     # Permissions:
@@ -675,15 +626,26 @@ def update_student(request, student_id):
     })
 
 
-@login_required
-@user_passes_test(is_branch_or_superadmin)
-def student_list(request):
-    user = request.user
-    if user.role == 'superadmin':
-        students = CustomUser.objects.filter(role='student')
-    else:  # branch_admin
-        students = CustomUser.objects.filter(role='student', branch=user.branch)
-    return render(request, 'student_list.html', {'students': students})
+@method_decorator(login_required, name='dispatch')
+class StudentListView(ListView):
+    model = CustomUser
+    template_name = 'student_list.html'  # Adjust if your template is in a subfolder
+    context_object_name = 'students'
+    paginate_by = 10
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'superadmin':
+            return CustomUser.objects.filter(role='student').order_by('last_name', 'first_name')
+        else:
+            return CustomUser.objects.filter(role='student', branch=user.branch).order_by('last_name', 'first_name')
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.role not in ['superadmin', 'branch_admin']:
+            messages.error(request, "You do not have permission to view this page.")
+            return redirect('dashboard')  # or wherever you want to redirect unauthorized users
+        return super().dispatch(request, *args, **kwargs)
+
 
 
 @login_required
