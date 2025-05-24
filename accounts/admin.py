@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Branch, TeachingPosition, NonTeachingPosition, StaffProfile,StudentClass,ClassArm
+from .models import CustomUser, Branch, TeachingPosition, NonTeachingPosition, StaffProfile,StudentClass,ClassArm, StudentProfile, ParentProfile
 from django.utils.html import format_html  # Import format_html
 
 
@@ -53,3 +53,5 @@ admin.site.register(Branch)
 admin.site.register(TeachingPosition)
 admin.site.register(NonTeachingPosition)
 admin.site.register(StaffProfile)
+admin.site.register(StudentProfile)
+admin.site.register(ParentProfile)

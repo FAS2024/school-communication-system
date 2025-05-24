@@ -126,7 +126,7 @@
                 <li class="nav-item">
                   <a href="{% url 'superadmin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
                 </li>
-                  <li class="nav-item">
+                <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#branchMenu" role="button" aria-expanded="false" aria-controls="branchMenu">
                     <i class="fas fa-user-graduate"></i><p>Branch Management</p>
                   </a>
@@ -160,8 +160,7 @@
                     <i class="fas fa-user-tie"></i><p>Parent Management</p>
                   </a>
                   <ul class="collapse" id="parentMenu">
-                    <li><a href="#">Add Parent</a></li>
-                    <li><a href="#">Parent List</a></li>
+                    <li><a href="{% url 'parent_list' %}">Parent List</a></li>
                     <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
@@ -175,13 +174,29 @@
                   </ul>
                 </li>
                 <li class="nav-item">
+                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+                    <i class="fas fa-user-tie"></i><p>Messages</p>
+                  </a>
+                  <ul class="collapse" id="messages">
+                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
+                    <li><a href="">Received from Staff(INBOX)</a></li>
+                    <li><a href="">Sent to Student(OUTBOX)</a></li>
+                    <li><a href="">Received from Student(INBOX)</a></li>
+                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
+                    <li><a href="">Received from Parent(INBOX)</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
                   <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
                 </li>
             
               <!-- BRANCH ADMIN MENU -->
               {% elif request.user.role == 'branch_admin' %}
                 <li class="nav-item">
-                  <a href="{% url 'dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                  <a href="{% url 'branch_admin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
                 </li>
                 <li class="nav-item">
                   <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
@@ -201,12 +216,11 @@
                   </ul>
                 </li>
                 <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="parentMenu">
+                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
                     <i class="fas fa-user-tie"></i><p>Parent Management</p>
                   </a>
                   <ul class="collapse" id="parentMenu">
-                    <li><a href="#">Add Parent</a></li>
-                    <li><a href="#">Parent List</a></li>
+                    <li><a href="{% url 'parent_list' %}">Parent List</a></li>
                     <li><a href="#">Attendance</a></li>
                   </ul>
                 </li>
@@ -222,11 +236,44 @@
                 <li class="nav-item">
                   <a href="#"><i class="fas fa-calendar-alt"></i><p>Class Timetables</p></a>
                 </li>
+                <li class="nav-item">
+                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
+                </li>
+
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+                    <i class="fas fa-user-tie"></i><p>Messages</p>
+                  </a>
+                  <ul class="collapse" id="messages">
+                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
+                    <li><a href="">Received from Staff(INBOX)</a></li>
+                    <li><a href="">Sent to Student(OUTBOX)</a></li>
+                    <li><a href="">Received from Student(INBOX)</a></li>
+                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
+                    <li><a href="">Received from Parent(INBOX)</a></li>
+                  </ul>
+                </li>
             
               <!-- STAFF MENU -->
               {% elif request.user.role == 'staff' %}
                 <li class="nav-item">
                   <a href="{% url 'staff_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
+                </li>
+                <li class="nav-item">
+                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+                    <i class="fas fa-user-tie"></i><p>Messages</p>
+                  </a>
+                  <ul class="collapse" id="messages">
+                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
+                    <li><a href="">Received from Staff(INBOX)</a></li>
+                    <li><a href="">Sent to Student(OUTBOX)</a></li>
+                    <li><a href="">Received from Student(INBOX)</a></li>
+                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
+                    <li><a href="">Received from Parent(INBOX)</a></li>
+                  </ul>
                 </li>
             
                 {% if request.user.staff_type == 'teaching' or request.user.staff_type == 'both' %}
@@ -237,6 +284,10 @@
                     <ul class="collapse" id="teachingMenu">
                       <li><a href="#">My Classes</a></li>
                       <li><a href="#">Attendance</a></li>
+                      <li><a href="#">Assignment</a></li>
+                      <li><a href="#">Lesson Plans</a></li>
+                      <li><a href="#">Resources</a></li>
+                      <li><a href="#">Calendar</a></li>
                       <li><a href="#">Results</a></li>
                     </ul>
                   </li>
@@ -253,6 +304,8 @@
                     </ul>
                   </li>
                 {% endif %}
+
+
               
               <!-- STUDENT MENU -->
               {% elif request.user.role == 'student' %}
@@ -269,6 +322,18 @@
                   <a href="#"><i class="fas fa-calendar-check"></i><p>Exam Schedules</p></a>
                 </li>
                 <li class="nav-item">
+                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+                    <i class="fas fa-user-tie"></i><p>Messages</p>
+                  </a>
+                  <ul class="collapse" id="messages">
+                    <li><a href="">Sent to School(OUTBOX)</a></li>
+                    <li><a href="">Received from school(INBOX)</a></li>
+                  </ul>
+                </li>
+                <li class="nav-item">
                   <a href="#"><i class="fas fa-cogs"></i><p>Settings</p></a>
                 </li>
             
@@ -281,10 +346,23 @@
                   <a href="#"><i class="fas fa-user-graduate"></i><p>My Children</p></a>
                 </li>
                 <li class="nav-item">
-                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Upcoming Events</p></a>
+                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Events</p></a>
                 </li>
                 <li class="nav-item">
                   <a href="#"><i class="fas fa-bell"></i><p>Notifications</p></a>
+                </li>
+                <li class="nav-item">
+                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+                    <i class="fas fa-user-tie"></i><p>Messages</p>
+                  </a>
+                  <ul class="collapse" id="messages">
+                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
+                    <li><a href="">Received from Staff(INBOX)</a></li>
+                    <li><a href="">Sent to Student(OUTBOX)</a></li>
+                    <li><a href="">Received from Student(INBOX)</a></li>
+                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
+                    <li><a href="">Received from Parent(INBOX)</a></li>
+                  </ul>
                 </li>
             
               {% endif %}
@@ -302,7 +380,7 @@
           
           </div>
         </div>
-       
+
       </div>
       <!-- End Sidebar -->
 
@@ -358,7 +436,7 @@
               <ul class="navbar-nav topbar-nav ms-md-auto align-items-center">
                 
                 <p class="welcome-text text-success fw-semibold fs-5 mt-3">
-                    👋 Welcome, {{ request.user.get_full_name }} 
+                    👋 Welcome, {{ request.user.get_full_name }} &nbsp;
                     (<span class="text-danger">{{ request.user.role }}</span>)
                   </p>
                   
@@ -683,7 +761,7 @@
                               >
                             {% else %}
                               <a
-                                href=""
+                                href="{% url 'parent_detail'  request.user.id %}"
                                 class="btn btn-xs btn-secondary btn-sm"
                                 >View Profile</a
                               >
@@ -694,9 +772,8 @@
                       </li>
                       <li>
                         <div class="dropdown-divider"></div>
-                  
-                        <a class="dropdown-item" href="#">My Balance</a>
                         <a class="dropdown-item" href="#">Inbox</a>
+                        <a class="dropdown-item" href="#">Outbox</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="#">Account Setting</a>
                         <div class="dropdown-divider"></div>
@@ -726,36 +803,11 @@
         </div>
         
         
-        
-        <footer class="footer">
+        <footer class="footer ">
           <div class="container-fluid d-flex justify-content-between">
-            <nav class="pull-left">
-              <ul class="nav">
-                <li class="nav-item">
-                  <a class="nav-link" href="http://www.themekita.com">
-                    ThemeKita
-                  </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="#"> Help </a>
-                </li>
-                <li class="nav-item">
-                  <a class="nav-link" href="#"> Licenses </a>
-                </li>
-              </ul>
-            </nav>
-            <div class="copyright">
-              2024, made with <i class="fa fa-heart heart text-danger"></i> by
-              <a href="http://www.themekita.com">ThemeKita</a>
-            </div>
-            <div>
-              Distributed by
-              <a target="_blank" href="https://themewagon.com/">ThemeWagon</a>.
-            </div>
+            &copy; 2025 Lagooz Schools — Empowering Education Through Communication<br />
+          <span class="site-developer">Powered by <strong>FASTech</strong></span>
           </div>
-        
-        
-        
         </footer>
       </div>
 
@@ -794,7 +846,7 @@
     <script src="{% static 'assets/js/kaiadmin.min.js' %}"></script>
 
     <!-- Kaiadmin DEMO methods, don't include it in your project! -->
-    <script src="{% static 'assets/js/setting-demo.js' %}"></script>
+    {% comment %} <script src="{% static 'assets/js/setting-demo.js' %}"></script>
     <script src="{% static 'assets/js/demo.js' %}"></script>
     <script>
       $("#lineChart").sparkline([102, 109, 120, 99, 110, 105, 115], {
@@ -823,7 +875,10 @@
         lineColor: "#ffa534",
         fillColor: "rgba(255, 165, 52, .14)",
       });
-    </script>
+    </script> {% endcomment %}
+
+
+
       {% if messages %}
         <div id="django-messages">
           {% for message in messages %}

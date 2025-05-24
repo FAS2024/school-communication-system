@@ -2,42 +2,48 @@
 {% load static %}
 
 {% block content %}
-<div class="student-detail-container">
-    <h2>Student Profile</h2>
+<div class="container py-5">
+    <div class="card shadow-lg border-0 rounded-4">
+        <div class="card-body p-4">
+            <h2 class="mb-4 text-center">Student Profile</h2>
 
-    <div class="student-profile-card" style="display: flex; align-items: center; gap: 2rem; margin-top: 2rem;">
-        <!-- Profile Picture -->
-        <div class="profile-pic-container">
-            {% if student.profile_picture %}
-                <img src="{{ student.profile_picture.url }}" alt="{{ student.first_name }}'s Profile Picture"
-                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
-            {% else %}
-                <img src="{% static 'images/default_profile_picture.png' %}" alt="Default Profile"
-                     style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 3px solid #ccc;">
-            {% endif %}
-        </div>
+            <div class="d-flex flex-column flex-md-row align-items-center gap-4">
+                <!-- Profile Picture -->
+                <div class="text-center">
+                    {% if student.profile_picture %}
+                        <img src="{{ student.profile_picture.url }}" alt="{{ student.first_name }}'s Profile Picture"
+                             class="rounded-circle border border-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile"
+                             class="rounded-circle border border-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    {% endif %}
+                </div>
 
-        <!-- Student Details -->
-        <div class="student-info">
-            <p><strong>Full Name:</strong> {{ student.first_name }} {{ student.last_name }}</p>
-            <p><strong>Email:</strong> {{ student.email }}</p>
-            <p><strong>Phone Number:</strong> {{ student.studentprofile.phone_number }}</p>
-            <p><strong>Branch:</strong> {{ student.branch.name }}</p>
-            <p><strong>Admission Number:</strong> {{ student.studentprofile.admission_number }}</p>
-            <p><strong>Class:</strong> {{ student.studentprofile.current_class }}</p>
-            <p><strong>Class:</strong> {{ student.studentprofile.current_class_arm }}</p>
-            <p><strong>Date of Birth:</strong> {{ student.studentprofile.date_of_birth }}</p>
-            <p><strong>Gender:</strong> {{ student.get_gender_display }}</p>
-            <p><strong>Guardian's Name:</strong> {{ student.studentprofile.guardian_name }}</p>
-            <p><strong>Address:</strong> {{ student.studentprofile.address }}</p>
+                <!-- Student Details -->
+                <div class="flex-grow-1">
+                    <div class="row g-3">
+                        <div class="col-md-6"><strong>Full Name:</strong> {{ student.first_name }} {{ student.last_name }}</div>
+                        <div class="col-md-6"><strong>Email:</strong> {{ student.email }}</div>
+                        <div class="col-md-6"><strong>Phone Number:</strong> {{ student.studentprofile.phone_number }}</div>
+                        <div class="col-md-6"><strong>Date of Birth:</strong> {{ student.studentprofile.date_of_birth }}</div>
+                        <div class="col-md-6"><strong>Gender:</strong> {{ student.get_gender_display }}</div>
+                        <div class="col-md-6"><strong>Admission Number:</strong> {{ student.studentprofile.admission_number }}</div>
+                        <div class="col-md-6"><strong>Class:</strong> {{ student.studentprofile.current_class }}</div>
+                        <div class="col-md-6"><strong>Class Arm:</strong> {{ student.studentprofile.current_class_arm }}</div>
+                        <div class="col-md-6"><strong>Branch:</strong> {{ student.branch.name }}</div>
+                        <div class="col-md-6"><strong>Nationality:</strong> {{ student.studentprofile.nationality }}</div>
+                        <div class="col-md-6"><strong>State:</strong> {{ student.studentprofile.state }}</div>
+                        <div class="col-12"><strong>Address:</strong> {{ student.studentprofile.address }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-4 d-flex justify-content-center gap-3">
+                <a href="{% url 'student_update' pk=student.pk %}" class="btn btn-primary px-4">Edit Student</a>
+                <a href="{% url 'student_list' %}" class="btn btn-outline-secondary px-4">Back to Student List</a>
+            </div>
         </div>
     </div>
-
-
-    <div style="margin-top: 2rem;">
-        <a href="{% url 'student_update' pk=student.pk %}" class="btn btn-primary" style="margin-right: 10px;">Edit Student</a>
-        <a href="{% url 'student_list' %}" class="btn btn-secondary">Back to Student List</a>
-    </div>
-
 </div>
 {% endblock %}

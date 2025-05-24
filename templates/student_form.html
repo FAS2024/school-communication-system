@@ -1,25 +1,72 @@
-{% extends 'base.html' %}
-
+{% extends "base.html" %}
+{% load form_extras %}
 {% block content %}
-<div class="container mt-4">
-  <h2 class="mb-4">
-    {% if is_update %}
-      Update Student
-    {% else %}
-      Create Student
-    {% endif %}
-  </h2>
+<div class="container py-5">
+  <div class="card shadow-lg border-0 rounded-4">
+    <div class="card-body p-4">
 
-  <div class="card">
-    <div class="card-body">
-      <form method="post" enctype="multipart/form-data">
+      <h2 class="text-center mb-4">
+        {% if user_form.instance.pk %}
+          Update Student
+        {% else %}
+          Create Student
+        {% endif %}
+      </h2>
+
+      <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
         {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">
-          {% if is_update %}Update{% else %}Create{% endif %} Student
-        </button>
-        <a href="{% url 'student_list' %}" class="btn btn-secondary ms-2">Back to Student List</a>
+
+        <!-- User Info Section -->
+        <fieldset class="mb-4">
+          <legend class="h5 border-bottom pb-2 mb-3">User Info</legend>
+          <div class="row g-3">
+            {% for field in user_form %}
+              <div class="col-md-6">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field|add_class:"form-control" }}
+                {% if field.help_text %}
+                  <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <!-- Student Profile Section -->
+        <fieldset class="mb-4">
+          <legend class="h5 border-bottom pb-2 mb-3">Student Profile</legend>
+          <div class="row g-3">
+            {% for field in profile_form %}
+              <div class="col-md-6">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field|add_class:"form-control" }}
+                {% if field.help_text %}
+                  <div class="form-text">{{ field.help_text }}</div>
+                {% endif %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        </fieldset>
+
+        <!-- Submit Button -->
+        <div class="d-flex justify-content-between mt-4">
+          <a href="{% url 'student_list' %}" class="btn btn-outline-secondary">Back to Student List</a>
+          <button type="submit" class="btn btn-primary">
+            {% if user_form.instance.pk %}
+              Update
+            {% else %}
+              Create
+            {% endif %}
+          </button>
+        </div>
       </form>
+
     </div>
   </div>
 </div>
