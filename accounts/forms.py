@@ -544,113 +544,6 @@ class ClassArmForm(forms.ModelForm):
         return name
 
 
-
-
-# class StudentCreationForm(UserCreationForm):
-#     password1 = forms.CharField(
-#         widget=forms.PasswordInput(),
-#         required=False,
-#         label='Password'
-#     )
-#     password2 = forms.CharField(
-#         widget=forms.PasswordInput(),
-#         required=False,
-#         label='Confirm Password'
-#     )
-#     email = forms.EmailField(required=True)
-#     username = forms.CharField(required=True)
-#     profile_picture = forms.ImageField(required=False)
-#     gender = forms.ChoiceField(
-#         choices=[('male', 'Male'), ('female', 'Female'), ('others', 'Others')],
-#         required=True
-#     )
-
-#     class Meta:
-#         model = CustomUser
-#         fields = [
-#             'email', 'profile_picture', 'username', 'first_name', 'last_name',
-#             'gender', 'password1', 'password2',
-#         ]
-
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop('user', None)
-#         super().__init__(*args, **kwargs)
-
-#         for field in self.fields.values():
-#             field.widget.attrs['class'] = 'form-control'
-
-#         self.instance.role = 'student'  # Force role to student
-
-#     def clean_email(self):
-#         email = self.cleaned_data.get('email')
-#         qs = CustomUser.objects.filter(email=email)
-#         if self.instance.pk:
-#             qs = qs.exclude(pk=self.instance.pk)
-#         if qs.exists():
-#             raise ValidationError("This email is already in use.")
-#         return email
-
-#     def clean_username(self):
-#         username = self.cleaned_data.get('username')
-#         qs = CustomUser.objects.filter(username=username)
-#         if self.instance.pk:
-#             qs = qs.exclude(pk=self.instance.pk)
-#         if qs.exists():
-#             raise ValidationError("This username is already taken.")
-#         return username
-
-#     def save(self, commit=True):
-#         user = super().save(commit=False)
-#         password1 = self.cleaned_data.get("password1")
-
-#         if password1:
-#             user.set_password(password1)
-#         elif self.instance and self.instance.pk:
-#             existing_user = CustomUser.objects.get(pk=self.instance.pk)
-#             user.password = existing_user.password
-
-#         if 'profile_picture' in self.cleaned_data:
-#             user.profile_picture = self.cleaned_data['profile_picture']
-
-#         if commit:
-#             user.save()
-#         return user
-
-
-# class StudentProfileForm(forms.ModelForm):
-#     class Meta:
-#         model = StudentProfile
-#         fields = [
-#             'phone_number', 'date_of_birth',
-#             'admission_number', 'current_class', 'current_class_arm',
-#             'parent', 'address', 'guardian_name'
-#         ]
-#         widgets = {
-#             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
-#             'phone_number': forms.TextInput(attrs={'placeholder': 'Phone Number'}),
-#             'address': forms.Textarea(attrs={'rows': 2}),
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop('user', None)
-#         super().__init__(*args, **kwargs)
-
-#         if user:
-#             if user.role == 'branch_admin':
-#                 self.fields['parent'].queryset = ParentProfile.objects.filter(user__branch=user.branch)
-#             elif user.role == 'superadmin':
-#                 self.fields['parent'].queryset = ParentProfile.objects.all()
-
-#             if user.role == 'student' and user == getattr(self.instance, 'user', None):
-#                 readonly_fields = [
-#                     'date_of_birth', 'admission_number', 'current_class',
-#                     'current_class_arm', 'parent', 'guardian_name'
-#                 ]
-#                 for field in readonly_fields:
-#                     if field in self.fields:
-#                         self.fields[field].disabled = True
-
-
 class StudentCreationForm(UserCreationForm):
     password1 = forms.CharField(
         widget=forms.PasswordInput(),
@@ -669,7 +562,6 @@ class StudentCreationForm(UserCreationForm):
         choices=[('male', 'Male'), ('female', 'Female'), ('others', 'Others')],
         required=True
     )
-
     class Meta:
         model = CustomUser
         fields = [
@@ -680,7 +572,7 @@ class StudentCreationForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-
+            
         for field in self.fields.values():
             field.widget.attrs['class'] = 'form-control'
 
@@ -698,6 +590,11 @@ class StudentCreationForm(UserCreationForm):
             self.fields['password1'].widget.attrs['placeholder'] = 'Enter new password (optional)'
             self.fields['password2'].widget.attrs['placeholder'] = 'Confirm new password'
 
+        # Disable gender field if the logged-in user is a student (cannot edit gender)
+        if user and user.role == 'student':
+            self.fields['gender'].disabled = True
+            
+        
     def clean_email(self):
         email = self.cleaned_data.get('email')
         qs = CustomUser.objects.filter(email=email)
@@ -738,35 +635,53 @@ class StudentCreationForm(UserCreationForm):
 
 class StudentProfileForm(forms.ModelForm):
     parent = forms.ModelChoiceField(queryset=ParentProfile.objects.none(), required=True)
+    phone_number = forms.CharField(max_length=15, required=False, label="Phone Number", help_text="Optional: Include country code.")
+    nationality = forms.CharField(max_length=30,label="Country")
+    state = forms.CharField(max_length=30,label="State")
     class Meta:
         model = StudentProfile
         fields = [
             'phone_number', 'date_of_birth',
             'admission_number', 'current_class', 'current_class_arm',
-            'parent', 'address', 'guardian_name'
+            'parent', 'nationality', 'state', 'address', 'guardian_name'
         ]
         widgets = {
             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
             'phone_number': forms.TextInput(attrs={'placeholder': 'Phone Number'}),
             'address': forms.Textarea(attrs={'rows': 2}),
         }
-
+        
+            
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # Superadmin or Branch Admin can choose from full/branch-limited queryset
         if user:
             if user.role == 'branch_admin':
                 self.fields['parent'].queryset = ParentProfile.objects.filter(user__branch=user.branch)
             elif user.role == 'superadmin':
                 self.fields['parent'].queryset = ParentProfile.objects.all()
+
+        # If student, limit parent queryset and disable field
+        if user and user.role == 'student' and user == getattr(self.instance, 'user', None):
+            # Ensure only the assigned parent is in the queryset
+            if hasattr(self.instance, 'parent') and self.instance.parent:
+                self.fields['parent'].queryset = ParentProfile.objects.filter(pk=self.instance.parent.pk)
+                self.fields['parent'].initial = self.instance.parent
+                self.fields['parent'].disabled = True
+                self.fields['parent'].widget.attrs['readonly'] = True
+            
             else:
                 self.fields['parent'].queryset = ParentProfile.objects.none()
+                self.fields['parent'].disabled = True
+                self.fields['parent'].label = "No Parent Assigned"
 
+        # Optional: mark other fields as read-only for students
         if user and user.role == 'student' and user == getattr(self.instance, 'user', None):
             readonly_fields = [
                 'date_of_birth', 'admission_number', 'current_class',
-                'current_class_arm', 'parent', 'guardian_name'
+                'current_class_arm', 'guardian_name', 'state', 'nationality'
             ]
             for field in readonly_fields:
                 if field in self.fields:

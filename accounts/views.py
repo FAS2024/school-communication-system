@@ -565,7 +565,10 @@ def create_student(request):
             profile.user = user
             profile.save()
 
+            messages.success(request, f"{user.first_name} {user.last_name} successfully created.")
             return redirect('student_list')
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         user_form = StudentCreationForm(user=request.user)
         profile_form = StudentProfileForm(user=request.user)
@@ -574,6 +577,7 @@ def create_student(request):
         'user_form': user_form,
         'profile_form': profile_form,
     })
+
 
 
 @login_required
@@ -615,7 +619,10 @@ def update_student(request, pk):
             profile.user = user
             profile.save()
 
-            return redirect('student_detail', student_id=user.pk)
+            messages.success(request, f"{user.first_name} {user.last_name} successfully updated.")
+            return redirect('student_detail', pk=user.pk)
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         user_form = StudentCreationForm(instance=user_instance, user=request.user)
         profile_form = StudentProfileForm(instance=profile_instance, user=request.user)
@@ -624,6 +631,8 @@ def update_student(request, pk):
         'user_form': user_form,
         'profile_form': profile_form,
     })
+
+
 
 
 @method_decorator(login_required, name='dispatch')

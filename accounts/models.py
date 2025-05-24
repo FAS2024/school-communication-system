@@ -142,19 +142,19 @@ class Branch(models.Model):
         return self.name
 
 
-class Message(models.Model):
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_messages', on_delete=models.CASCADE)
-    receiver = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='received_messages', on_delete=models.CASCADE)
-    content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-    is_read = models.BooleanField(default=False)
+# class Message(models.Model):
+#     sender = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sent_messages', on_delete=models.CASCADE)
+#     receiver = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='received_messages', on_delete=models.CASCADE)
+#     content = models.TextField()
+#     timestamp = models.DateTimeField(auto_now_add=True)
+#     is_read = models.BooleanField(default=False)
 
-    def __str__(self):
+#     def __str__(self):
 
-        return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
+#         return f"Message from {self.sender.username} to {self.receiver.username} at {self.timestamp}"
 
-    class Meta:
-        ordering = ['-timestamp']
+#     class Meta:
+#         ordering = ['-timestamp']
 
 
 class ParentProfile(models.Model):
@@ -192,6 +192,8 @@ class StudentProfile(models.Model):
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     parent = models.ForeignKey('ParentProfile', on_delete=models.CASCADE, related_name='students')
     guardian_name = models.CharField(max_length=100, blank=True, null=True)
+    nationality = models.CharField(max_length=50, default='Nigeria')  # temporary default
+    state = models.CharField(max_length=50, default='Lagos') 
 
     def __str__(self):
         return self.admission_number
@@ -212,3 +214,77 @@ class StaffProfile(models.Model):
         return self.user.get_full_name()
 
 
+
+class Communication(models.Model):
+    MESSAGE_TYPE_CHOICES = [
+        ('announcement', 'Announcement'),
+        ('post', 'Post'),
+        ('notification', 'Notification'),
+        ('news', 'News'),
+        ('personal', 'Personal'),
+        ('group', 'Group'),
+    ]
+
+    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_communications')
+    message_type = models.CharField(max_length=20, choices=MESSAGE_TYPE_CHOICES)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    body = models.TextField()
+
+    is_draft = models.BooleanField(default=False)
+    scheduled_time = models.DateTimeField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.message_type.title()} from {self.sender.username}"
+
+
+
+
+class CommunicationAttachment(models.Model):
+    communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='communication_attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name
+
+
+class CommunicationTargetGroup(models.Model):
+    communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='target_groups')
+    role = models.CharField(max_length=50, null=True, blank=True)  # e.g., 'student', 'staff'
+    branch = models.ForeignKey('Branch', null=True, blank=True, on_delete=models.SET_NULL)
+    class_name = models.CharField(max_length=20, null=True, blank=True)
+
+    def __str__(self):
+        parts = []
+        if self.role:
+            parts.append(f"Role: {self.role}")
+        if self.branch:
+            parts.append(f"Branch: {self.branch.name}")
+        if self.class_name:
+            parts.append(f"Class: {self.class_name}")
+        return ', '.join(parts)
+
+
+
+class CommunicationRecipient(models.Model):
+    communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='recipients')
+    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='received_communications')
+    read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.recipient.username} -> {self.communication.title or 'Untitled Message'}"
+
+
+
+class CommunicationComment(models.Model):
+    communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='comments')
+    commenter = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Comment by {self.commenter.username} on {self.communication.title or 'Untitled'}"
