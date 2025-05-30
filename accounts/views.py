@@ -1107,7 +1107,8 @@ def get_filtered_users(request):
     form = CommunicationTargetGroupForm(request.GET, user=request.user)
     if form.is_valid():
         recipients = form.get_filtered_recipients(form.cleaned_data)
-        users = recipients.values('id', 'first_name', 'email')
+        # users = recipients.values('id', 'first_name', 'email')
+        users = recipients.values('id', 'first_name', 'last_name', 'email', 'branch__name', 'profile_picture')
         return JsonResponse(list(users), safe=False)
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 

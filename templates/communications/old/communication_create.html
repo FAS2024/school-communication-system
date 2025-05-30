@@ -436,3 +436,18 @@
 {% endblock %}
 
  {% endcomment %}
+
+
+
+
+
+ for (const user of response) {
+        const row = `
+          <tr>
+            <td><input type="checkbox" class="recipient-checkbox" value="${user.id}"></td>
+            <td>${user.first_name}</td>
+            <td>${user.email}</td>
+          </tr>
+        `;
+        $recipientsTableBody.append(row);
+      }
