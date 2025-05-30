@@ -13,10 +13,8 @@ from .forms import (
         ParentCreationForm,
         StudentProfileForm,
         CommunicationForm,
-        CommunicationAttachmentForm,
         CommunicationRecipientForm,
         CommunicationTargetGroupForm,
-        CommentForm,
         AttachmentFormSet
     )
 from .models import (
@@ -71,6 +69,12 @@ from django.db.models import Q
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
+
+from .utils import filter_users_by_target_group_or_params
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 
 
 
@@ -1064,444 +1068,266 @@ def delete_class_arm(request, pk):
 
 
 
-# class CommunicationCreateView(LoginRequiredMixin, TemplateView):
-#     template_name = 'communication/communication_create.html'
+# Helper function to return filtered queryset based on GET params (used in ajax views)
+@login_required
+def ajax_filtered_queryset(request, model, filter_field, filter_value_key='id', values_fields=None):
+    filter_value = request.GET.get(filter_value_key)
+    if filter_value:
+        qs = model.objects.filter(**{f'{filter_field}': filter_value})
+        if values_fields:
+            qs = qs.values(*values_fields)
+        else:
+            qs = qs.values()
+        return JsonResponse(list(qs), safe=False)
+    return JsonResponse([], safe=False)
 
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         user = self.request.user
 
-#         # Helper queries
-#         CustomUserModel = CustomUser
+@login_required
+def communication_index(request):
+    context = {
+        'communication_form': CommunicationForm(user=request.user),
+        'target_group_form': CommunicationTargetGroupForm(user=request.user),
+        'attachment_formset': AttachmentFormSet(),
+    }
+    return render(request, 'communications/communication_form.html', context)
 
-#         if user.role == 'student':
-#             # Get this student's class and arm from StudentProfile
-#             try:
-#                 student_profile = user.studentprofile
-#                 current_class = student_profile.current_class
-#                 current_class_arm = student_profile.current_class_arm
-#             except StudentProfile.DoesNotExist:
-#                 current_class = None
-#                 current_class_arm = None
 
-#             if current_class and current_class_arm:
-#                 # Classmates: students in the same class and same arm, exclude self
-#                 classmates = CustomUserModel.objects.filter(
-#                     role='student',
-#                     studentprofile__current_class=current_class,
-#                     studentprofile__current_class_arm=current_class_arm
-#                 ).exclude(pk=user.pk)
+@login_required
+def get_student_classes(request):
+    return ajax_filtered_queryset(request, StudentClass, 'branch_id', 'branch_id', ['id', 'name'])
 
-#                 # Class teacher from StudentClass model (class_teacher FK)
-#                 class_teacher = CustomUserModel.objects.filter(
-#                     pk=current_class.class_teacher_id
-#                 )
 
-#                 # Combine classmates and class teacher queryset
-#                 context['users'] = classmates | class_teacher
+@login_required
+def get_class_arms(request):
+    return ajax_filtered_queryset(request, ClassArm, 'student_class_id', 'class_id', ['id', 'name'])
+
+
+@login_required
+def get_filtered_users(request):
+    form = CommunicationTargetGroupForm(request.GET, user=request.user)
+    if form.is_valid():
+        recipients = form.get_filtered_recipients(form.cleaned_data)
+        users = recipients.values('id', 'first_name', 'email')
+        return JsonResponse(list(users), safe=False)
+    return JsonResponse({'error': 'Invalid filter data'}, status=400)
+
+
+@method_decorator([login_required, require_POST], name='dispatch')
+class SendCommunicationView(View):
+    def post(self, request):
+        communication_form = CommunicationForm(request.POST, user=request.user)
+        target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
+        attachment_formset = AttachmentFormSet(request.POST, request.FILES)
+
+        if not communication_form.is_valid():
+            messages.error(request, "Please correct the communication form.")
+            return redirect('communication_index')
+
+        if not target_group_form.is_valid():
+            messages.error(request, "Please correct the target group form.")
+            return redirect('communication_index')
+
+        if not attachment_formset.is_valid():
+            messages.error(request, "Please correct the attachment form.")
+            return redirect('communication_index')
+
+        communication = communication_form.save(commit=False)
+        communication.created_by = request.user
+        communication.created_at = timezone.now()
+        communication.save()
+
+        # Link attachments and save
+        attachment_formset.instance = communication
+        attachment_formset.save()
+
+        # Get all recipients filtered by target group form
+        allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+
+        # Get selected recipient IDs from POST (AJAX selection)
+        selected_recipient_ids = request.POST.getlist('selected_recipients')  # e.g. ['12', '34', '56']
+
+        # Final recipients queryset is the intersection of allowed recipients and selected IDs
+        recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
+
+        # Manual emails from form
+        manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+        manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
+
+        valid_manual_emails = []
+        for email in manual_emails_list:
+            try:
+                validate_email(email)
+                valid_manual_emails.append(email)
+            except ValidationError:
+                messages.warning(request, f"Invalid email skipped: {email}")
+
+        # Save CommunicationRecipient entries in a transaction
+        with transaction.atomic():
+            for user_recipient in recipients_qs:
+                CommunicationRecipient.objects.create(
+                    communication=communication,
+                    recipient=user_recipient
+                )
+            for manual_email in valid_manual_emails:
+                CommunicationRecipient.objects.create(
+                    communication=communication,
+                    email=manual_email
+                )
+
+        messages.success(request, "Communication sent successfully.")
+        return redirect('communication_index')
+
+
+
+# class RecipientsPreviewAjaxView(View):
+#     def post(self, request):
+#         # Parse filters from request.POST
+#         data = request.POST.dict()
+#         form = CommunicationForm(data, user=request.user)
+
+#         # We want to call get_filtered_recipients to return the preview list
+#         recipients_preview = ""
+#         if form.is_valid():
+#             # If send_to_all is true, show 'All users'
+#             if form.cleaned_data.get('send_to_all'):
+#                 recipients_preview = "All users"
 #             else:
-#                 context['users'] = CustomUserModel.objects.none()
+#                 # Get recipients from saved_target_group or manual selection
+#                 if form.cleaned_data.get('saved_target_group'):
+#                     group = form.cleaned_data['saved_target_group']
+#                     target_group_data = {
+#                         'branch': group.branch_id,
+#                         'role': group.role,
+#                         'staff_type': group.staff_type,
+#                         'teaching_positions': group.teaching_positions.values_list('id', flat=True),
+#                         'non_teaching_positions': group.non_teaching_positions.values_list('id', flat=True),
+#                         'student_class': group.student_class_id,
+#                         'class_arm': group.class_arm_id,
+#                     }
+#                     recipients = form.get_filtered_recipients(target_group_data)
+#                     recipients_preview = ", ".join([u.get_full_name() or u.username for u in recipients[:10]])
+#                 elif form.cleaned_data.get('individual_users'):
+#                     recipients = form.cleaned_data['individual_users']
+#                     recipients_preview = ", ".join([u.get_full_name() or u.username for u in recipients[:10]])
+#                 else:
+#                     recipients_preview = form.cleaned_data.get('manual_emails', '')
 
-#         elif user.role == 'staff':
-#             # Staff see other staff in same branch + branch admins in same branch
-#             staff_users = CustomUserModel.objects.filter(
-#                 role='staff',
-#                 branch=user.branch
-#             ).exclude(pk=user.pk)
-
-#             branch_admins = CustomUserModel.objects.filter(
-#                 role='branch_admin',
-#                 branch=user.branch
-#             )
-
-#             context['users'] = staff_users | branch_admins
-
-#         elif user.role == 'parent':
-#             # Parent sees child's class teachers + branch admins
-
-#             # Get all children of this parent (via ParentProfile -> StudentProfile)
-#             try:
-#                 parent_profile = user.parentprofile
-#                 children = parent_profile.students.all()
-#             except ParentProfile.DoesNotExist:
-#                 children = CustomUserModel.objects.none()
-
-#             # Get all classes of the children
-#             children_classes = children.values_list('current_class', flat=True).distinct()
-
-#             # Class teachers for these classes
-#             class_teachers = CustomUserModel.objects.filter(
-#                 pk__in=StudentClass.objects.filter(id__in=children_classes).values_list('class_teacher', flat=True)
-#             )
-
-#             branch_admins = CustomUserModel.objects.filter(
-#                 role='branch_admin',
-#                 branch=user.branch
-#             )
-
-#             context['users'] = class_teachers | branch_admins
-
-#         elif user.role == 'branch_admin':
-#             # Branch admin can message anyone in their branch
-#             context['users'] = CustomUserModel.objects.filter(branch=user.branch)
-
-#         elif user.role == 'superadmin':
-#             # Superadmin can message anyone
-#             context['users'] = CustomUserModel.objects.all()
-
-#         else:
-#             context['users'] = CustomUserModel.objects.none()
-
-#         # Add all branches for UI filtering if needed
-#         context['branches'] = Branch.objects.all()
-
-#         return context
-
-# class CommunicationCreateAjaxView(LoginRequiredMixin, View):
-    
-#     def get(self, request, *args, **kwargs):
-#         """
-#         AJAX endpoint to get roles and users filtered by branch and other filters
-#         Query params:
-#             branch_id: int
-#             role: str (e.g. 'staff', 'student', 'parent')
-#             staff_type: str (optional, 'teaching' or 'non_teaching')
-#         """
-#         branch_id = request.GET.get('branch_id')
-#         role = request.GET.get('role')
-#         staff_type = request.GET.get('staff_type')
-
-#         if not branch_id or not role:
-#             return JsonResponse({'success': False, 'error': 'branch_id and role are required'}, status=400)
-        
-#         try:
-#             branch = Branch.objects.get(pk=branch_id)
-#         except Branch.DoesNotExist:
-#             return JsonResponse({'success': False, 'error': 'Branch not found'}, status=404)
-
-#         users = CustomUser.objects.none()
-
-#         # Example logic - adjust field names and models accordingly
-#         if role == 'staff':
-#             users = CustomUser.objects.filter(branch=branch, role='staff')
-#             if staff_type == 'teaching':
-#                 users = users.filter(is_teaching=True)
-#             elif staff_type == 'non_teaching':
-#                 users = users.filter(is_teaching=False)
-#         elif role == 'student':
-#             users = CustomUser.objects.filter(branch=branch, role='student')
-#         elif role == 'parent':
-#             users = CustomUser.objects.filter(branch=branch, role='parent')
-
-#         # Serialize users to send minimal info (id and name)
-#         users_data = [{'id': user.id, 'name': user.get_full_name()} for user in users]
-
-#         # Return role info + users list
-#         return JsonResponse({
-#             'success': True,
-#             'role': role,
-#             'users': users_data,
-#         })
+#         return JsonResponse({'recipients_preview': recipients_preview})
 
 
-#     def post(self, request, *args, **kwargs):
-#         data = request.POST
-#         files = request.FILES.getlist('files')
 
-#         form = CommunicationForm(data)
-#         if not form.is_valid():
-#             return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
-#         # Recipients can be individuals or 'send_to_all' flags
-#         try:
-#             recipients_data = json.loads(data.get('recipients', '[]'))  # list of user ids
-#             target_groups_data = json.loads(data.get('target_groups', '[]'))  # list of groups with branch, role, class_name, send_to_all flag
-#         except json.JSONDecodeError:
-#             return JsonResponse({'success': False, 'error': 'Invalid JSON format for recipients or target groups'}, status=400)
-
-#         communication = form.save(commit=False)
-#         communication.sender = request.user
-
-#         scheduled_time_str = data.get('scheduled_time')
-#         if scheduled_time_str:
-#             try:
-#                 dt = datetime.strptime(scheduled_time_str, '%Y-%m-%dT%H:%M')
-#                 communication.scheduled_time = make_aware(dt)
-#             except ValueError:
-#                 return JsonResponse({'success': False, 'error': 'Invalid scheduled_time format'}, status=400)
-
-#         communication.save()
-
-#         for f in files:
-#             CommunicationAttachment.objects.create(communication=communication, file=f)
-
-#         # Save recipients - individuals only
-#         for recipient_id in recipients_data:
-#             user = get_object_or_404(CustomUser, pk=recipient_id)
-#             CommunicationRecipient.objects.create(communication=communication, recipient=user)
-
-#         # Save target groups - with possible send_to_all flag
-#         for group in target_groups_data:
-#             branch = None
-#             branch_id = group.get('branch')
-#             if branch_id:
-#                 branch = get_object_or_404(Branch, pk=branch_id)
-
-#             send_to_all = group.get('send_to_all', False)
-
-#             target_group = CommunicationTargetGroup.objects.create(
-#                 communication=communication,
-#                 role=group.get('role'),
-#                 branch=branch,
-#                 class_name=group.get('class_name'),
-#                 send_to_all=send_to_all  # You might need to add this field to your model
-#             )
-
-#             # If sending to all in this group, optionally create recipients for all users in that group (optional)
-#             # Or handle it later when sending notifications.
-
-#         return JsonResponse({'success': True, 'message': 'Message created successfully'})
 
 
 
 # @login_required
-# @require_GET
-# def ajax_get_users(request):
+# def get_recipients(request):
+#     user = request.user
+
+#     # Get filter values from GET request (adjust field names as needed)
 #     branch_id = request.GET.get('branch')
-#     role = request.GET.get('role')
-#     staff_type = request.GET.get('staff_type', 'all')
+#     role_name = request.GET.get('role')
+#     staff_type = request.GET.get('staff_type')
+#     teaching_positions_ids = request.GET.getlist('teaching_positions[]')
+#     non_teaching_positions_ids = request.GET.getlist('non_teaching_positions[]')
+#     student_class_id = request.GET.get('student_class')
+#     class_arm_id = request.GET.get('class_arm')
 
-#     if not branch_id or not role:
-#         return JsonResponse({'success': False, 'error': 'Branch and role are required'})
+#     recipients = CustomUser.objects.none()  # default empty
 
-#     try:
-#         branch = Branch.objects.get(pk=branch_id)
-#     except Branch.DoesNotExist:
-#         return JsonResponse({'success': False, 'error': 'Invalid branch'})
+#     # Helper function to filter staff by positions and staff_type
+#     def filter_staff(qs):
+#         if staff_type:
+#             qs = qs.filter(staff_type=staff_type)
+#         if teaching_positions_ids:
+#             qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
+#         if non_teaching_positions_ids:
+#             qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
+#         return qs.distinct()
 
-#     # Filter users by branch and role
-#     users = CustomUser.objects.filter(branch=branch, role=role)
+#     if user.role == 'student':
+#         # Students can message students, staff, branch_admin in their branch (exclude self)
+#         recipients = CustomUser.objects.filter(
+#             Q(branch_id=user.branch_id),
+#             Q(role='student') | Q(role='staff') | Q(role='branch_admin')
+#         ).exclude(id=user.id)
 
-#     # Additional filter for staff
-#     if role == 'staff':
-#         if staff_type == 'teaching':
-#             users = users.filter(is_teaching=True)
-#         elif staff_type == 'non-teaching':
-#             users = users.filter(is_teaching=False)
+#     elif user.role == 'parent':
+#         # Parents can message their children, their children's class teachers, branch admin in their branch
 
-#     users_data = [{'id': u.id, 'full_name': u.get_full_name(), 'username': u.username} for u in users]
+#         # Children of the parent
+#         children = StudentProfile.objects.filter(parent__user=user)
 
-#     return JsonResponse({'success': True, 'users': users_data})
+#         # Get their current classes
+#         child_class_ids = children.values_list('current_class_id', flat=True).distinct()
+
+#         # Get staff users who are class teachers of these classes
+#         class_teacher_users = CustomUser.objects.filter(
+#             role='staff',
+#             class_teacher_of__id__in=child_class_ids
+#         ).distinct()
+
+#         # Branch admins in parent's branch
+#         branch_admins = CustomUser.objects.filter(
+#             role='branch_admin',
+#             branch_id=user.branch_id
+#         )
+
+#         # Children users
+#         children_users = CustomUser.objects.filter(
+#             id__in=children.values_list('user_id', flat=True)
+#         )
+
+#         # Union all these
+#         recipients = (children_users | class_teacher_users | branch_admins).distinct()
+
+#     elif user.role in ['staff', 'branch_admin', 'superadmin']:
+#         # For staff roles: filter by passed filters
+
+#         qs = CustomUser.objects.all()
+
+#         if branch_id:
+#             qs = qs.filter(branch_id=branch_id)
+
+#         if role_name:
+#             qs = qs.filter(role=role_name)
+
+#         if role_name == 'staff' or role_name is None:
+#             qs = filter_staff(qs)
+
+#         if role_name == 'student' or role_name is None:
+#             if student_class_id:
+#                 qs = qs.filter(studentprofile__current_class_id=student_class_id)
+#             if class_arm_id:
+#                 qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
+
+#         # Exclude self
+#         recipients = qs.exclude(id=user.id).distinct()
+
+#     else:
+#         # Default: no recipients
+#         recipients = CustomUser.objects.none()
+
+#     # Optionally serialize recipients or return as JSON (example below)
+#     data = [
+#         {
+#             'id': recipient.id,
+#             'email': recipient.email,
+#             'username': recipient.username,
+#             'full_name': recipient.get_full_name(),
+#             'role': recipient.role,
+#             'branch': recipient.branch.name if recipient.branch else None
+#         }
+#         for recipient in recipients
+#     ]
+
+#     return JsonResponse({'recipients': data})
 
 
 
-# from django.shortcuts import render, get_object_or_404, redirect
-# from django.contrib.auth.decorators import login_required
-# from django.utils import timezone
-# from django.db import transaction
-
-# from .models import Communication, CommunicationAttachment, CommunicationRecipient, CommunicationComment, SentMessageDelete
-# from .forms import CommunicationForm, CommentForm
-
-@login_required
-def inbox(request):
-    received = CommunicationRecipient.objects.filter(
-        recipient=request.user, deleted=False
-    ).select_related('communication').order_by('-communication__created_at')
-    context = {'received_messages': received}
-    return render(request, 'messaging/inbox.html', context)
-
-@login_required
-def sent_messages(request):
-    sent = Communication.objects.filter(sender=request.user).order_by('-created_at')
-
-    # Exclude messages deleted by sender
-    deleted_message_ids = SentMessageDelete.objects.filter(sender=request.user, deleted=True).values_list('communication_id', flat=True)
-    sent = sent.exclude(id__in=deleted_message_ids)
-
-    context = {'sent_messages': sent}
-    return render(request, 'messaging/sent.html', context)
-
-
-
-# # views.py (inside CommunicationCreateView or message creation logic)
-# from notifications.utils import send_email_notification
-
-# def notify_recipients(communication):
-#     recipients = communication.recipients.all()
-#     subject = f"New {communication.message_type.title()} from {communication.sender.username}"
+# def send_notification_email(recipient, communication):
+#     subject = f"New Message: {communication.title or 'Untitled'}"
 #     message = communication.body
-
-#     emails = [r.recipient.email for r in recipients if r.recipient.email]
-#     send_email_notification(subject, message, emails)
-
-
-
-
-# # In your view or signal
-# def notify_push_recipients(communication):
-#     tokens = [r.recipient.profile.fcm_token for r in communication.recipients.all() if hasattr(r.recipient, 'profile') and r.recipient.profile.fcm_token]
-#     title = f"{communication.message_type.title()} from {communication.sender.username}"
-#     body = communication.short_body()
-#     send_push_notification(title, body, tokens)
-
-
-
-# notify_recipients(communication)
-# notify_push_recipients(communication)
-
-
-
-@login_required
-def message_detail(request, pk):
-    message = get_object_or_404(Communication, pk=pk)
-    
-    # Mark as read if recipient
-    try:
-        recipient_entry = CommunicationRecipient.objects.get(communication=message, recipient=request.user)
-        recipient_entry.mark_as_read()
-    except CommunicationRecipient.DoesNotExist:
-        recipient_entry = None
-
-    comments = message.comments.order_by('created_at')
-    comment_form = CommentForm()
-
-    context = {
-        'message': message,
-        'comments': comments,
-        'comment_form': comment_form,
-        'recipient_entry': recipient_entry,
-    }
-    return render(request, 'messaging/message_detail.html', context)
-
-
-@login_required
-def send_message(request):
-    if request.method == 'POST':
-        comm_form = CommunicationForm(request.POST)
-        target_form = CommunicationTargetGroupForm(request.POST)
-        attachment_formset = AttachmentFormSet(request.POST, request.FILES)
-
-        selected_user_ids = request.POST.getlist('selected_users')
-
-        if comm_form.is_valid() and target_form.is_valid() and attachment_formset.is_valid():
-            if not selected_user_ids:
-                messages.error(request, "You must select at least one recipient.")
-            else:
-                communication = comm_form.save()
-                target_group = target_form.save(commit=False)
-                target_group.communication = communication
-                target_group.save()
-                target_form.save_m2m()
-
-                # Save attachments
-                attachment_formset.instance = communication
-                attachment_formset.save()
-
-                # Link selected users (you must have a model or method to save this)
-                communication.recipients.set(User.objects.filter(id__in=selected_user_ids))
-
-                messages.success(request, "Message sent successfully.")
-                return redirect('some_view_name')
-        else:
-            messages.error(request, "Please fix the errors below.")
-    else:
-        comm_form = CommunicationForm()
-        target_form = CommunicationTargetGroupForm()
-        attachment_formset = AttachmentFormSet()
-
-    context = {
-        'comm_form': comm_form,
-        'target_form': target_form,
-        'attachment_formset': attachment_formset,
-    }
-    return render(request, 'communication/send_message.html', context)
-
-
-@csrf_exempt
-@login_required
-def get_target_users(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        branch = data.get('branch')
-        role = data.get('role')
-        staff_type = data.get('staff_type')
-        teaching_positions = data.get('teaching_positions', [])
-        non_teaching_positions = data.get('non_teaching_positions', [])
-        student_class = data.get('student_class')
-        class_arm = data.get('class_arm')
-
-        # Filter users based on your actual profile models here
-        users = CustomUser.objects.none()
-
-        if not branch or not role:
-            return JsonResponse({'users': []})
-
-        # Example filtering logic, adjust according to your model structure
-        if role in ['superadmin', 'branch_admin', 'staff']:
-            users = CustomUser.objects.filter(profile__branch_id=branch, profile__role=role)
-            if staff_type:
-                users = users.filter(profile__staff_type=staff_type)
-            if teaching_positions:
-                users = users.filter(profile__teaching_positions__id__in=teaching_positions)
-            if non_teaching_positions:
-                users = users.filter(profile__non_teaching_positions__id__in=non_teaching_positions)
-        elif role == 'student':
-            users = CustomUser.objects.filter(
-                profile__branch_id=branch,
-                profile__role=role,
-                profile__student_class_id=student_class,
-                profile__class_arm_id=class_arm,
-            )
-        else:
-            users = CustomUser.objects.filter(profile__branch_id=branch, profile__role=role)
-
-        users = users.distinct()[:100]  # Limit for performance
-
-        user_list = [{
-            'id': u.id,
-            'username': u.username,
-            'email': u.email,
-            'role': u.profile.role,
-        } for u in users]
-
-        return JsonResponse({'users': user_list})
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-
-
-def send_notification_email(recipient, communication):
-    subject = f"New Message: {communication.title or 'Untitled'}"
-    message = communication.body
-    from_email = 'no-reply@example.com'
-    recipient_list = [recipient.email]
-    send_mail(subject, message, from_email, recipient_list, fail_silently=True)
-
-
-@login_required
-def add_comment(request, pk):
-    message = get_object_or_404(Communication, pk=pk)
-    if request.method == 'POST':
-        form = CommentForm(request.POST)
-        if form.is_valid():
-            comment = form.save(commit=False)
-            comment.communication = message
-            comment.commenter = request.user
-            comment.save()
-            return redirect('messaging:message_detail', pk=pk)
-    return redirect('messaging:message_detail', pk=pk)
-
-@login_required
-def delete_received_message(request, pk):
-    recipient_entry = get_object_or_404(CommunicationRecipient, communication_id=pk, recipient=request.user)
-    recipient_entry.deleted = True
-    recipient_entry.save()
-    return redirect('messaging:inbox')
-
-@login_required
-def delete_sent_message(request, pk):
-    communication = get_object_or_404(Communication, pk=pk, sender=request.user)
-    obj, created = SentMessageDelete.objects.get_or_create(communication=communication, sender=request.user)
-    obj.deleted = True
-    obj.save()
-    return redirect('messaging:sent_messages')
+#     from_email = 'no-reply@example.com'
+#     recipient_list = [recipient.email]
+#     send_mail(subject, message, from_email, recipient_list, fail_silently=True)

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h2>Create Communication</h2>
+
+<form id="target-group-form" method="get">
+  <fieldset>
+    <legend>Select Target Group</legend>
+    {{ target_group_form.as_p }}
+  </fieldset>
+</form>
+
+<!-- Recipients Table -->
+<h3>Filtered Recipients</h3>
+<table id="recipients-table" class="table table-striped">
+  <thead>
+    <tr>
+      <th><input type="checkbox" id="select-all-recipients"></th>
+      <th>Name</th>
+      <th>Email</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="3">Select filters above to view recipients.</td></tr>
+  </tbody>
+</table>
+
+<form id="communication-form" method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <fieldset>
+    <legend>Message Details</legend>
+    {{ communication_form.as_p }}
+  </fieldset>
+
+  <fieldset>
+    <legend>Attachments</legend>
+    {{ attachment_formset.management_form }}
+    {{ attachment_formset.as_p }}
+  </fieldset>
+
+  <input type="hidden" name="selected_recipients" id="selected-recipients">
+
+  <button type="submit" class="btn btn-primary">Send Message</button>
+</form>
+
+<!-- Include jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+$(document).ready(function () {
+  const $form = $('#target-group-form');
+  const $recipientsTableBody = $('#recipients-table tbody');
+  const $selectAll = $('#select-all-recipients');
+
+  function loadRecipients() {
+    const data = $form.serialize();
+    $.get("{% url 'get_filtered_users' %}", data, function (response) {
+      $recipientsTableBody.empty();
+
+      if (response.length === 0) {
+        $recipientsTableBody.append('<tr><td colspan="3">No users found.</td></tr>');
+        return;
+      }
+
+      for (const user of response) {
+        const row = `
+          <tr>
+            <td><input type="checkbox" class="recipient-checkbox" value="${user.id}"></td>
+            <td>${user.first_name}</td>
+            <td>${user.email}</td>
+          </tr>
+        `;
+        $recipientsTableBody.append(row);
+      }
+
+      // Reset "select all" checkbox when data is refreshed
+      $selectAll.prop('checked', false);
+    });
+  }
+
+  // Load recipients when target group filters change
+  $form.find('select, input[type=checkbox]').on('change', function () {
+    loadRecipients();
+  });
+
+  // Select all checkbox toggle
+  $selectAll.on('change', function () {
+    $('.recipient-checkbox').prop('checked', this.checked);
+  });
+
+  // Add selected recipients to hidden field before form submission
+  $('#communication-form').on('submit', function () {
+    $('#communication-form input[name="selected_recipients"]').remove(); // clear old values
+
+    $('.recipient-checkbox:checked').each(function () {
+      $('<input>').attr({
+        type: 'hidden',
+        name: 'selected_recipients',
+        value: this.value
+      }).appendTo('#communication-form');
+    });
+  });
+});
+</script>
+{% endblock %}
