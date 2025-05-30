@@ -1,3 +1,7 @@
+
+
+
+
 {% extends "base.html" %}
 {% load static %}
 
@@ -8,7 +12,6 @@
   <fieldset>
     <legend>Select Target Group</legend>
 
-    <!-- Branch field: hidden for students and parents -->
     {% if user_role != "student" and user_role != "parent" %}
       <div id="branch-field">
         <label for="id_branch">Branch:</label>
@@ -50,7 +53,6 @@
   </fieldset>
 </form>
 
-<!-- Recipients Table -->
 <h3>Filtered Recipients</h3>
 <table id="recipients-table" class="table table-striped">
   <thead>
@@ -80,7 +82,17 @@
   <fieldset>
     <legend>Attachments</legend>
     {{ attachment_formset.management_form }}
-    {{ attachment_formset.as_p }}
+    <div id="attachments-container">
+      {% for form in attachment_formset.forms %}
+        <div class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}">
+          {{ form.as_p }}
+          {% if forloop.counter > 2 %}
+            <button type="button" class="btn btn-danger remove-attachment" style="margin-top:10px;">Remove</button>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <button type="button" id="add-attachment" class="btn btn-success" style="margin-top:10px;">Add More Files</button>
   </fieldset>
 
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
@@ -96,7 +108,6 @@
     const $recipientsTableBody = $("#recipients-table tbody");
     const $selectAll = $("#select-all-recipients");
 
-    // Load recipients
     function loadRecipients() {
       const data = $form.serialize();
       $.get("{% url 'get_filtered_users' %}", data, function (response) {
@@ -130,17 +141,14 @@
       });
     }
 
-    // Trigger recipient reload on filter change
     $form.find("select, input[type=checkbox]").on("change", loadRecipients);
 
-    // Select all toggle
     $selectAll.on("change", function () {
       $(".recipient-checkbox").prop("checked", this.checked);
     });
 
-    // Add selected recipients to hidden field
     $("#communication-form").on("submit", function () {
-      $('#communication-form input[name="selected_recipients"]').remove(); // Clear any previous inputs
+      $('#communication-form input[name="selected_recipients"]').remove();
       $(".recipient-checkbox:checked").each(function () {
         $("<input>")
           .attr({ type: "hidden", name: "selected_recipients", value: this.value })
@@ -148,7 +156,6 @@
       });
     });
 
-    // Dynamic dependent fields
     const roleField = $("#id_role");
     const staffTypeField = $("#id_staff_type");
     const teachingField = $("#id_teaching_positions");
@@ -156,7 +163,6 @@
     const studentClassField = $("#id_student_class");
     const classArmField = $("#id_class_arm");
 
-    // Show/hide role field
     {% if user_role == "student" or user_role == "parent" %}
       $("#role-field").show();
     {% else %}
@@ -169,7 +175,6 @@
       });
     {% endif %}
 
-    // Role change logic
     roleField.on("change", function () {
       const selectedRole = $(this).val();
       if (selectedRole === "staff") {
@@ -183,7 +188,6 @@
       }
     });
 
-    // Staff type logic
     staffTypeField.on("change", function () {
       const type = $(this).val();
       if (type === "teaching") {
@@ -199,7 +203,6 @@
       }
     });
 
-    // Student class logic
     studentClassField.on("change", function () {
       if ($(this).val()) {
         $("#class-arm-field").show();
@@ -207,6 +210,59 @@
         $("#class-arm-field").hide();
       }
     });
+
+    // Attachment logic
+    let formIdx = {{ attachment_formset.total_form_count }};
+    const maxForms = 10;
+
+    $('#add-attachment').on('click', function () {
+      if (formIdx >= maxForms) {
+        alert("Maximum of 10 attachments allowed.");
+        return;
+      }
+
+      const formHtml = $('#attachments-container .attachment-form:first').clone();
+      formHtml.find(':input').each(function () {
+        const name = $(this).attr('name').replace(/\d+/, formIdx);
+        const id = $(this).attr('id').replace(/\d+/, formIdx);
+        $(this).attr({ name, id }).val('');
+      });
+
+      formHtml.find('.remove-attachment').remove();
+      formHtml.addClass('extra-attachment');
+      formHtml.append('<button type="button" class="btn btn-danger remove-attachment" style="margin-top:10px;">Remove</button>');
+
+      $('#attachments-container').append(formHtml);
+      $('#id_' + '{{ attachment_formset.prefix }}' + '-TOTAL_FORMS').val(++formIdx);
+    });
+
+    $('#attachments-container').on('click', '.remove-attachment', function () {
+      $(this).closest('.attachment-form').remove();
+      formIdx--;
+      $('#id_' + '{{ attachment_formset.prefix }}' + '-TOTAL_FORMS').val(formIdx);
+    });
   });
 </script>
+
+<!-- Optional Styling -->
+<style>
+  .attachment-form {
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 6px;
+    background: #f9f9f9;
+    position: relative;
+  }
+
+  .attachment-form .btn-danger {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+  }
+
+  #add-attachment {
+    display: block;
+  }
+</style>
 {% endblock %}

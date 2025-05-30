@@ -6,9 +6,7 @@
 
 <form id="target-group-form" method="get" style="margin-bottom: 2rem;">
   <fieldset style="border: 1px solid #ccc; border-radius: 8px; padding: 1rem;">
-    <legend style="padding: 0 0.5rem; font-weight: 600; font-size: 1.1rem;">
-      Select Target Group
-    </legend>
+    <legend style="padding: 0 0.5rem; font-weight: 600; font-size: 1.1rem;">Select Target Group</legend>
 
     {% if user_role != "student" and user_role != "parent" %}
       <div id="branch-field" class="form-group">
@@ -84,9 +82,7 @@
 
       {% for field in communication_form %}
         <div class="form-group" style="margin-bottom: 1rem; display: flex; flex-direction: column;">
-          <label for="{{ field.id_for_label }}" class="form-label" style="font-weight: 600; margin-bottom: 0.25rem;">
-            {{ field.label }}:
-          </label>
+          <label for="{{ field.id_for_label }}" class="form-label" style="font-weight: 600; margin-bottom: 0.25rem;">{{ field.label }}:</label>
           {{ field }}
           {% if field.help_text %}
             <small class="form-text text-muted" style="margin-top: 0.25rem;">{{ field.help_text }}</small>
@@ -112,17 +108,13 @@
           </div>
         {% endfor %}
       </div>
-      <button type="button" id="add-attachment" class="btn btn-success" style="margin-top: 0.75rem;">
-        Add More Files
-      </button>
+      <button type="button" id="add-attachment" class="btn btn-success" style="margin-top: 0.75rem;">Add More Files</button>
     </fieldset>
 
   </div>
 
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-  <button type="submit" class="btn btn-primary" style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem;">
-    Send Message
-  </button>
+  <button type="submit" class="btn btn-primary" style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem;">Send Message</button>
 </form>
 
 <!-- jQuery -->
@@ -176,9 +168,7 @@
     });
 
     $("#communication-form").on("submit", function () {
-      // Remove existing hidden inputs before adding new ones
       $('#communication-form input[name="selected_recipients"]').remove();
-
       $(".recipient-checkbox:checked").each(function () {
         $("<input>")
           .attr({ type: "hidden", name: "selected_recipients", value: this.value })
@@ -224,8 +214,8 @@
         $("#teaching-positions-field").show();
         $("#non-teaching-positions-field").hide();
       } else if (staffType === "non-teaching") {
-        $("#teaching-positions-field").hide();
         $("#non-teaching-positions-field").show();
+        $("#teaching-positions-field").hide();
       } else {
         $("#teaching-positions-field, #non-teaching-positions-field").hide();
       }
@@ -239,39 +229,68 @@
       }
     });
 
-    // Attachment formset dynamic add/remove functionality
-    const maxAttachments = 10;
-    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
-
+    // Attachment Add/Remove
     $("#add-attachment").on("click", function () {
-      if (totalForms >= maxAttachments) {
-        alert("Maximum attachments reached.");
+      const totalForms = $("#id_form-TOTAL_FORMS");
+      let formCount = parseInt(totalForms.val());
+      if (formCount >= 10) {
+        alert("Maximum 10 attachments allowed.");
         return;
       }
 
-      const newForm = $(".attachment-form:first").clone();
+      const newForm = $(".attachment-form:first").clone(false);
       newForm.find("input, select, textarea").each(function () {
-        const name = $(this).attr("name").replace("-0-", `-${totalForms}-`);
+        const name = $(this).attr("name").replace("0", formCount);
         const id = "id_" + name;
         $(this).attr({ name: name, id: id }).val("");
-        if ($(this).is(":checkbox") || $(this).is(":radio")) {
-          $(this).prop("checked", false);
-        }
       });
-      newForm.find(".remove-attachment").remove();
+      newForm.find(".text-danger").remove();
       newForm.append('<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>');
-
       $("#attachments-container").append(newForm);
-      totalForms++;
-      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+      totalForms.val(formCount + 1);
     });
 
     $("#attachments-container").on("click", ".remove-attachment", function () {
       $(this).closest(".attachment-form").remove();
-      totalForms--;
-      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+      const totalForms = $("#id_form-TOTAL_FORMS");
+      let formCount = parseInt(totalForms.val());
+      totalForms.val(formCount - 1);
     });
 
   });
 </script>
+
+<style>
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-label {
+    font-weight: 600;
+  }
+
+  .table-striped tbody tr:nth-child(odd) {
+    background-color: #f9f9f9;
+  }
+
+  .table-striped tbody tr:hover {
+    background-color: #e6f0ff;
+  }
+
+  input[type="checkbox"] {
+    cursor: pointer;
+  }
+
+  button.btn {
+    cursor: pointer;
+  }
+
+  #attachments-container .attachment-form {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    position: relative;
+    background-color: #fafafa;
+  }
+</style>
 {% endblock %}

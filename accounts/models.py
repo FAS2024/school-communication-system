@@ -213,7 +213,7 @@ class Communication(models.Model):
     body = models.TextField()
     is_draft = models.BooleanField(default=False)
     scheduled_time = models.DateTimeField(blank=True, null=True)
-    send_to_all = models.BooleanField(blank=True, null=True)
+    # send_to_all = models.BooleanField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

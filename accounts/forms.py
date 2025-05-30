@@ -705,11 +705,15 @@ class StudentProfileForm(forms.ModelForm):
 
 
 class CommunicationForm(forms.ModelForm):
-    send_to_all = forms.BooleanField(required=False, label="Send to all users")
+    # send_to_all = forms.BooleanField(required=False, label="Send to all users")
     manual_emails = forms.CharField(
         required=False,
         label="Add manual emails",
-        widget=forms.Textarea(attrs={"placeholder": "Comma-separated emails"}),
+        widget=forms.Textarea(attrs={
+            "placeholder": "Comma-separated emails",
+            "rows": 2,  # reduce height
+            "cols": 40  # optional: adjust width
+        }),
         help_text="Add emails manually (e.g., external contacts)"
     )
 
@@ -721,7 +725,7 @@ class CommunicationForm(forms.ModelForm):
             'body',
             'is_draft',
             'scheduled_time',
-            'send_to_all',
+            # 'send_to_all',
         ]
         widgets = {
             'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
