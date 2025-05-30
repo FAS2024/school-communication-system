@@ -1088,6 +1088,8 @@ def communication_index(request):
         'communication_form': CommunicationForm(user=request.user),
         'target_group_form': CommunicationTargetGroupForm(user=request.user),
         'attachment_formset': AttachmentFormSet(),
+        'user_role': request.user.role,
+        'user_branch_id': request.user.branch.id if request.user.branch else '',
     }
     return render(request, 'communications/communication_form.html', context)
 

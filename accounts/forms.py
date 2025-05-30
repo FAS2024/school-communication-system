@@ -774,12 +774,16 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             if 'role' in self.fields:
                 if self.user.role in ['student', 'parent']:
                     self.fields['role'].choices = [
+                        ('', '------------'),  # Empty value with a placeholder label
                         ('student', 'Student'),
                         ('staff', 'Staff'),
                         ('branch_admin', 'Branch Admin'),
                     ]
                 else:
-                    self.fields['role'].choices = CommunicationTargetGroup.ROLE_CHOICES
+                    self.fields['role'].choices = [
+                        ('', '----------- '),
+                        *CommunicationTargetGroup.ROLE_CHOICES
+                    ]
 
         # Set queryset for related fields
         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
@@ -790,6 +794,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
     def get_filtered_recipients(self, target_group_data):
         user = self.user
 
+        # Extract filter parameters
         branch_id = target_group_data.get('branch')
         role_name = target_group_data.get('role')
         staff_type = target_group_data.get('staff_type')
@@ -805,53 +810,63 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                 qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
             if non_teaching_positions_ids:
                 qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
-            return qs.distinct()
+            return qs
 
+        def filter_students(qs):
+            if student_class_id:
+                qs = qs.filter(studentprofile__current_class_id=student_class_id)
+            if class_arm_id:
+                qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
+            return qs
+
+        def apply_role_filters(qs):
+            if role_name:
+                qs = qs.filter(role=role_name)
+            if role_name in ['staff', 'branchadmin'] or role_name is None:
+                qs = filter_staff(qs)
+            if role_name == 'student' or role_name is None:
+                qs = filter_students(qs)
+            return qs
+
+        # Main logic by user role
         if user.role == 'student':
-            recipients = CustomUser.objects.filter(
+            qs = CustomUser.objects.filter(
                 branch_id=user.branch_id,
                 role__in=['student', 'staff', 'branch_admin']
             ).exclude(id=user.id)
 
+            if role_name:
+                qs = apply_role_filters(qs)
+            else:
+                return CustomUser.objects.none()
+
         elif user.role == 'parent':
             children = StudentProfile.objects.filter(parent__user=user)
             child_class_ids = children.values_list('current_class_id', flat=True)
-            class_teacher_users = CustomUser.objects.filter(
-                role='staff',
-                class_teacher_of__id__in=child_class_ids
-            )
-            branch_admins = CustomUser.objects.filter(
-                role='branch_admin',
-                branch_id=user.branch_id
-            )
-            children_users = CustomUser.objects.filter(
-                id__in=children.values_list('user_id', flat=True)
-            )
-            recipients = (children_users | class_teacher_users | branch_admins).distinct()
+
+            children_users = CustomUser.objects.filter(id__in=children.values_list('user_id', flat=True))
+            class_teacher_users = CustomUser.objects.filter(role='staff', class_teacher_of__id__in=child_class_ids)
+            branch_admins = CustomUser.objects.filter(role='branch_admin', branch_id=user.branch_id)
+
+            qs = (children_users | class_teacher_users | branch_admins).distinct()
+
+            if role_name:
+                qs = apply_role_filters(qs)
+            else:
+                return CustomUser.objects.none()
 
         elif user.role in ['staff', 'branch_admin', 'superadmin']:
             qs = CustomUser.objects.all()
 
             if branch_id:
                 qs = qs.filter(branch_id=branch_id)
-            if role_name:
-                qs = qs.filter(role=role_name)
 
-            # Apply role-specific filters
-            if role_name == 'staff' or role_name is None:
-                qs = filter_staff(qs)
-            if role_name == 'student' or role_name is None:
-                if student_class_id:
-                    qs = qs.filter(studentprofile__current_class_id=student_class_id)
-                if class_arm_id:
-                    qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
-
-            recipients = qs.exclude(id=user.id).distinct()
+            qs = apply_role_filters(qs)
 
         else:
-            recipients = CustomUser.objects.none()
+            return CustomUser.objects.none()
 
-        return recipients
+        return qs.exclude(id=user.id).distinct()
 
 
 class MultiFileInput(ClearableFileInput):
@@ -888,113 +903,46 @@ class CommunicationCommentForm(forms.ModelForm):
         fields = ['comment']
 
 
-
-
-
-
-# class CommunicationForm(forms.ModelForm):
-#     send_to_all = forms.BooleanField(required=False, label="Send to all users")
-
-#     manual_emails = forms.CharField(
-#         required=False,
-#         label="Add manual emails",
-#         widget=forms.Textarea(attrs={"placeholder": "Comma-separated emails"}),
-#         help_text="Add emails manually (e.g., external contacts)"
+# # Student inbox - only receive from allowed sources
+# if user.role == 'student':
+#     inbox = Message.objects.filter(
+#         recipient=user,
+#         sender__in=User.objects.filter(
+#             Q(role='parent', id=user.parent.id) |
+#             Q(role='staff', branch=user.branch) |
+#             Q(role='branchadmin', branch=user.branch) |
+#             Q(role='superadmin')
+#         )
 #     )
 
-#     class Meta:
-#         model = Communication
-#         fields = [
-#             'message_type',
-#             'title',
-#             'body',
-#             'is_draft',
-#             'scheduled_time',
-#             'send_to_all',
-#         ]
-#         widgets = {
-#             'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-#         }
 
-#     def __init__(self, *args, user=None, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.user = user
 
-#     def clean(self):
-#         cleaned_data = super().clean()
 
-#         body = cleaned_data.get('body')
-#         message_type = cleaned_data.get('message_type')
+# ////////////////////////////////////////////////////
 
-#         if message_type in ['announcement', 'post', 'notification', 'news', 'personal', 'group'] and not body:
-#             raise forms.ValidationError("Body is required for this message type.")
 
-#         return cleaned_data
 
-# class CommunicationTargetGroupForm(forms.ModelForm):
-#     class Meta:
-#         model = CommunicationTargetGroup
-#         fields = [
-#             'branch',
-#             'role',
-#             'staff_type',
-#             'teaching_positions',
-#             'non_teaching_positions',
-#             'student_class',
-#             'class_arm',
-#         ]
-#         widgets = {
-#             'teaching_positions': forms.CheckboxSelectMultiple(),
-#             'non_teaching_positions': forms.CheckboxSelectMultiple(),
-#         }
 
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop('user', None)
-#         super().__init__(*args, **kwargs)
 
-#         if user:
-#             # Hide or filter branch field
-#             if user.role in ['student', 'parent']:
-#                 self.fields.pop('branch', None)
-#             else:
-#                 self.fields['branch'].queryset = Branch.objects.all()
+# def get_filtered_recipients(self, target_group_data):
+#     user = self.user
 
-#             # Filter role choices
-#             if 'role' in self.fields:
-#                 if user.role in ['student', 'parent']:
-#                     self.fields['role'].choices = [
-#                         ('student', 'Student'),
-#                         ('staff', 'Staff'),
-#                         ('branch_admin', 'Branch Admin'),
-#                     ]
-#                 else:
-#                     self.fields['role'].choices = CommunicationTargetGroup.ROLE_CHOICES
+#     branch_id = target_group_data.get('branch')
+#     role_name = target_group_data.get('role')
+#     staff_type = target_group_data.get('staff_type')
+#     teaching_positions_ids = target_group_data.get('teaching_positions')
+#     non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
+#     student_class_id = target_group_data.get('student_class')
+#     class_arm_id = target_group_data.get('class_arm')
 
-#         # Load related queryset
-#         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
-#         self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
-#         self.fields['student_class'].queryset = StudentClass.objects.all()
-#         self.fields['class_arm'].queryset = ClassArm.objects.all()
-
-#     def get_filtered_recipients(self, target_group_data):
-#         user = self.user
-
-#         branch_id = target_group_data.get('branch')
-#         role_name = target_group_data.get('role')
-#         staff_type = target_group_data.get('staff_type')
-#         teaching_positions_ids = target_group_data.get('teaching_positions')
-#         non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
-#         student_class_id = target_group_data.get('student_class')
-#         class_arm_id = target_group_data.get('class_arm')
-
-#         def filter_staff(qs):
-#             if staff_type:
-#                 qs = qs.filter(staff_type=staff_type)
-#             if teaching_positions_ids:
-#                 qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
-#             if non_teaching_positions_ids:
-#                 qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
-#             return qs.distinct()
+#     def filter_staff(qs):
+#         if staff_type:
+#             qs = qs.filter(staff_type=staff_type)
+#         if teaching_positions_ids:
+#             qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
+#         if non_teaching_positions_ids:
+#             qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
+#         return qs.distinct()
 
 #         if user.role == 'student':
 #             recipients = CustomUser.objects.filter(
@@ -1016,6 +964,9 @@ class CommunicationCommentForm(forms.ModelForm):
 #             children_users = CustomUser.objects.filter(
 #                 id__in=children.values_list('user_id', flat=True)
 #             )
+            
+            
+            
 #             recipients = (children_users | class_teacher_users | branch_admins).distinct()
 
 #         elif user.role in ['staff', 'branch_admin', 'superadmin']:
@@ -1041,50 +992,3 @@ class CommunicationCommentForm(forms.ModelForm):
 #             recipients = CustomUser.objects.none()
 
 #         return recipients
-
-
-# class MultiFileInput(ClearableFileInput):
-#     allow_multiple_selected = True
-
-#     def value_from_datadict(self, data, files, name):
-#         # Return a list of uploaded files (if any)
-#         return files.getlist(name)
-
-# class CommunicationAttachmentModelForm(forms.ModelForm):
-#     class Meta:
-#         model = CommunicationAttachment
-#         fields = ['file']
-
-
-# AttachmentFormSet = inlineformset_factory(
-#     Communication,
-#     CommunicationAttachment,
-#     form=CommunicationAttachmentModelForm,
-#     extra=2,
-#     can_delete=True
-# )
-
-# class CommunicationRecipientForm(forms.ModelForm):
-#     class Meta:
-#         model = CommunicationRecipient
-#         fields = ['recipient']
-
-# class CommunicationCommentForm(forms.ModelForm):
-#     class Meta:
-#         model = CommunicationComment
-#         fields = ['comment']
-
-
-
-
-# # Student inbox - only receive from allowed sources
-# if user.role == 'student':
-#     inbox = Message.objects.filter(
-#         recipient=user,
-#         sender__in=User.objects.filter(
-#             Q(role='parent', id=user.parent.id) |
-#             Q(role='staff', branch=user.branch) |
-#             Q(role='branchadmin', branch=user.branch) |
-#             Q(role='superadmin')
-#         )
-#     )
