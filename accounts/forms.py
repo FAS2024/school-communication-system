@@ -862,11 +862,10 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         elif user.role in ['staff', 'branch_admin', 'superadmin']:
             qs = CustomUser.objects.all()
 
-            if branch_id:
-                qs = qs.filter(branch_id=branch_id)
-
-            qs = apply_role_filters(qs)
-
+            if role_name or branch_id:
+                qs = apply_role_filters(qs.filter(branch_id=branch_id))
+            else:
+                return CustomUser.objects.none()
         else:
             return CustomUser.objects.none()
 
@@ -925,74 +924,79 @@ class CommunicationCommentForm(forms.ModelForm):
 # ////////////////////////////////////////////////////
 
 
-
-
-
 # def get_filtered_recipients(self, target_group_data):
-#     user = self.user
+#         user = self.user
 
-#     branch_id = target_group_data.get('branch')
-#     role_name = target_group_data.get('role')
-#     staff_type = target_group_data.get('staff_type')
-#     teaching_positions_ids = target_group_data.get('teaching_positions')
-#     non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
-#     student_class_id = target_group_data.get('student_class')
-#     class_arm_id = target_group_data.get('class_arm')
+#         # Extract filter parameters
+#         branch_id = target_group_data.get('branch')
+#         role_name = target_group_data.get('role')
+#         staff_type = target_group_data.get('staff_type')
+#         teaching_positions_ids = target_group_data.get('teaching_positions')
+#         non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
+#         student_class_id = target_group_data.get('student_class')
+#         class_arm_id = target_group_data.get('class_arm')
 
-#     def filter_staff(qs):
-#         if staff_type:
-#             qs = qs.filter(staff_type=staff_type)
-#         if teaching_positions_ids:
-#             qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
-#         if non_teaching_positions_ids:
-#             qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
-#         return qs.distinct()
+#         def filter_staff(qs):
+#             if staff_type:
+#                 qs = qs.filter(staff_type=staff_type)
+#             if teaching_positions_ids:
+#                 qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
+#             if non_teaching_positions_ids:
+#                 qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
+#             return qs
 
+#         def filter_students(qs):
+#             if student_class_id:
+#                 qs = qs.filter(studentprofile__current_class_id=student_class_id)
+#             if class_arm_id:
+#                 qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
+#             return qs
+
+#         def apply_role_filters(qs):
+#             if role_name:
+#                 qs = qs.filter(role=role_name)
+#             if role_name in ['staff', 'branchadmin'] or role_name is None:
+#                 qs = filter_staff(qs)
+#             if role_name == 'student' or role_name is None:
+#                 qs = filter_students(qs)
+#             return qs
+
+#         # Main logic by user role
 #         if user.role == 'student':
-#             recipients = CustomUser.objects.filter(
+#             qs = CustomUser.objects.filter(
 #                 branch_id=user.branch_id,
 #                 role__in=['student', 'staff', 'branch_admin']
 #             ).exclude(id=user.id)
 
+#             if role_name:
+#                 qs = apply_role_filters(qs)
+#             else:
+#                 return CustomUser.objects.none()
+
 #         elif user.role == 'parent':
 #             children = StudentProfile.objects.filter(parent__user=user)
 #             child_class_ids = children.values_list('current_class_id', flat=True)
-#             class_teacher_users = CustomUser.objects.filter(
-#                 role='staff',
-#                 class_teacher_of__id__in=child_class_ids
-#             )
-#             branch_admins = CustomUser.objects.filter(
-#                 role='branch_admin',
-#                 branch_id=user.branch_id
-#             )
-#             children_users = CustomUser.objects.filter(
-#                 id__in=children.values_list('user_id', flat=True)
-#             )
-            
-            
-            
-#             recipients = (children_users | class_teacher_users | branch_admins).distinct()
+
+#             children_users = CustomUser.objects.filter(id__in=children.values_list('user_id', flat=True))
+#             class_teacher_users = CustomUser.objects.filter(role='staff', class_teacher_of__id__in=child_class_ids)
+#             branch_admins = CustomUser.objects.filter(role='branch_admin', branch_id=user.branch_id)
+
+#             qs = (children_users | class_teacher_users | branch_admins).distinct()
+
+#             if role_name:
+#                 qs = apply_role_filters(qs)
+#             else:
+#                 return CustomUser.objects.none()
 
 #         elif user.role in ['staff', 'branch_admin', 'superadmin']:
 #             qs = CustomUser.objects.all()
 
 #             if branch_id:
 #                 qs = qs.filter(branch_id=branch_id)
-#             if role_name:
-#                 qs = qs.filter(role=role_name)
-
-#             # Apply role-specific filters
-#             if role_name == 'staff' or role_name is None:
-#                 qs = filter_staff(qs)
-#             if role_name == 'student' or role_name is None:
-#                 if student_class_id:
-#                     qs = qs.filter(studentprofile__current_class_id=student_class_id)
-#                 if class_arm_id:
-#                     qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
-
-#             recipients = qs.exclude(id=user.id).distinct()
-
+                
+#             qs = apply_role_filters(qs) 
+    
 #         else:
-#             recipients = CustomUser.objects.none()
+#             return CustomUser.objects.none()
 
-#         return recipients
+#         return qs.exclude(id=user.id).distinct()
