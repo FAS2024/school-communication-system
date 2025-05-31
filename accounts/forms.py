@@ -735,6 +735,30 @@ class CommunicationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
 
+        # Restrict message_type choices depending on sender role
+        if 'message_type' in self.fields:
+            all_message_types = [
+                ('announcement', 'Announcement'),
+                ('post', 'Post'),
+                ('notification', 'Notification'),
+                ('news', 'News'),
+                ('personal', 'Personal'),
+                ('group', 'Group'),
+            ]
+
+            if self.user.role in ['student', 'parent']:
+                allowed_types = ['post', 'personal', 'group']
+                filtered_choices = [
+                    (value, label) for value, label in all_message_types if value in allowed_types
+                ]
+                # Remove manual_emails field so students and parents don't see it
+                self.fields.pop('manual_emails', None)
+            else:
+                filtered_choices = all_message_types
+
+            self.fields['message_type'].choices = filtered_choices
+    
+                
     def clean(self):
         cleaned_data = super().clean()
         body = cleaned_data.get('body')
@@ -768,28 +792,28 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if self.user:
-            # Hide/filter branch for certain roles
+            # Hide 'branch' field for students and parents
             if self.user.role in ['student', 'parent']:
                 self.fields.pop('branch', None)
             else:
                 self.fields['branch'].queryset = Branch.objects.all()
 
-            # Filter role choices for limited roles
+            # Set role choices based on user role
             if 'role' in self.fields:
                 if self.user.role in ['student', 'parent']:
                     self.fields['role'].choices = [
-                        ('', '------------'),  # Empty value with a placeholder label
+                        ('', '------------'),
                         ('student', 'Student'),
                         ('staff', 'Staff'),
                         ('branch_admin', 'Branch Admin'),
                     ]
                 else:
                     self.fields['role'].choices = [
-                        ('', '----------- '),
-                        *CommunicationTargetGroup.ROLE_CHOICES
+                        ('', '-----------'),
+                        *CommunicationTargetGroup.ROLE_CHOICES,
                     ]
 
-        # Set queryset for related fields
+        # Set querysets for related fields
         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
         self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
         self.fields['student_class'].queryset = StudentClass.objects.all()
@@ -798,7 +822,6 @@ class CommunicationTargetGroupForm(forms.ModelForm):
     def get_filtered_recipients(self, target_group_data):
         user = self.user
 
-        # Extract filter parameters
         branch_id = target_group_data.get('branch')
         role_name = target_group_data.get('role')
         staff_type = target_group_data.get('staff_type')
@@ -826,13 +849,13 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         def apply_role_filters(qs):
             if role_name:
                 qs = qs.filter(role=role_name)
-            if role_name in ['staff', 'branchadmin'] or role_name is None:
+            # Use corrected 'branch_admin' here:
+            if role_name in ['staff', 'branch_admin'] or role_name is None:
                 qs = filter_staff(qs)
             if role_name == 'student' or role_name is None:
                 qs = filter_students(qs)
             return qs
 
-        # Main logic by user role
         if user.role == 'student':
             qs = CustomUser.objects.filter(
                 branch_id=user.branch_id,
@@ -913,7 +936,7 @@ class CommunicationCommentForm(forms.ModelForm):
 #         sender__in=User.objects.filter(
 #             Q(role='parent', id=user.parent.id) |
 #             Q(role='staff', branch=user.branch) |
-#             Q(role='branchadmin', branch=user.branch) |
+#             Q(role='branch_admin', branch=user.branch) |
 #             Q(role='superadmin')
 #         )
 #     )
@@ -955,7 +978,7 @@ class CommunicationCommentForm(forms.ModelForm):
 #         def apply_role_filters(qs):
 #             if role_name:
 #                 qs = qs.filter(role=role_name)
-#             if role_name in ['staff', 'branchadmin'] or role_name is None:
+#             if role_name in ['staff', 'branch_admin'] or role_name is None:
 #                 qs = filter_staff(qs)
 #             if role_name == 'student' or role_name is None:
 #                 qs = filter_students(qs)

@@ -1115,44 +1115,124 @@ def get_filtered_users(request):
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
 
-@method_decorator([login_required, require_POST], name='dispatch')
+# @method_decorator([login_required, require_POST], name='dispatch')
+# class SendCommunicationView(View):
+#     def post(self, request):
+#         communication_form = CommunicationForm(request.POST, user=request.user)
+#         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
+#         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
+
+#         if not communication_form.is_valid():
+#             messages.error(request, "Please correct the communication form.")
+#             return redirect('communication_index')
+
+#         if not target_group_form.is_valid():
+#             messages.error(request, "Please correct the target group form.")
+#             return redirect('communication_index')
+
+#         if not attachment_formset.is_valid():
+#             messages.error(request, "Please correct the attachment form.")
+#             return redirect('communication_index')
+
+#         communication = communication_form.save(commit=False)
+#         communication.sender = request.user
+#         communication.created_at = timezone.now()
+#         communication.save()
+
+#         # Link attachments and save
+#         attachment_formset.instance = communication
+#         attachment_formset.save()
+
+#         # Get all recipients filtered by target group form
+#         allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+
+#         print('ARaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
+#         # Get selected recipient IDs from POST (AJAX selection)
+#         selected_recipient_ids = request.POST.getlist('selected_recipients')  # e.g. ['12', '34', '56']
+#         print('SRaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
+#         # Final recipients queryset is the intersection of allowed recipients and selected IDs
+#         recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
+#         print('RQSaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
+#         # Manual emails from form
+#         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+#         print('MERaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
+#         manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
+#         print('MELaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
+        
+#         valid_manual_emails = []
+#         for email in manual_emails_list:
+#             try:
+#                 validate_email(email)
+#                 valid_manual_emails.append(email)
+#             except ValidationError:
+#                 messages.warning(request, f"Invalid email skipped: {email}")
+
+#         # Save CommunicationRecipient entries in a transaction
+#         with transaction.atomic():
+#             for user_recipient in recipients_qs:
+#                 CommunicationRecipient.objects.create(
+#                     communication=communication,
+#                     recipient=user_recipient
+#                 )
+#             for manual_email in valid_manual_emails:
+#                 CommunicationRecipient.objects.create(
+#                     communication=communication,
+#                     email=manual_email
+#                 )
+
+#         messages.success(request, "Communication sent successfully.")
+#         return redirect('communication_index')
+import sys
+@method_decorator(login_required, name='dispatch')
 class SendCommunicationView(View):
     def post(self, request):
+        print(">>> POST handler called <<<", file=sys.stderr)
+
         communication_form = CommunicationForm(request.POST, user=request.user)
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
+        # Validate all forms
         if not communication_form.is_valid():
+            print("communication_form errors:", communication_form.errors, file=sys.stderr)
             messages.error(request, "Please correct the communication form.")
-            return redirect('communication_index')
+            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
 
         if not target_group_form.is_valid():
+            print("target_group_form errors:", target_group_form.errors, file=sys.stderr)
             messages.error(request, "Please correct the target group form.")
-            return redirect('communication_index')
+            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
 
         if not attachment_formset.is_valid():
+            print("attachment_formset errors:", attachment_formset.errors, file=sys.stderr)
             messages.error(request, "Please correct the attachment form.")
-            return redirect('communication_index')
+            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
 
+        # Save communication but don't commit yet
         communication = communication_form.save(commit=False)
-        communication.created_by = request.user
+        communication.sender = request.user
         communication.created_at = timezone.now()
         communication.save()
 
-        # Link attachments and save
+        # Save attachments linking to communication
         attachment_formset.instance = communication
         attachment_formset.save()
 
-        # Get all recipients filtered by target group form
+        # Get allowed recipients filtered by target group form, excluding sender
         allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
 
-        # Get selected recipient IDs from POST (AJAX selection)
-        selected_recipient_ids = request.POST.getlist('selected_recipients')  # e.g. ['12', '34', '56']
+        # Get selected recipient IDs from POST (expected to be a list)
+        selected_recipient_ids = request.POST.getlist('selected_recipients')
+        print(f"Selected recipient IDs: {selected_recipient_ids}", file=sys.stderr)
 
-        # Final recipients queryset is the intersection of allowed recipients and selected IDs
+        if not selected_recipient_ids:
+            selected_recipient_ids = []
+
+        # Filter allowed recipients by selected IDs
         recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
+        print(f"Recipients count: {recipients_qs.count()}", file=sys.stderr)
 
-        # Manual emails from form
+        # Process manual emails entered in the communication form
         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
         manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
 
@@ -1163,8 +1243,10 @@ class SendCommunicationView(View):
                 valid_manual_emails.append(email)
             except ValidationError:
                 messages.warning(request, f"Invalid email skipped: {email}")
+                print(f"Invalid manual email skipped: {email}", file=sys.stderr)
 
-        # Save CommunicationRecipient entries in a transaction
+        print("Saving recipients...", file=sys.stderr)
+        # Save CommunicationRecipient records inside a transaction
         with transaction.atomic():
             for user_recipient in recipients_qs:
                 CommunicationRecipient.objects.create(
@@ -1177,6 +1259,7 @@ class SendCommunicationView(View):
                     email=manual_email
                 )
 
+        print("Recipients saved, redirecting now.", file=sys.stderr)
         messages.success(request, "Communication sent successfully.")
         return redirect('communication_index')
 
