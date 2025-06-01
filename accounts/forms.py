@@ -770,6 +770,8 @@ class CommunicationForm(forms.ModelForm):
         return cleaned_data
 
 
+from django.core.exceptions import ValidationError
+
 class CommunicationTargetGroupForm(forms.ModelForm):
     class Meta:
         model = CommunicationTargetGroup
@@ -792,13 +794,11 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         if self.user:
-            # Hide 'branch' field for students and parents
             if self.user.role in ['student', 'parent']:
                 self.fields.pop('branch', None)
             else:
                 self.fields['branch'].queryset = Branch.objects.all()
 
-            # Set role choices based on user role
             if 'role' in self.fields:
                 if self.user.role in ['student', 'parent']:
                     self.fields['role'].choices = [
@@ -813,13 +813,41 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                         *CommunicationTargetGroup.ROLE_CHOICES,
                     ]
 
-        # Set querysets for related fields
         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
         self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
         self.fields['student_class'].queryset = StudentClass.objects.all()
         self.fields['class_arm'].queryset = ClassArm.objects.all()
 
+    def clean(self):
+        cleaned_data = super().clean()
+        staff_type = cleaned_data.get('staff_type')
+        teaching_positions = cleaned_data.get('teaching_positions')
+        non_teaching_positions = cleaned_data.get('non_teaching_positions')
+
+        if staff_type == 'teaching':
+            if non_teaching_positions.exists():
+                raise ValidationError("Non-teaching positions must not be selected for teaching staff type.")
+            if not teaching_positions.exists():
+                raise ValidationError("Please select at least one teaching position.")
+        
+        elif staff_type == 'non_teaching':
+            if teaching_positions.exists():
+                raise ValidationError("Teaching positions must not be selected for non-teaching staff type.")
+            if not non_teaching_positions.exists():
+                raise ValidationError("Please select at least one non-teaching position.")
+        
+        elif staff_type == 'both':
+            if not (teaching_positions.exists() or non_teaching_positions.exists()):
+                raise ValidationError("At least one teaching or non-teaching position must be selected for 'both' staff type.")
+
+        return cleaned_data
+    
     def get_filtered_recipients(self, target_group_data):
+        from .models import CustomUser,StudentProfile
+        from django.db.models import Q
+        qs = CustomUser.objects.filter(is_active=True)
+
+
         user = self.user
 
         branch_id = target_group_data.get('branch')
@@ -829,6 +857,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
         student_class_id = target_group_data.get('student_class')
         class_arm_id = target_group_data.get('class_arm')
+        search = target_group_data.get('search')
 
         def filter_staff(qs):
             if staff_type:
@@ -849,11 +878,12 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         def apply_role_filters(qs):
             if role_name:
                 qs = qs.filter(role=role_name)
-            # Use corrected 'branch_admin' here:
+
             if role_name in ['staff', 'branch_admin'] or role_name is None:
                 qs = filter_staff(qs)
             if role_name == 'student' or role_name is None:
                 qs = filter_students(qs)
+
             return qs
 
         if user.role == 'student':
@@ -861,11 +891,9 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                 branch_id=user.branch_id,
                 role__in=['student', 'staff', 'branch_admin']
             ).exclude(id=user.id)
-
-            if role_name:
-                qs = apply_role_filters(qs)
-            else:
+            if not role_name:
                 return CustomUser.objects.none()
+            qs = apply_role_filters(qs)
 
         elif user.role == 'parent':
             children = StudentProfile.objects.filter(parent__user=user)
@@ -876,23 +904,32 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             branch_admins = CustomUser.objects.filter(role='branch_admin', branch_id=user.branch_id)
 
             qs = (children_users | class_teacher_users | branch_admins).distinct()
-
-            if role_name:
-                qs = apply_role_filters(qs)
-            else:
+            if not role_name:
                 return CustomUser.objects.none()
+            qs = apply_role_filters(qs)
 
         elif user.role in ['staff', 'branch_admin', 'superadmin']:
-            qs = CustomUser.objects.all()
-
-            if role_name or branch_id:
-                qs = apply_role_filters(qs.filter(branch_id=branch_id))
-            else:
+            if not (role_name or branch_id):
                 return CustomUser.objects.none()
+            qs = CustomUser.objects.all()
+            if branch_id:
+                qs = qs.filter(branch_id=branch_id)
+            qs = apply_role_filters(qs)
+
         else:
             return CustomUser.objects.none()
 
+        # Apply search filter if present
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search)
+            )
+
         return qs.exclude(id=user.id).distinct()
+
+
 
 
 class MultiFileInput(ClearableFileInput):

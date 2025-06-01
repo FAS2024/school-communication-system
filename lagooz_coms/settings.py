@@ -131,13 +131,17 @@ USE_TZ = True
 
 # URL to use when referring to static files
 
-# Static files (CSS, JavaScript, images)
-STATIC_URL = '/static/'
+# # Static files (CSS, JavaScript, images)
+# STATIC_URL = '/static/'
 
-# If you're deploying to production, specify the location for static files
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # Default static folder
-]
+# # If you're deploying to production, specify the location for static files
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, 'static'),  # Default static folder
+# ]
+
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # This is where static files will be collected into during deployment
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Only needed in production
@@ -146,13 +150,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Only needed in production
 # STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'  # For custom storage backends
 
 
-# Media files (uploads from users)
-MEDIA_URL = '/media/'  # The URL where media files will be accessible
+# # Media files (uploads from users)
+# MEDIA_URL = '/media/'  # The URL where media files will be accessible
 
-# The file system path to store uploaded files
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # The directory where user-uploaded files will be stored
+# # The file system path to store uploaded files
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # The directory where user-uploaded files will be stored
 
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Default primary key field type

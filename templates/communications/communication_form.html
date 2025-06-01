@@ -1,23 +1,23 @@
+
 {% extends "base.html" %} {% load static %} {% block content %}
 <h2 style="margin-bottom: 1rem">Create Communication</h2>
 
 <style>
-    
   #form-fields-container {
     border: 1px solid #ccc;
     border-radius: 8px;
     padding: 1rem;
     display: flex;
-    flex-wrap: wrap;        /* allow wrapping */
-    gap: 1rem;              /* spacing between fields */
+    flex-wrap: wrap; /* allow wrapping */
+    gap: 1rem; /* spacing between fields */
     justify-content: flex-start; /* align fields left */
-    align-items: flex-start;      /* align items at top */
+    align-items: flex-start; /* align items at top */
     /* Remove scroll and nowrap */
-    overflow-x: visible;   
+    overflow-x: visible;
     white-space: normal;
-     /* New background color */
+    /* New background color */
     background-color: #f9f9fb; /* very light gray-blue */
-  
+
     /* Optional subtle shadow for nice depth */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
   }
@@ -26,24 +26,23 @@
     font-weight: 600;
     font-size: 1.1rem;
     padding: 0 0.5rem;
-    flex-basis: 100%;  /* make legend take full width on its own line */
+    flex-basis: 100%; /* make legend take full width on its own line */
     margin-bottom: 1rem; /* space below legend */
   }
 
   .form-group {
     display: flex;
     flex-direction: column; /* label on top of input */
-    min-width: 180px;       /* minimum width for each group */
-    flex-grow: 1; 
-    margin-top: -2rem; 
-        /* fields can grow to fill space */
+    min-width: 180px; /* minimum width for each group */
+    flex-grow: 1;
+    margin-top: -2rem;
+    /* fields can grow to fill space */
   }
 
   .form-label {
     margin-bottom: 0.3rem;
     font-weight: 500;
   }
-
 </style>
 
 <form id="target-group-form" method="get" style="margin-bottom: 1rem">
@@ -56,7 +55,12 @@
       {{ target_group_form.branch }}
     </div>
     {% else %}
-    <input type="hidden" id="id_branch" name="branch" value="{{ user_branch_id }}" />
+    <input
+      type="hidden"
+      id="id_branch"
+      name="branch"
+      value="{{ user_branch_id }}"
+    />
     {% endif %}
 
     <div id="role-field" class="form-group" style="display: none">
@@ -70,12 +74,20 @@
     </div>
 
     <div id="teaching-positions-field" class="form-group" style="display: none">
-      <label for="id_teaching_positions" class="form-label">Teaching Positions:</label>
+      <label for="id_teaching_positions" class="form-label"
+        >Teaching Positions:</label
+      >
       {{ target_group_form.teaching_positions }}
     </div>
 
-    <div id="non-teaching-positions-field" class="form-group" style="display: none">
-      <label for="id_non_teaching_positions" class="form-label">Non-Teaching Positions:</label>
+    <div
+      id="non-teaching-positions-field"
+      class="form-group"
+      style="display: none"
+    >
+      <label for="id_non_teaching_positions" class="form-label"
+        >Non-Teaching Positions:</label
+      >
       {{ target_group_form.non_teaching_positions }}
     </div>
 
@@ -90,7 +102,6 @@
     </div>
   </fieldset>
 </form>
-
 
 <h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
 <table
@@ -130,6 +141,7 @@
 <form
   id="communication-form"
   method="post"
+  action="{% url 'send_communication' %}"
   enctype="multipart/form-data"
   style="max-width: 900px"
 >
@@ -229,7 +241,6 @@
 
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
 
 <script>
   $(document).ready(function () {
@@ -419,7 +430,9 @@
           }
 
           response.forEach((user, index) => {
-            const profilePic = (user.profile_picture && user.profile_picture.url) || "/static/assets/img/profile-pic.png";
+            const profilePic =
+              (user.profile_picture && user.profile_picture.url) ||
+              "/static/assets/img/profile-pic.png";
             const isChecked = selectedRecipients.has(user.id.toString())
               ? "checked"
               : "";
@@ -557,6 +570,4 @@
   });
 </script>
 
-
-{% endblock %} 
-
+{% endblock %}

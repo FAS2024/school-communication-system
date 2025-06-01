@@ -70,11 +70,14 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
 
-from .utils import filter_users_by_target_group_or_params
+
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+
+# from .utils import filter_users_by_target_group_or_params
+# from .utils import get_filtered_recipients
 
 
 
@@ -1109,9 +1112,12 @@ def get_filtered_users(request):
     form = CommunicationTargetGroupForm(request.GET, user=request.user)
     if form.is_valid():
         recipients = form.get_filtered_recipients(form.cleaned_data)
-        # users = recipients.values('id', 'first_name', 'email')
-        users = recipients.values('id', 'first_name', 'last_name', 'email', 'branch__name', 'profile_picture')
+        users = recipients.values(
+            'id', 'first_name', 'last_name', 'email',
+            'branch__name', 'profile_picture'
+        )
         return JsonResponse(list(users), safe=False)
+    
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
 
@@ -1182,86 +1188,69 @@ def get_filtered_users(request):
 
 #         messages.success(request, "Communication sent successfully.")
 #         return redirect('communication_index')
-import sys
-@method_decorator(login_required, name='dispatch')
+
+
+@method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
     def post(self, request):
-        print(">>> POST handler called <<<", file=sys.stderr)
-
         communication_form = CommunicationForm(request.POST, user=request.user)
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
-        # Validate all forms
-        if not communication_form.is_valid():
-            print("communication_form errors:", communication_form.errors, file=sys.stderr)
-            messages.error(request, "Please correct the communication form.")
-            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
+        if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
+            communication = communication_form.save(commit=False)
+            communication.sender = request.user
+            communication.save()
 
-        if not target_group_form.is_valid():
-            print("target_group_form errors:", target_group_form.errors, file=sys.stderr)
-            messages.error(request, "Please correct the target group form.")
-            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
+            # Save attachments
+            for form in attachment_formset:
+                if form.cleaned_data and form.cleaned_data.get('file'):
+                    form.instance.communication = communication
+                    form.save()
 
-        if not attachment_formset.is_valid():
-            print("attachment_formset errors:", attachment_formset.errors, file=sys.stderr)
-            messages.error(request, "Please correct the attachment form.")
-            return self._render_with_forms(request, communication_form, target_group_form, attachment_formset)
+            # Step 1: Get allowed recipients from form filtering (excluding sender)
+            allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
 
-        # Save communication but don't commit yet
-        communication = communication_form.save(commit=False)
-        communication.sender = request.user
-        communication.created_at = timezone.now()
-        communication.save()
+            # Step 2: Get selected recipients from POST (from AJAX-selected user checkboxes)
+            selected_recipient_ids = request.POST.getlist('selected_recipients')  # ['1', '2', '3']
+            recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
 
-        # Save attachments linking to communication
-        attachment_formset.instance = communication
-        attachment_formset.save()
+            # Step 3: Process manual email list (e.g. 'a@b.com, c@d.com')
+            manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+            manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
+            
+            valid_manual_emails = []
+            for email in manual_emails_list:
+                try:
+                    validate_email(email)
+                    valid_manual_emails.append(email)
+                except ValidationError:
+                    messages.warning(request, f"Invalid email skipped: {email}")
 
-        # Get allowed recipients filtered by target group form, excluding sender
-        allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+            # Step 4: Save CommunicationRecipient entries
+            with transaction.atomic():
+                for user_recipient in recipients_qs:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        recipient=user_recipient
+                    )
+                for manual_email in valid_manual_emails:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        email=manual_email
+                    )
 
-        # Get selected recipient IDs from POST (expected to be a list)
-        selected_recipient_ids = request.POST.getlist('selected_recipients')
-        print(f"Selected recipient IDs: {selected_recipient_ids}", file=sys.stderr)
+            messages.success(request, "Communication sent successfully.")
+            return redirect('communication_success')
 
-        if not selected_recipient_ids:
-            selected_recipient_ids = []
-
-        # Filter allowed recipients by selected IDs
-        recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
-        print(f"Recipients count: {recipients_qs.count()}", file=sys.stderr)
-
-        # Process manual emails entered in the communication form
-        manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-        manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-
-        valid_manual_emails = []
-        for email in manual_emails_list:
-            try:
-                validate_email(email)
-                valid_manual_emails.append(email)
-            except ValidationError:
-                messages.warning(request, f"Invalid email skipped: {email}")
-                print(f"Invalid manual email skipped: {email}", file=sys.stderr)
-
-        print("Saving recipients...", file=sys.stderr)
-        # Save CommunicationRecipient records inside a transaction
-        with transaction.atomic():
-            for user_recipient in recipients_qs:
-                CommunicationRecipient.objects.create(
-                    communication=communication,
-                    recipient=user_recipient
-                )
-            for manual_email in valid_manual_emails:
-                CommunicationRecipient.objects.create(
-                    communication=communication,
-                    email=manual_email
-                )
-
-        print("Recipients saved, redirecting now.", file=sys.stderr)
-        messages.success(request, "Communication sent successfully.")
+        messages.error(request, "There was an error with your submission.")
         return redirect('communication_index')
+
+
+
+def communication_success(request):
+    # This view just renders the success message template.
+    return render(request, 'communications/communication_success.html')
 
 
 
@@ -1299,116 +1288,6 @@ class SendCommunicationView(View):
 #                     recipients_preview = form.cleaned_data.get('manual_emails', '')
 
 #         return JsonResponse({'recipients_preview': recipients_preview})
-
-
-
-
-
-
-
-# @login_required
-# def get_recipients(request):
-#     user = request.user
-
-#     # Get filter values from GET request (adjust field names as needed)
-#     branch_id = request.GET.get('branch')
-#     role_name = request.GET.get('role')
-#     staff_type = request.GET.get('staff_type')
-#     teaching_positions_ids = request.GET.getlist('teaching_positions[]')
-#     non_teaching_positions_ids = request.GET.getlist('non_teaching_positions[]')
-#     student_class_id = request.GET.get('student_class')
-#     class_arm_id = request.GET.get('class_arm')
-
-#     recipients = CustomUser.objects.none()  # default empty
-
-#     # Helper function to filter staff by positions and staff_type
-#     def filter_staff(qs):
-#         if staff_type:
-#             qs = qs.filter(staff_type=staff_type)
-#         if teaching_positions_ids:
-#             qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
-#         if non_teaching_positions_ids:
-#             qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
-#         return qs.distinct()
-
-#     if user.role == 'student':
-#         # Students can message students, staff, branch_admin in their branch (exclude self)
-#         recipients = CustomUser.objects.filter(
-#             Q(branch_id=user.branch_id),
-#             Q(role='student') | Q(role='staff') | Q(role='branch_admin')
-#         ).exclude(id=user.id)
-
-#     elif user.role == 'parent':
-#         # Parents can message their children, their children's class teachers, branch admin in their branch
-
-#         # Children of the parent
-#         children = StudentProfile.objects.filter(parent__user=user)
-
-#         # Get their current classes
-#         child_class_ids = children.values_list('current_class_id', flat=True).distinct()
-
-#         # Get staff users who are class teachers of these classes
-#         class_teacher_users = CustomUser.objects.filter(
-#             role='staff',
-#             class_teacher_of__id__in=child_class_ids
-#         ).distinct()
-
-#         # Branch admins in parent's branch
-#         branch_admins = CustomUser.objects.filter(
-#             role='branch_admin',
-#             branch_id=user.branch_id
-#         )
-
-#         # Children users
-#         children_users = CustomUser.objects.filter(
-#             id__in=children.values_list('user_id', flat=True)
-#         )
-
-#         # Union all these
-#         recipients = (children_users | class_teacher_users | branch_admins).distinct()
-
-#     elif user.role in ['staff', 'branch_admin', 'superadmin']:
-#         # For staff roles: filter by passed filters
-
-#         qs = CustomUser.objects.all()
-
-#         if branch_id:
-#             qs = qs.filter(branch_id=branch_id)
-
-#         if role_name:
-#             qs = qs.filter(role=role_name)
-
-#         if role_name == 'staff' or role_name is None:
-#             qs = filter_staff(qs)
-
-#         if role_name == 'student' or role_name is None:
-#             if student_class_id:
-#                 qs = qs.filter(studentprofile__current_class_id=student_class_id)
-#             if class_arm_id:
-#                 qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
-
-#         # Exclude self
-#         recipients = qs.exclude(id=user.id).distinct()
-
-#     else:
-#         # Default: no recipients
-#         recipients = CustomUser.objects.none()
-
-#     # Optionally serialize recipients or return as JSON (example below)
-#     data = [
-#         {
-#             'id': recipient.id,
-#             'email': recipient.email,
-#             'username': recipient.username,
-#             'full_name': recipient.get_full_name(),
-#             'role': recipient.role,
-#             'branch': recipient.branch.name if recipient.branch else None
-#         }
-#         for recipient in recipients
-#     ]
-
-#     return JsonResponse({'recipients': data})
-
 
 
 # def send_notification_email(recipient, communication):

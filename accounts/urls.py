@@ -96,6 +96,7 @@ urlpatterns = [
     path('communications/ajax/get_class_arms/', views.get_class_arms, name='get_class_arms'),
     path('communications/ajax/get_filtered_users/', views.get_filtered_users, name='get_filtered_users'),
     path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
+    path('communication/sent/', views.communication_success, name='communication_success'),
 
 ]
 

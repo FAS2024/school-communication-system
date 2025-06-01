@@ -6,7 +6,6 @@ import datetime
 from datetime import date
 
 from django.utils import timezone
-from .utils import filter_users_by_target_group_or_params
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -235,7 +234,7 @@ class Communication(models.Model):
 
 class CommunicationAttachment(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='attachments')
-    file = models.FileField(upload_to='communication_attachments/')
+    file = models.FileField(upload_to='communication_attachments/', blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -260,13 +259,8 @@ class CommunicationTargetGroup(models.Model):
     communication = models.ForeignKey(
         Communication, on_delete=models.CASCADE, related_name='target_groups'
     )
-    branch = models.ForeignKey(
-        'Branch', null=True, blank=True, on_delete=models.SET_NULL
-    )
-    role = models.CharField(
-        max_length=20, choices=ROLE_CHOICES, null=True, blank=True
-    )
-
+    branch = models.ForeignKey('Branch', null=True, blank=True, on_delete=models.SET_NULL, db_index=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True, db_index=True)
     # Staff-specific
     staff_type = models.CharField(
         max_length=20, choices=STAFF_TYPE_CHOICES, null=True, blank=True
