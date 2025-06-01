@@ -212,13 +212,16 @@ class Communication(models.Model):
     body = models.TextField()
     is_draft = models.BooleanField(default=False)
     scheduled_time = models.DateTimeField(blank=True, null=True)
+    sent = models.BooleanField(default=False)
     # send_to_all = models.BooleanField(blank=True, null=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def short_body(self):
         return self.body[:75] + "..." if len(self.body) > 75 else self.body
+    
+    def is_due(self):
+        return self.scheduled_time is None or self.scheduled_time <= timezone.now()
 
     def __str__(self):
         return f"{self.message_type.title()} from {self.sender.username}"
@@ -302,13 +305,15 @@ class CommunicationTargetGroup(models.Model):
 class CommunicationRecipient(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='recipients')
     recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='received_communications')
-
+    email = models.EmailField(null=True, blank=True)  # for manual email support
     # Soft delete for recipient
     deleted = models.BooleanField(default=False)
 
     # Read status
     read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
+    delivered = models.BooleanField(default=False)
+    delivered_at = models.DateTimeField(null=True, blank=True)
 
     def mark_as_read(self):
         if not self.read:
@@ -317,7 +322,11 @@ class CommunicationRecipient(models.Model):
             self.save()
 
     def __str__(self):
-        return f"{self.recipient.username} -> {self.communication.title or 'Untitled Message'}"
+        if self.recipient:
+            return f"{self.recipient.username} -> {self.communication.title or 'Untitled Message'}"
+        else:
+            return f"{self.email} -> {self.communication.title or 'Untitled Message'}"
+
 
 class CommunicationComment(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='comments')

@@ -76,8 +76,8 @@ from django.views.decorators.http import require_POST
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
-# from .utils import filter_users_by_target_group_or_params
-# from .utils import get_filtered_recipients
+
+from .utils import send_communication_to_recipients
 
 
 
@@ -1087,6 +1087,7 @@ def ajax_filtered_queryset(request, model, filter_field, filter_value_key='id', 
 
 @login_required
 def communication_index(request):
+    
     context = {
         'communication_form': CommunicationForm(user=request.user),
         'target_group_form': CommunicationTargetGroupForm(user=request.user),
@@ -1128,65 +1129,53 @@ def get_filtered_users(request):
 #         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
 #         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
-#         if not communication_form.is_valid():
-#             messages.error(request, "Please correct the communication form.")
-#             return redirect('communication_index')
+#         if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
+#             communication = communication_form.save(commit=False)
+#             communication.sender = request.user
+#             communication.save()
 
-#         if not target_group_form.is_valid():
-#             messages.error(request, "Please correct the target group form.")
-#             return redirect('communication_index')
+#             # Save attachments
+#             for form in attachment_formset:
+#                 if form.cleaned_data and form.cleaned_data.get('file'):
+#                     form.instance.communication = communication
+#                     form.save()
 
-#         if not attachment_formset.is_valid():
-#             messages.error(request, "Please correct the attachment form.")
-#             return redirect('communication_index')
+#             # Step 1: Get allowed recipients from form filtering (excluding sender)
+#             allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
 
-#         communication = communication_form.save(commit=False)
-#         communication.sender = request.user
-#         communication.created_at = timezone.now()
-#         communication.save()
+#             # Step 2: Get selected recipients from POST (from AJAX-selected user checkboxes)
+#             selected_recipient_ids = request.POST.getlist('selected_recipients')  # ['1', '2', '3']
+#             recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
 
-#         # Link attachments and save
-#         attachment_formset.instance = communication
-#         attachment_formset.save()
+#             # Step 3: Process manual email list (e.g. 'a@b.com, c@d.com')
+#             manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+#             manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
+            
+#             valid_manual_emails = []
+#             for email in manual_emails_list:
+#                 try:
+#                     validate_email(email)
+#                     valid_manual_emails.append(email)
+#                 except ValidationError:
+#                     messages.warning(request, f"Invalid email skipped: {email}")
 
-#         # Get all recipients filtered by target group form
-#         allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+#             # Step 4: Save CommunicationRecipient entries
+#             with transaction.atomic():
+#                 for user_recipient in recipients_qs:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         recipient=user_recipient
+#                     )
+#                 for manual_email in valid_manual_emails:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         email=manual_email
+#                     )
 
-#         print('ARaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
-#         # Get selected recipient IDs from POST (AJAX selection)
-#         selected_recipient_ids = request.POST.getlist('selected_recipients')  # e.g. ['12', '34', '56']
-#         print('SRaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
-#         # Final recipients queryset is the intersection of allowed recipients and selected IDs
-#         recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
-#         print('RQSaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
-#         # Manual emails from form
-#         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-#         print('MERaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
-#         manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-#         print('MELaaaaaaaaaaaaaaaaaaaaaaaaaa',allowed_recipients)
-        
-#         valid_manual_emails = []
-#         for email in manual_emails_list:
-#             try:
-#                 validate_email(email)
-#                 valid_manual_emails.append(email)
-#             except ValidationError:
-#                 messages.warning(request, f"Invalid email skipped: {email}")
+#             messages.success(request, "Communication sent successfully.")
+#             return redirect('communication_success')
 
-#         # Save CommunicationRecipient entries in a transaction
-#         with transaction.atomic():
-#             for user_recipient in recipients_qs:
-#                 CommunicationRecipient.objects.create(
-#                     communication=communication,
-#                     recipient=user_recipient
-#                 )
-#             for manual_email in valid_manual_emails:
-#                 CommunicationRecipient.objects.create(
-#                     communication=communication,
-#                     email=manual_email
-#                 )
-
-#         messages.success(request, "Communication sent successfully.")
+#         messages.error(request, "There was an error with your submission.")
 #         return redirect('communication_index')
 
 
@@ -1200,6 +1189,7 @@ class SendCommunicationView(View):
         if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
             communication = communication_form.save(commit=False)
             communication.sender = request.user
+            communication.sent = False
             communication.save()
 
             # Save attachments
@@ -1208,17 +1198,18 @@ class SendCommunicationView(View):
                     form.instance.communication = communication
                     form.save()
 
-            # Step 1: Get allowed recipients from form filtering (excluding sender)
-            allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+            # Step 1: Filter allowed recipients (excluding sender)
+            allowed_recipients = target_group_form.get_filtered_recipients(
+                target_group_form.cleaned_data
+            ).exclude(id=request.user.id)
 
-            # Step 2: Get selected recipients from POST (from AJAX-selected user checkboxes)
-            selected_recipient_ids = request.POST.getlist('selected_recipients')  # ['1', '2', '3']
+            # Step 2: Get selected recipients
+            selected_recipient_ids = request.POST.getlist('selected_recipients')
             recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
 
-            # Step 3: Process manual email list (e.g. 'a@b.com, c@d.com')
+            # Step 3: Manual emails
             manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
             manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-            
             valid_manual_emails = []
             for email in manual_emails_list:
                 try:
@@ -1227,25 +1218,32 @@ class SendCommunicationView(View):
                 except ValidationError:
                     messages.warning(request, f"Invalid email skipped: {email}")
 
-            # Step 4: Save CommunicationRecipient entries
-            with transaction.atomic():
-                for user_recipient in recipients_qs:
-                    CommunicationRecipient.objects.create(
-                        communication=communication,
-                        recipient=user_recipient
-                    )
-                for manual_email in valid_manual_emails:
-                    CommunicationRecipient.objects.create(
-                        communication=communication,
-                        email=manual_email
-                    )
+            # Step 4: Send now or schedule
+            if communication.is_due():
+                with transaction.atomic():
+                    for user_recipient in recipients_qs:
+                        CommunicationRecipient.objects.create(
+                            communication=communication,
+                            recipient=user_recipient
+                        )
+                    for manual_email in valid_manual_emails:
+                        CommunicationRecipient.objects.create(
+                            communication=communication,
+                            email=manual_email
+                        )
 
-            messages.success(request, "Communication sent successfully.")
+                send_communication_to_recipients(communication)
+                communication.sent = True
+                communication.save()
+                messages.success(request, "Communication sent immediately.")
+            else:
+                # Don't save recipients yet. Let Celery handle that at scheduled time.
+                messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
+
             return redirect('communication_success')
 
         messages.error(request, "There was an error with your submission.")
         return redirect('communication_index')
-
 
 
 def communication_success(request):

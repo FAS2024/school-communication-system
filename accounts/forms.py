@@ -23,7 +23,7 @@ from django.forms.widgets import ClearableFileInput
 from django.contrib.auth import get_user_model
 from django.forms.widgets import CheckboxSelectMultiple
 from django.db.models import Q
-
+from django.utils.timezone import localtime
 
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
@@ -703,7 +703,6 @@ class StudentProfileForm(forms.ModelForm):
                     self.fields[field].disabled = True
 
 
-
 class CommunicationForm(forms.ModelForm):
     # send_to_all = forms.BooleanField(required=False, label="Send to all users")
     manual_emails = forms.CharField(
@@ -734,6 +733,11 @@ class CommunicationForm(forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+
+        if self.instance and self.instance.scheduled_time:
+            local_dt = localtime(self.instance.scheduled_time)
+            self.initial['scheduled_time'] = local_dt.strftime('%Y-%m-%dT%H:%M')
+            self.fields['scheduled_time'].label = "Scheduled time (24-hour clock)"
 
         # Restrict message_type choices depending on sender role
         if 'message_type' in self.fields:
@@ -769,8 +773,6 @@ class CommunicationForm(forms.ModelForm):
 
         return cleaned_data
 
-
-from django.core.exceptions import ValidationError
 
 class CommunicationTargetGroupForm(forms.ModelForm):
     class Meta:

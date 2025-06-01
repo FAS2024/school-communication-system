@@ -116,13 +116,25 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+# LANGUAGE_CODE = 'en-us'
+
+# TIME_ZONE = 'UTC'
+
+# USE_I18N = True
+
+# USE_TZ = True
+
+
+
+
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Lagos'  # Your local timezone here
 
 USE_I18N = True
 
 USE_TZ = True
+
 
 
 # Static files (CSS, JavaScript, Images)
@@ -169,6 +181,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'  # This assumes the 'login' URL name exists
 
 
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'send-due-communications-every-minute': {
+        'task': 'communications.tasks.send_due_communications',  # path to your task
+        'schedule': crontab(minute='*/1'),  # every minute
+    },
+}
+
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 
 # # settings.py
