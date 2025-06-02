@@ -6,6 +6,7 @@ import datetime
 from datetime import date
 
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -321,6 +322,12 @@ class CommunicationRecipient(models.Model):
             self.read_at = timezone.now()
             self.save()
 
+    def clean(self):
+        if not self.recipient and not self.email:
+            raise ValidationError("Either a registered user (recipient) or an email must be provided.")
+        if self.recipient and self.email:
+            raise ValidationError("Provide only a recipient OR an email, not both.")
+        
     def __str__(self):
         if self.recipient:
             return f"{self.recipient.username} -> {self.communication.title or 'Untitled Message'}"

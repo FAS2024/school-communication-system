@@ -703,15 +703,75 @@ class StudentProfileForm(forms.ModelForm):
                     self.fields[field].disabled = True
 
 
+# class CommunicationForm(forms.ModelForm):
+#     # send_to_all = forms.BooleanField(required=False, label="Send to all users")
+#     manual_emails = forms.CharField(
+#         required=False,
+#         label="Add manual emails",
+#         widget=forms.Textarea(attrs={
+#             "placeholder": "Comma-separated emails",
+#             "rows": 2,  # reduce height
+#             "cols": 40  # optional: adjust width
+#         }),
+#         help_text="Add emails manually (e.g., external contacts)"
+#     )
+
+#     class Meta:
+#         model = Communication
+#         fields = [
+#             'message_type',
+#             'title',
+#             'body',
+#             'is_draft',
+#             'scheduled_time',
+#             # 'send_to_all',
+#         ]
+#         widgets = {
+#             'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+#         }
+
+#     def __init__(self, *args, user=None, **kwargs):
+#         super().__init__(*args, **kwargs)
+#         self.user = user
+
+#         if self.instance and self.instance.scheduled_time:
+#             local_dt = localtime(self.instance.scheduled_time)
+#             self.initial['scheduled_time'] = local_dt.strftime('%Y-%m-%dT%H:%M')
+#             self.fields['scheduled_time'].label = "Scheduled time (24-hour clock)"
+
+#         # Restrict message_type choices depending on sender role
+#         if 'message_type' in self.fields:
+#             all_message_types = [
+#                 ('announcement', 'Announcement'),
+#                 ('post', 'Post'),
+#                 ('notification', 'Notification'),
+#                 ('news', 'News'),
+#                 ('personal', 'Personal'),
+#                 ('group', 'Group'),
+#             ]
+
+#             if self.user.role in ['student', 'parent']:
+#                 allowed_types = ['post', 'personal', 'group']
+#                 filtered_choices = [
+#                     (value, label) for value, label in all_message_types if value in allowed_types
+#                 ]
+#                 # Remove manual_emails field so students and parents don't see it
+#                 self.fields.pop('manual_emails', None)
+#             else:
+#                 filtered_choices = all_message_types
+
+#             self.fields['message_type'].choices = filtered_choices
+#             self.fields['message_type'].choices = [('', 'Select a message type')] + filtered_choices
+
+
 class CommunicationForm(forms.ModelForm):
-    # send_to_all = forms.BooleanField(required=False, label="Send to all users")
     manual_emails = forms.CharField(
         required=False,
         label="Add manual emails",
         widget=forms.Textarea(attrs={
             "placeholder": "Comma-separated emails",
-            "rows": 2,  # reduce height
-            "cols": 40  # optional: adjust width
+            "rows": 2,
+            "cols": 40
         }),
         help_text="Add emails manually (e.g., external contacts)"
     )
@@ -724,7 +784,6 @@ class CommunicationForm(forms.ModelForm):
             'body',
             'is_draft',
             'scheduled_time',
-            # 'send_to_all',
         ]
         widgets = {
             'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
@@ -734,12 +793,13 @@ class CommunicationForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.user = user
 
+        # Format scheduled_time for display
         if self.instance and self.instance.scheduled_time:
             local_dt = localtime(self.instance.scheduled_time)
             self.initial['scheduled_time'] = local_dt.strftime('%Y-%m-%dT%H:%M')
             self.fields['scheduled_time'].label = "Scheduled time (24-hour clock)"
 
-        # Restrict message_type choices depending on sender role
+        # Message type filtering based on user role
         if 'message_type' in self.fields:
             all_message_types = [
                 ('announcement', 'Announcement'),
@@ -750,28 +810,38 @@ class CommunicationForm(forms.ModelForm):
                 ('group', 'Group'),
             ]
 
-            if self.user.role in ['student', 'parent']:
+            if self.user and self.user.role in ['student', 'parent']:
                 allowed_types = ['post', 'personal', 'group']
-                filtered_choices = [
-                    (value, label) for value, label in all_message_types if value in allowed_types
-                ]
-                # Remove manual_emails field so students and parents don't see it
-                self.fields.pop('manual_emails', None)
+                filtered_choices = [(v, l) for v, l in all_message_types if v in allowed_types]
+                self.fields.pop('manual_emails', None)  # Hide manual emails for limited roles
             else:
                 filtered_choices = all_message_types
 
             self.fields['message_type'].choices = filtered_choices
-    
-                
+            self.fields['message_type'].choices = [('', '--------------')] + filtered_choices
+            self.fields['title'].required = True  
+            self.fields['body'].required = True  
+
     def clean(self):
         cleaned_data = super().clean()
-        body = cleaned_data.get('body')
         message_type = cleaned_data.get('message_type')
+        title = cleaned_data.get('title')
+        body = cleaned_data.get('body')
 
-        if message_type in ['announcement', 'post', 'notification', 'news', 'personal', 'group'] and not body:
-            raise forms.ValidationError("Body is required for this message type.")
+        # Check for required fields manually to improve clarity
+        if not message_type:
+            self.add_error('message_type', "Message type is required.")
+        if not title:
+            self.add_error('title', "Title is required.")
+        if not body:
+            self.add_error('body', "Body is required.")
+
+        # Raise global form error if any of the above is missing
+        if self.errors:
+            raise ValidationError("Please correct the required fields.")
 
         return cleaned_data
+
 
 
 class CommunicationTargetGroupForm(forms.ModelForm):
@@ -930,8 +1000,6 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             )
 
         return qs.exclude(id=user.id).distinct()
-
-
 
 
 class MultiFileInput(ClearableFileInput):
