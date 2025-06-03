@@ -305,11 +305,17 @@ class CommunicationTargetGroup(models.Model):
     
 class CommunicationRecipient(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='recipients')
-    recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='received_communications')
-    email = models.EmailField(null=True, blank=True)  # for manual email support
+    # recipient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='received_communications')
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        null=True,  
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='received_communications',
+    )
+    email = models.EmailField(null=True, blank=True)  # required for non-user recipients
     # Soft delete for recipient
     deleted = models.BooleanField(default=False)
-
     # Read status
     read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)

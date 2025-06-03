@@ -1,4 +1,3 @@
-
 {% extends "base.html" %} {% load static %} {% block content %}
 <h2 style="margin-bottom: 1rem">Create Communication</h2>
 
@@ -52,7 +51,11 @@
     {% if user_role != "student" and user_role != "parent" %}
     <div id="branch-field" class="form-group">
       <label for="id_branch" class="form-label">Branch:</label>
-      {{ target_group_form.branch }}
+      {{ target_group_form.branch }} {% if target_group_form.branch.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.branch.errors }}
+      </div>
+      {% endif %}
     </div>
     {% else %}
     <input
@@ -63,14 +66,23 @@
     />
     {% endif %}
 
-    <div id="role-field" class="form-group" style="display: none">
+    <div id="role-field" class="form-group" style="{% if target_group_form.role.errors %}display: block{% else %}display: none{% endif %}">
       <label for="id_role" class="form-label">Role:</label>
-      {{ target_group_form.role }}
+      {{ target_group_form.role }} {% if target_group_form.role.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.role.errors }}
+      </div>
+      {% endif %}
     </div>
 
     <div id="staff-type-field" class="form-group" style="display: none">
       <label for="id_staff_type" class="form-label">Staff Type:</label>
-      {{ target_group_form.staff_type }}
+      {{ target_group_form.staff_type }} 
+      {% if target_group_form.staff_type.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.staff_type.errors }}
+      </div>
+      {% endif %}
     </div>
 
     <div id="teaching-positions-field" class="form-group" style="display: none">
@@ -78,6 +90,11 @@
         >Teaching Positions:</label
       >
       {{ target_group_form.teaching_positions }}
+      {% if target_group_form.teaching_positions.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.teaching_positions.errors }}
+      </div>
+      {% endif %}
     </div>
 
     <div
@@ -88,17 +105,32 @@
       <label for="id_non_teaching_positions" class="form-label"
         >Non-Teaching Positions:</label
       >
-      {{ target_group_form.non_teaching_positions }}
+      {{ target_group_form.non_teaching_positions }} 
+      {% if target_group_form.non_teaching_positions.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.non_teaching_positions.errors }}
+      </div>
+      {% endif %}
     </div>
 
     <div id="student-class-field" class="form-group" style="display: none">
       <label for="id_student_class" class="form-label">Student Class:</label>
-      {{ target_group_form.student_class }}
+      {{ target_group_form.student_class }} 
+      {% if target_group_form.student_class.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.student_class.errors }}
+      </div>
+      {% endif %}
     </div>
 
     <div id="class-arm-field" class="form-group" style="display: none">
       <label for="id_class_arm" class="form-label">Class Arm:</label>
-      {{ target_group_form.class_arm }}
+      {{ target_group_form.class_arm }} 
+      {% if target_group_form.class_arm.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.class_arm.errors }}
+      </div>
+      {% endif %}
     </div>
   </fieldset>
 </form>
@@ -246,7 +278,6 @@
 
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
 <script>
   $(document).ready(function () {
     const $form = $("#target-group-form");
@@ -421,44 +452,39 @@
     }
 
     function loadRecipients() {
-      $.get(
-        "{% url 'get_filtered_users' %}",
-        $form.serialize(),
-        function (response) {
-          $recipientsTableBody.empty();
-          if (response.length === 0) {
-            $recipientsTableBody.append(
-              '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
-            );
-            $selectAll.prop("checked", false);
-            return;
-          }
+      $.get("{% url 'get_filtered_users' %}", $form.serialize(), function (response) {
+        recipientsTable.clear();
 
-          response.forEach((user, index) => {
-            const profilePic =
-              (user.profile_picture && user.profile_picture.url) ||
-              "/static/assets/img/profile-pic.png";
-            const isChecked = selectedRecipients.has(user.id.toString())
-              ? "checked"
-              : "";
-            const row = `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td class="text-center"><input type="checkbox" class="recipient-checkbox" value="${
-                user.id
-              }" ${isChecked}></td>
-              <td class="text-center">${index + 1}</td>
-              <td class="text-center"><img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;"></td>
-              <td class="text-center">${user.branch__name}</td>
-              <td>${user.first_name} ${user.last_name}</td>
-              <td>${user.email}</td>
-            </tr>`;
-            $recipientsTableBody.append(row);
-          });
-
-          updateRecipientTableCheckboxStates();
+        if (response.length === 0) {
+          recipientsTable.draw();
+          $selectAll.prop("checked", false);
+          $recipientsTableBody.html(
+            '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
+          );
+          return;
         }
-      );
+
+        response.forEach((user, index) => {
+          const profilePic =
+            (user.profile_picture && user.profile_picture.url) ||
+            "/static/assets/img/profile-pic.png";
+          const isChecked = selectedRecipients.has(user.id.toString());
+
+          recipientsTable.row.add([
+            `<input type="checkbox" class="recipient-checkbox" value="${user.id}" ${isChecked ? "checked" : ""}>`,
+            index + 1,
+            `<img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;">`,
+            user.branch__name,
+            `${user.first_name} ${user.last_name}`,
+            user.email,
+          ]);
+        });
+
+        recipientsTable.draw();
+        updateRecipientTableCheckboxStates();
+      });
     }
+
 
     function handleDependencyChange() {
       clearSelectedRecipients();
@@ -576,9 +602,22 @@
 </script>
 
 <script>
-  $(document).ready(function () {
-    $('#recipients-table').DataTable();
+let recipientsTable;
+
+$(document).ready(function () {
+  recipientsTable = $("#recipients-table").DataTable({
+    columnDefs: [
+      {
+        targets: 0,
+        orderable: false,
+        searchable: false,
+      },
+    ],
+    order: [[1, "asc"]],
   });
+});
+
 </script>
+
 
 {% endblock %}

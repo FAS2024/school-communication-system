@@ -9,12 +9,14 @@
     </a>
 </div>
 
-<table style="width: 100%; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+<div style="overflow-x: auto; width: 100%;">
+  <table id="student-table" style="min-width: 1000px; border-collapse: collapse; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
     <thead style="background-color: #f8f9fa;">
         <tr>
             <th style="padding: 10px;">S/N</th>
             <th style="padding: 10px;">Profile Picture</th>
             <th style="padding: 10px;">Full Name</th>
+            <th style="padding: 10px;">Email</th>
             <th style="padding: 10px;">Admission No</th>
             <th style="padding: 10px;">Class</th>
             <th style="padding: 10px;">Class Arm</th>
@@ -36,11 +38,12 @@
                 {% endif %}
             </td>
             <td style="padding: 10px;">{{ student.get_full_name }}</td>
+            <td style="padding: 10px;">{{ student.email }}</td>
             <td style="padding: 10px;">{{ student.studentprofile.admission_number }}</td>
             <td style="padding: 10px;">{{ student.studentprofile.current_class }}</td>
             <td style="padding: 10px;">{{ student.studentprofile.current_class_arm }}</td>
             <td style="padding: 10px;">{{ student.branch.name }}</td>
-            <td style="padding: 10px;">
+            <td style="padding: 10px; white-space: nowrap;">
                 <a href="{% url 'student_detail' student.pk %}" class="btn btn-sm btn-info" style="margin-right: 5px;">View</a>
                 <a href="{% url 'student_update' student.pk %}" class="btn btn-sm btn-warning" style="margin-right: 5px;">Edit</a>
                 <a href="{% url 'student_delete' student.pk %}" class="btn btn-sm btn-danger"
@@ -49,14 +52,16 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="8" style="text-align: center; padding: 20px;">No students found.</td>
+            <td colspan="9" style="text-align: center; padding: 20px;">No students found.</td>
         </tr>
         {% endfor %}
     </tbody>
-</table>
+  </table>
+</div>
+
 
 <!-- Stylish Pagination -->
-<div class="d-flex justify-content-center mt-4">
+{% comment %} <div class="d-flex justify-content-center mt-4">
   <nav aria-label="Student pagination">
     <ul class="pagination pagination-rounded">
       {% if page_obj.has_previous %}
@@ -94,5 +99,27 @@
       {% endif %}
     </ul>
   </nav>
-</div>
+</div> {% endcomment %}
+
+
+<!-- DataTables & Bootstrap 5 Integration -->
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  $(document).ready(function () {
+    $('#student-table').DataTable({
+      paging: true,
+      responsive: true,
+      language: {
+        searchPlaceholder: "🔍 Search branches...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ branches"
+      },
+      columnDefs: [
+        { orderable: false, targets: 4 } // Disable sorting on Actions
+      ]
+    });
+  });
+</script>
 {% endblock %}

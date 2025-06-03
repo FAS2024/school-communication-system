@@ -1253,81 +1253,118 @@ def get_filtered_users(request):
 #         messages.error(request, "There was an error with your submission.")
 #         return redirect('communication_index')
 
+
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
 
     def _get_allowed_recipients(self, target_group_form, user):
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
+        
+        print('rrrrrrrrrrrrrrrrrrrrrr:',recipients)
         return recipients.exclude(id=user.id)
+    
 
     def _get_selected_recipients(self, request, allowed_recipients):
         selected_ids = request.POST.getlist('selected_recipients')
+        print('rrrrrrrrrrrrrrrrrrrrrr:',selected_ids)
         return allowed_recipients.filter(id__in=selected_ids)
 
+    def _parse_manual_emails(self, email_string):
+        emails = [email.strip() for email in email_string.split(',') if email.strip()]
+        valid_emails = []
+        print('rrrrrrrrrrrrrrrrrrrrrr:',valid_emails)
+
+        for email in emails:
+            try:
+                validate_email(email)
+                valid_emails.append(email)
+            except ValidationError:
+                messages.warning(self.request, f"Invalid email skipped: {email}")
+        return valid_emails
+
+    def _check_conflicts(self, selected_recipients, manual_emails, form):
+        if selected_recipients.exists():
+            selected_emails = set(selected_recipients.values_list('email', flat=True))
+            conflicting = selected_emails.intersection(manual_emails)
+            if conflicting:
+                form.add_error(
+                    None,
+                    f"The following manual email(s) are already among selected recipients: {', '.join(conflicting)}"
+                )
+                return False
+        return True
+
+    def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
+        return render(
+            self.request,
+            'communications/communication_form.html',  # Use your actual template path
+            {
+                'communication_form': communication_form,
+                'target_group_form': target_group_form,
+                'attachment_formset': attachment_formset,
+            }
+        )
+
     def post(self, request):
+        self.request = request
         communication_form = CommunicationForm(request.POST, user=request.user)
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
-        if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
-            allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
-            selected_recipients = self._get_selected_recipients(request, allowed_recipients)
+        if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-            # Manual emails processing
-            manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-            manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-            valid_manual_emails = []
+        allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
+        selected_recipients = self._get_selected_recipients(request, allowed_recipients)
 
-            for email in manual_emails_list:
-                try:
-                    validate_email(email)
-                    valid_manual_emails.append(email)
-                except ValidationError:
-                    messages.warning(request, f"Invalid email skipped: {email}")
+        manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+        valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
+        manual_email_set = set(valid_manual_emails)
 
-            # Ensure at least one recipient (selected or manual) is present
-            if not selected_recipients.exists() and not valid_manual_emails:
-                messages.error(request, "Please select at least one recipient or provide a valid manual email.")
-                return redirect('communication_index')
+        if not selected_recipients.exists() and not valid_manual_emails:
+            communication_form.add_error(
+                None, "Please select at least one recipient or provide a valid manual email."
+            )
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-            # Save communication instance
-            communication = communication_form.save(commit=False)
-            communication.sender = request.user
-            communication.sent = False
+        if not self._check_conflicts(selected_recipients, manual_email_set, communication_form):
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+        communication = communication_form.save(commit=False)
+        communication.sender = request.user
+        communication.sent = False
+        communication.save()
+
+        # Save attachments
+        for form in attachment_formset:
+            if form.cleaned_data and form.cleaned_data.get('file'):
+                form.instance.communication = communication
+                form.save()
+
+        # Immediate send or schedule
+        if communication.is_due():
+            with transaction.atomic():
+                for user_recipient in selected_recipients:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        recipient=user_recipient
+                    )
+                for email in valid_manual_emails:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        email=email
+                    )
+
+            send_communication_to_recipients(communication)
+            communication.sent = True
             communication.save()
+            messages.success(request, "Communication sent immediately.")
+        else:
+            # Scheduled: handled by background process
+            messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
 
-            # Save attachments
-            for form in attachment_formset:
-                if form.cleaned_data and form.cleaned_data.get('file'):
-                    form.instance.communication = communication
-                    form.save()
+        return redirect('communication_success')
 
-            # Send or schedule communication
-            if communication.is_due():
-                with transaction.atomic():
-                    for user_recipient in selected_recipients:
-                        CommunicationRecipient.objects.create(
-                            communication=communication,
-                            recipient=user_recipient
-                        )
-                    for manual_email in valid_manual_emails:
-                        CommunicationRecipient.objects.create(
-                            communication=communication,
-                            email=manual_email
-                        )
-
-                send_communication_to_recipients(communication)
-                communication.sent = True
-                communication.save()
-                messages.success(request, "Communication sent immediately.")
-            else:
-                # Scheduled - recipients saved later by celery task
-                messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
-
-            return redirect('communication_success')
-
-        messages.error(request, "There was an error with your submission.")
-        return redirect('communication_index')
 
 
 def communication_success(request):
