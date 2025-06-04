@@ -78,6 +78,7 @@ from django.core.exceptions import ValidationError
 
 
 from .utils import send_communication_to_recipients
+from django.conf import settings  # Make sure this is imported at the top
 
 
 
@@ -1123,6 +1124,10 @@ def get_filtered_users(request):
         )
         return JsonResponse(list(users), safe=False)
     
+    # Return detailed form errors only in DEBUG mode
+    if settings.DEBUG:
+        return JsonResponse({'errors': form.errors}, status=400)
+
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
 
@@ -1314,6 +1319,14 @@ class SendCommunicationView(View):
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
+        # For student or parent users, force the branch to be the user's branch
+        if request.user.role in ['student', 'parent']:
+            # Set cleaned_data branch to user's branch instance
+            target_group_form.cleaned_data['branch'] = request.user.branch
+            # Also, if the form instance exists, set the branch attribute too (for later save if any)
+            if hasattr(target_group_form, 'instance'):
+                target_group_form.instance.branch = request.user.branch
+        
         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
 

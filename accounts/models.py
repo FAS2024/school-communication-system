@@ -263,7 +263,7 @@ class CommunicationTargetGroup(models.Model):
     communication = models.ForeignKey(
         Communication, on_delete=models.CASCADE, related_name='target_groups'
     )
-    branch = models.ForeignKey('Branch', null=True, blank=True, on_delete=models.SET_NULL, db_index=True)
+    branch = models.ForeignKey('Branch', null=False, blank=False, on_delete=models.CASCADE, db_index=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True, db_index=True)
     # Staff-specific
     staff_type = models.CharField(
