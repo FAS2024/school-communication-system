@@ -1077,17 +1077,67 @@ def delete_class_arm(request, pk):
 
 
 # Helper function to return filtered queryset based on GET params (used in ajax views)
+# @login_required
+# def ajax_filtered_queryset(request, model, filter_field, filter_value_key='id', values_fields=None):
+#     filter_value = request.GET.get(filter_value_key)
+#     if filter_value:
+#         qs = model.objects.filter(**{f'{filter_field}': filter_value})
+#         if values_fields:
+#             qs = qs.values(*values_fields)
+#         else:
+#             qs = qs.values()
+#         return JsonResponse(list(qs), safe=False)
+#     return JsonResponse([], safe=False)
+
 @login_required
-def ajax_filtered_queryset(request, model, filter_field, filter_value_key='id', values_fields=None):
-    filter_value = request.GET.get(filter_value_key)
-    if filter_value:
-        qs = model.objects.filter(**{f'{filter_field}': filter_value})
-        if values_fields:
-            qs = qs.values(*values_fields)
-        else:
-            qs = qs.values()
-        return JsonResponse(list(qs), safe=False)
-    return JsonResponse([], safe=False)
+@require_GET
+def ajax_get_filtered_users(request):
+    # Define filter fields from the form
+    filter_fields = CommunicationTargetGroupForm.Meta.fields
+
+    # Clean and prepare data from GET parameters
+    cleaned_data = {
+        field: (value if value else None)
+        for field in filter_fields
+        if (value := request.GET.get(field)) is not None
+    }
+
+    # Instantiate the form with user context
+    form = CommunicationTargetGroupForm(user=request.user, data=cleaned_data)
+
+    if not form.is_valid():
+        return JsonResponse({'errors': form.errors}, status=400)
+
+    try:
+        # Get filtered recipients
+        users_qs = form.get_filtered_recipients(form.cleaned_data)
+
+        # Optimize DB queries (ensure related fields are prefetched)
+        users_qs = users_qs.select_related('branch')  # if applicable
+
+        users_list = []
+        for user in users_qs:
+            profile_picture_url = None
+            if hasattr(user, 'profile_picture'):
+                profile_picture = user.profile_picture
+                if profile_picture and hasattr(profile_picture, 'url'):
+                    profile_picture_url = profile_picture.url
+
+            users_list.append({
+                'id': user.id,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'email': user.email,
+                'branch__name': getattr(user.branch, 'name', 'N/A') if hasattr(user, 'branch') else 'N/A',
+                'profile_picture': {
+                    'url': profile_picture_url
+                }
+            })
+
+        return JsonResponse(users_list, safe=False)
+
+    except ValidationError as e:
+        return JsonResponse({'error': str(e)}, status=400)
 
 
 @login_required
@@ -1103,14 +1153,14 @@ def communication_index(request):
     return render(request, 'communications/communication_form.html', context)
 
 
-@login_required
-def get_student_classes(request):
-    return ajax_filtered_queryset(request, StudentClass, 'branch_id', 'branch_id', ['id', 'name'])
+# @login_required
+# def get_student_classes(request):
+#     return ajax_filtered_queryset(request, StudentClass, 'branch_id', 'branch_id', ['id', 'name'])
 
 
-@login_required
-def get_class_arms(request):
-    return ajax_filtered_queryset(request, ClassArm, 'student_class_id', 'class_id', ['id', 'name'])
+# @login_required
+# def get_class_arms(request):
+#     return ajax_filtered_queryset(request, ClassArm, 'student_class_id', 'class_id', ['id', 'name'])
 
 
 @login_required
