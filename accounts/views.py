@@ -1095,11 +1095,21 @@ def ajax_get_filtered_users(request):
     # Define filter fields from the form
     filter_fields = CommunicationTargetGroupForm.Meta.fields
 
-    # Clean and prepare data from GET parameters
+    # Extract raw GET parameters for filter fields
+    raw_filter_values = {
+        field: request.GET.get(field, None)
+        for field in filter_fields
+    }
+
+    # If any filter field is present and has an empty string '', return empty result immediately
+    if any(value == '' for value in raw_filter_values.values() if value is not None):
+        return JsonResponse([], safe=False)
+
+    # Clean and prepare data from GET parameters (convert empty strings to None)
     cleaned_data = {
         field: (value if value else None)
-        for field in filter_fields
-        if (value := request.GET.get(field)) is not None
+        for field, value in raw_filter_values.items()
+        if value is not None
     }
 
     # Instantiate the form with user context
@@ -1138,6 +1148,7 @@ def ajax_get_filtered_users(request):
 
     except ValidationError as e:
         return JsonResponse({'error': str(e)}, status=400)
+
 
 
 @login_required

@@ -1021,10 +1021,16 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # Setup queryset for related fields
-        self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
-        self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
-        self.fields['student_class'].queryset = StudentClass.objects.all()
-        self.fields['class_arm'].queryset = ClassArm.objects.all()
+        if self.user.role == "parent":
+            self.fields['teaching_positions'].queryset = TeachingPosition.objects.filter(is_class_teacher=True)
+            # self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
+            self.fields['student_class'].queryset = StudentClass.objects.all()
+            self.fields['class_arm'].queryset = ClassArm.objects.all()
+        else:
+            self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
+            self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
+            self.fields['student_class'].queryset = StudentClass.objects.all()
+            self.fields['class_arm'].queryset = ClassArm.objects.all()
 
         # Make optional fields not required
         for field in ['teaching_positions', 'non_teaching_positions', 'student_class', 'class_arm']:
@@ -1039,13 +1045,23 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             # Branch is fixed to user's branch
             self.fields['branch'].initial = self.user.branch
             self.fields['branch'].disabled = True
-            self.fields['role'].choices = [
-                ('', '------------'),
-                ('student', 'Student'),
-                ('parent', 'Parent'),
-                ('staff', 'Staff'),
-                ('branch_admin', 'Branch Admin'),
-            ]
+            
+            if self.user.role == 'parent':
+                self.fields['role'].choices = [
+                    ('', '------------'),
+                    ('student', 'My Child/Children'),
+                    ('staff', 'Staff'),
+                    ('branch_admin', 'Branch Admin'),
+                ]
+            elif self.user.role == 'student':
+                self.fields['role'].choices = [
+                    ('', '------------'),
+                    ('student', 'Students'),
+                    ('parent', 'My Parent'),
+                    ('staff', 'Staffs'),
+                    ('branch_admin', 'Branch Admin'),
+                ]
+                
             self.fields['role'].required = True
             self.fields['branch'].required = False  # disabled field
 
@@ -1056,122 +1072,6 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             self.fields['role'].choices = [('', '-----------')] + list(CommunicationTargetGroup.ROLE_CHOICES)
             self.fields['role'].required = False
 
-    # def clean(self):
-    #     cleaned_data = super().clean()
-
-    #     role = cleaned_data.get('role')
-    #     staff_type = cleaned_data.get('staff_type')
-    #     branch = cleaned_data.get('branch')
-    #     teaching_positions = cleaned_data.get('teaching_positions') or self.fields['teaching_positions'].queryset.none()
-    #     non_teaching_positions = cleaned_data.get('non_teaching_positions') or self.fields['non_teaching_positions'].queryset.none()
-    #     student_class = cleaned_data.get('student_class')
-    #     class_arm = cleaned_data.get('class_arm')
-
-    #     if self.user.role in self.STUDENT_ROLES:
-    #         # Force branch to user branch
-    #         cleaned_data['branch'] = self.user.branch
-
-    #         if not role:
-    #             raise ValidationError('You must select a role.')
-
-    #         require_full_filter = student_class or class_arm  # True if either is selected
-
-    #         if role in ['student', 'parent'] and require_full_filter:
-    #             if not student_class or not class_arm:
-    #                 raise ValidationError('Both class and arm are required to filter.')
-                
-    #     elif self.user.role in self.STAFF_ROLES:
-    #         if not branch:
-    #             raise ValidationError('Branch must be selected.')
-
-    #         require_staff_filter = staff_type or teaching_positions or non_teaching_positions
-
-    #         if role in ['staff', 'branch_admin', 'superadmin'] and require_staff_filter:
-    #             self._validate_staff_positions(staff_type, teaching_positions, non_teaching_positions)
-
-    #     return cleaned_data
-
-    # def _validate_staff_positions(self, staff_type, teaching_positions, non_teaching_positions):
-    #     if not staff_type and not teaching_positions.exists() and not non_teaching_positions.exists():
-    #         raise ValidationError("Staff type and at least one teaching or non-teaching position must be selected.")
-
-    #     if staff_type == 'teaching':
-    #         if non_teaching_positions.exists():
-    #             raise ValidationError("Non-teaching positions cannot be selected for teaching staff type.")
-    #         if not teaching_positions.exists():
-    #             raise ValidationError("At least one teaching position must be selected.")
-    #     elif staff_type == 'non_teaching':
-    #         if teaching_positions.exists():
-    #             raise ValidationError("Teaching positions cannot be selected for non-teaching staff type.")
-    #         if not non_teaching_positions.exists():
-    #             raise ValidationError("At least one non-teaching position must be selected.")
-    #     elif staff_type == 'both':
-    #         if not (teaching_positions.exists() or non_teaching_positions.exists()):
-    #             raise ValidationError("Select at least one teaching or non-teaching position for 'both' staff type.")
-
-    # def save(self, commit=True):
-    #     instance = super().save(commit=False)
-    #     instance.sender = self.user
-
-    #     # Enforce branch and role constraints based on user role
-    #     if self.user.role in self.STUDENT_ROLES:
-    #         instance.branch = self.user.branch
-    #         role = self.cleaned_data.get('role')
-
-    #         if role in ['student', 'parent']:
-    #             instance.student_class = self.cleaned_data.get('student_class')
-    #             instance.class_arm = self.cleaned_data.get('class_arm')
-    #             # Clear staff-related fields
-    #             instance.staff_type = None
-    #             instance.teaching_positions.clear()
-    #             instance.non_teaching_positions.clear()
-
-    #         elif role in ['staff', 'branch_admin', 'superadmin']:
-    #             instance.staff_type = self.cleaned_data.get('staff_type')
-
-    #             if instance.staff_type == 'teaching':
-    #                 instance.teaching_positions.set(self.cleaned_data.get('teaching_positions'))
-    #                 instance.non_teaching_positions.clear()
-    #             elif instance.staff_type == 'non_teaching':
-    #                 instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions'))
-    #                 instance.teaching_positions.clear()
-    #             else:  # both or none
-    #                 # clear or set as needed
-    #                 pass
-
-    #             instance.student_class = None
-    #             instance.class_arm = None
-
-    #         else:
-    #             raise ValidationError("Invalid role selected.")
-
-    #         instance.role = role
-
-    #     elif self.user.role in self.STAFF_ROLES:
-    #         # Staff/admin users can set branch, role, staff_type freely
-    #         instance.branch = self.cleaned_data.get('branch')
-    #         instance.role = self.cleaned_data.get('role')
-    #         instance.staff_type = self.cleaned_data.get('staff_type')
-
-    #         if instance.staff_type == 'teaching':
-    #             instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
-    #             instance.non_teaching_positions.clear()
-    #         elif instance.staff_type == 'non_teaching':
-    #             instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
-    #             instance.teaching_positions.clear()
-    #         else:
-    #             instance.teaching_positions.clear()
-    #             instance.non_teaching_positions.clear()
-
-    #         instance.student_class = self.cleaned_data.get('student_class')
-    #         instance.class_arm = self.cleaned_data.get('class_arm')
-
-    #     if commit:
-    #         instance.save()
-    #         self.save_m2m()
-
-    #     return instance
-    
     def clean(self):
         cleaned_data = super().clean()
 
@@ -1182,6 +1082,15 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         non_teaching_positions = cleaned_data.get('non_teaching_positions') or self.fields['non_teaching_positions'].queryset.none()
         student_class = cleaned_data.get('student_class')
         class_arm = cleaned_data.get('class_arm')
+        
+        if not role:
+            # Automatically clear all recipient-related filters if no role selected
+            cleaned_data['student_class'] = None
+            cleaned_data['class_arm'] = None
+            cleaned_data['staff_type'] = None
+            cleaned_data['teaching_positions'] = []
+            cleaned_data['non_teaching_positions'] = []
+            return cleaned_data
 
         if self.user.role in self.STUDENT_ROLES:
             # Force branch to user's branch
@@ -1304,7 +1213,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
 
         # Base queryset excluding current user
         qs = CustomUser.objects.filter(is_active=True).exclude(id=self.user.id)
-
+    
         def filter_staff(qs, staff_type, teaching_positions, non_teaching_positions):
             if not staff_type:
                 return CustomUser.objects.none()
@@ -1342,11 +1251,13 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                 if role == 'student':
                     qs = qs.filter(role='student')
 
-                    # Optional: Limit to same class/arm only, if that's the intent
-                    if student_class:
+                    # Initially return none if no class is selected
+                    if not student_class:
+                        qs = qs.none()
+                    else:
                         qs = qs.filter(studentprofile__current_class_id=student_class)
-                    if class_arm:
-                        qs = qs.filter(studentprofile__current_class_arm_id=class_arm)
+                        if class_arm:
+                            qs = qs.filter(studentprofile__current_class_arm_id=class_arm)
 
                 # Student wants to see their own parent
                 elif role == 'parent':
@@ -1373,7 +1284,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                 # Class teachers of children's classes
                 class_teacher_user_ids = CustomUser.objects.filter(
                     role='staff',
-                    class_teacher_of__id__in=child_class_ids
+                    class_teacher_of__id__in=child_class_ids,is_class_teacher=True
                 ).values_list('id', flat=True)
 
                 # Branch admins
@@ -1420,8 +1331,6 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             qs = qs.filter(Q(username__icontains=search) | Q(email__icontains=search))
 
         return qs
-
-
 
 class MultiFileInput(ClearableFileInput):
     allow_multiple_selected = True
