@@ -230,7 +230,8 @@ class StaffProfile(models.Model):
     user = models.OneToOneField(
         CustomUser,
         on_delete=models.CASCADE,
-        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']}
+        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']},
+        related_name='staffprofile'
     )
     phone_number = PhoneNumberField(blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
@@ -242,6 +243,7 @@ class StaffProfile(models.Model):
     staff_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
     managing_class = models.ForeignKey('StudentClass', related_name='staff_profiles', on_delete=models.SET_NULL, null=True)
     managing_class_arm = models.ForeignKey('ClassArm', related_name='staff_profiles', on_delete=models.SET_NULL, null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     class Meta:

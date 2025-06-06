@@ -22,6 +22,7 @@
               <th scope="col">S/N</th>
               <th scope="col">Profile</th>
               <th scope="col">Full Name</th>
+              <th scope="col">Staff Number</th>
               <th scope="col">Email</th>
               <th scope="col">Role</th>
               <th scope="col">Branch</th>
@@ -52,6 +53,7 @@
                 {% endif %}
               </td>
               <td class="text-nowrap">{{ staff.get_full_name }}</td>
+              <td class="text-nowrap">{{ staff.staffprofile.staff_number }}</td>
               <td class="text-nowrap">{{ staff.email }}</td>
               <td>{{ staff.get_role_display }}</td>
               <td>{{ staff.branch.name }}</td>

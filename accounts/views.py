@@ -347,12 +347,20 @@ def create_staff(request):
                 staff_profile.qualification = profile_form.cleaned_data['qualification']
                 staff_profile.years_of_experience = profile_form.cleaned_data['years_of_experience']
                 staff_profile.address = profile_form.cleaned_data['address']
+                staff_profile.nationality = profile_form.cleaned_data['nationality']
+                staff_profile.state = profile_form.cleaned_data['state']
+                staff_profile.managing_class = profile_form.cleaned_data['managing_class']
+                staff_profile.managing_class_arm = profile_form.cleaned_data['managing_class_arm']
+                
                 staff_profile.save()
             except StaffProfile.DoesNotExist:
                 messages.error(request, "Staff profile was not created properly.")
                 return redirect('create_staff')
 
-            messages.success(request, f"{selected_role.replace('_', ' ').title()} created successfully.")
+            messages.success(
+                request,
+                f"{new_user.get_full_name()} ({selected_role.replace('_', ' ').title()}) created successfully."
+            )
             return redirect('staff_list')
         else:
             messages.error(request, "Please correct the errors in the form.")
