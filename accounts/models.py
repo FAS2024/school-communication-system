@@ -8,7 +8,7 @@ from datetime import date
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
-
+from accounts.utils import generate_profile_number, get_prefix_for_user
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -155,7 +155,18 @@ class ParentProfile(models.Model):
     phone_number = PhoneNumberField(blank=True, null=True)
     occupation = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
-    relationship_to_student = models.CharField(max_length=50)
+    relationship_to_student = models.CharField(
+        max_length=20,
+        choices=[
+            ('father', 'Father'),
+            ('mother', 'Mother'),
+            ('guardian', 'Guardian'),
+            ('other', 'Other'),
+        ],
+        default='father',
+        verbose_name="Relationship to Student",
+    )
+
     date_of_birth = models.DateField(null=True, blank=True)
     preferred_contact_method = models.CharField(
         max_length=20,
@@ -183,9 +194,11 @@ class ParentProfile(models.Model):
     def save(self, *args, **kwargs):
         if self.user.role != 'parent':
             raise ValidationError("User must have a 'parent' role.")
+
         if not self.parent_number:
-            from accounts.utils import generate_profile_number
-            self.parent_number = generate_profile_number('PAR', ParentProfile)
+            prefix = get_prefix_for_user(self.user)
+            self.parent_number = generate_profile_number(prefix, ParentProfile)
+
         super().save(*args, **kwargs)
 
 
@@ -221,8 +234,8 @@ class StudentProfile(models.Model):
         if self.user.role != 'student':
             raise ValidationError("User must have a 'student' role.")
         if not self.admission_number:
-            from accounts.utils import generate_profile_number
-            self.admission_number = generate_profile_number('STU', StudentProfile)
+            prefix = get_prefix_for_user(self.user)  # This will return 'STU' for students
+            self.admission_number = generate_profile_number(prefix, StudentProfile)
         super().save(*args, **kwargs)
 
     
@@ -253,13 +266,15 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return self.user.get_full_name()
-
+    
     def save(self, *args, **kwargs):
         if self.user.role not in ['staff', 'superadmin', 'branch_admin']:
-            raise ValueError("Invalid user role for StaffProfile")
+            raise ValidationError("Invalid user role for StaffProfile")
+
         if not self.staff_number:
-            from accounts.utils import generate_profile_number
-            self.staff_number = generate_profile_number('STA', StaffProfile)
+            prefix = get_prefix_for_user(self.user)
+            self.staff_number = generate_profile_number(prefix, StaffProfile)
+
         super().save(*args, **kwargs)
 
 class Communication(models.Model):
