@@ -9,6 +9,8 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
 from accounts.utils import generate_profile_number, get_prefix_for_user
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -256,6 +258,16 @@ class StaffProfile(models.Model):
     staff_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
     managing_class = models.ForeignKey('StudentClass', related_name='staff_profiles', on_delete=models.SET_NULL, null=True)
     managing_class_arm = models.ForeignKey('ClassArm', related_name='staff_profiles', on_delete=models.SET_NULL, null=True, blank=True)
+    # position = models.ForeignKey(TeachingPosition, on_delete=models.SET_NULL, null=True, blank=True)
+    # Generic foreign key fields
+    position_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to=models.Q(app_label='accounts', model__in=['teachingposition', 'nonteachingposition']),
+    )
+    position_object_id = models.PositiveIntegerField(null=True)
+    primary_position = GenericForeignKey('position_content_type', 'position_object_id')
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

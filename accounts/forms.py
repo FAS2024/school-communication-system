@@ -25,6 +25,7 @@ from django.forms.widgets import CheckboxSelectMultiple
 from django.db.models import Q
 from django.utils.timezone import localtime
 import re
+from django.contrib.contenttypes.models import ContentType
 
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
@@ -189,17 +190,38 @@ class StaffCreationForm(UserCreationForm):
         return user
 
 class StaffProfileForm(forms.ModelForm):
+    primary_position = forms.ChoiceField(label="Primary Position", required=False)
+
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        self.fields['managing_class'].required = False
-        self.fields['managing_class_arm'].required = False
+        if not user or user.role not in ['superadmin', 'branch_admin']:
+            # Option 1: Hide the field
+            self.fields['primary_position'].widget = forms.HiddenInput()
+            self.fields['primary_position'].disabled = True
+
+            # Option 2 (alternative): Raise an error if unauthorized
+            # raise PermissionDenied("You are not authorized to assign staff positions.")
+
+        else:
+            # Only superadmin or branch_admin can see and set primary_position
+            teaching_positions = TeachingPosition.objects.all()
+            non_teaching_positions = NonTeachingPosition.objects.all()
+
+            choices = [('', '---------')]
+            choices += [(f"teaching:{p.id}", f"{p.name} (Teaching)") for p in teaching_positions]
+            choices += [(f"non_teaching:{p.id}", f"{p.name} (Non-Teaching)") for p in non_teaching_positions]
+
+            self.fields['primary_position'].choices = choices
+            
+            self.fields['managing_class'].required = False
+            self.fields['managing_class_arm'].required = False
 
         if user and user.role == 'staff' and user == self.instance.user:
             editable_fields = [
                 'phone_number', 'qualification',
-                'years_of_experience', 'address'
+                'years_of_experience', 'address', 'primary_position'
             ]
             for field_name in self.fields:
                 if field_name not in editable_fields:
@@ -212,7 +234,7 @@ class StaffProfileForm(forms.ModelForm):
             'qualification', 'years_of_experience',
             'address', 'nationality', 'state',
             'staff_number', 'managing_class',
-            'managing_class_arm'
+            'managing_class_arm', 
         ]
         widgets = {
             'date_of_birth': forms.DateInput(attrs={'type': 'date'}),
@@ -222,6 +244,8 @@ class StaffProfileForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+
+        # Validate managing_class and managing_class_arm dependency
         managing_class = cleaned_data.get('managing_class')
         managing_class_arm = cleaned_data.get('managing_class_arm')
 
@@ -230,24 +254,36 @@ class StaffProfileForm(forms.ModelForm):
                 "Please select a managing class before selecting a class arm."
             )
 
+        # Handle primary_position field (Generic ForeignKey logic)
+        primary_position_value = cleaned_data.get('primary_position')
+
+        if primary_position_value:
+            try:
+                type_str, obj_id = primary_position_value.split(':')
+                obj_id = int(obj_id)
+            except (ValueError, AttributeError):
+                raise forms.ValidationError("Invalid format for primary position.")
+
+            if type_str == 'teaching':
+                model = TeachingPosition
+            elif type_str == 'non_teaching':
+                model = NonTeachingPosition
+            else:
+                raise forms.ValidationError("Invalid position type.")
+
+            try:
+                model.objects.get(id=obj_id)
+            except model.DoesNotExist:
+                raise forms.ValidationError("Selected position does not exist.")
+
+            content_type = ContentType.objects.get_for_model(model)
+            self.instance.position_content_type = content_type
+            self.instance.position_object_id = obj_id
+        else:
+            self.instance.position_content_type = None
+            self.instance.position_object_id = None
+
         return cleaned_data
-
-    def clean_staff_number(self):
-        staff_number = self.cleaned_data.get('staff_number')
-        if not staff_number:
-            return staff_number  # will be auto-generated if left empty
-
-        pattern = r'^LAGS/(STA|ADM)/\d{4}/\d{4}$'
-        if not re.match(pattern, staff_number):
-            raise ValidationError("Staff number must be in format 'LAGS/STA/YYYY/XXXX' or 'LAGS/ADM/YYYY/XXXX'.")
-
-        existing = StaffProfile.objects.filter(staff_number=staff_number)
-        if self.instance.pk:
-            existing = existing.exclude(pk=self.instance.pk)
-        if existing.exists():
-            raise ValidationError("This staff number is already in use.")
-
-        return staff_number
 
 class StudentClassForm(forms.ModelForm):
     arms = forms.ModelMultipleChoiceField(
@@ -1131,7 +1167,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         role = self.initial.get('role') or self.data.get('role')
-        if self.user.role == 'student':
+        if self.user and self.user.role == 'student':
             if role == 'student':
                 self.fields['student_class'].required = True
                 self.fields['class_arm'].required = True
@@ -1139,7 +1175,6 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         if self.user and self.user.role == 'parent':
             self.fields['staff_type'].choices = [('teaching', 'Teaching Staff')]
 
-            # This line must be run after form is initialized
             self.fields['teaching_positions'].queryset = TeachingPosition.objects.filter(is_class_teacher=True)
 
             self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.none()
@@ -1436,33 +1471,26 @@ class CommunicationTargetGroupForm(forms.ModelForm):
 
                 # Get all children linked to this parent
                 children = parent.students.all()
-                child_class_ids = children.values_list('current_class_id', flat=True)
 
-                # Children (as CustomUser)
+                # Class arm IDs and user IDs of the children
+                child_class_arm_ids = children.values_list('current_class_arm', flat=True)
                 children_user_ids = children.values_list('user_id', flat=True)
 
-                # Class teachers of children's classes
-                class_teacher_user_ids = CustomUser.objects.filter(
-                    role='staff',
-                    class_teacher_of__id__in=child_class_ids
-                ).values_list('id', flat=True)
-
-                # Branch admins
+                # Branch admins (relevant to this parent’s branch)
                 branch_admin_ids = CustomUser.objects.filter(
                     role='branch_admin',
                     branch_id=self.user.branch_id
                 ).values_list('id', flat=True)
 
-                # Combine all allowed user IDs
-                allowed_user_ids = list(children_user_ids) + list(class_teacher_user_ids) + list(branch_admin_ids)
+                # Initial queryset: children + branch admins
+                allowed_user_ids = list(children_user_ids) + list(branch_admin_ids)
                 qs = qs.filter(id__in=allowed_user_ids).distinct()
 
-                # Now filter by specific role if provided
+                # Now apply role-based filtering
                 if not role:
                     return qs.none()
 
                 if role == 'student':
-                    # Just the parent's children, optionally filtered by class and class_arm
                     qs = qs.filter(
                         role='student',
                         studentprofile__parent=parent
@@ -1472,9 +1500,30 @@ class CommunicationTargetGroupForm(forms.ModelForm):
                     if class_arm:
                         qs = qs.filter(studentprofile__current_class_arm_id=class_arm)
 
+                elif role == 'staff':
+                    qs = CustomUser.objects.none()
+
+                    if role == 'staff' and staff_type == 'teaching' and teaching_positions:
+                        qs = CustomUser.objects.filter(
+                            role='staff',
+                            staff_type='teaching',
+                            staffprofile__position__is_class_teacher=True
+                        )
+                        # if student_class:
+                        #     qs = qs.filter(staffprofile__managing_class_id=student_class)
+                        # if class_arm:
+                        #     qs = qs.filter(staffprofile__managing_class_arm_id=class_arm)
+
+                elif role == 'branch_admin':
+                    qs = qs.filter(
+                        role='branch_admin',
+                        branch_id=self.user.branch_id
+                    )
+
                 else:
-                    # Staff filtering logic
+                    # Optional: Fallback staff filtering
                     qs = filter_staff(qs, staff_type, teaching_positions, non_teaching_positions)
+
 
         elif self.user.role in self.STAFF_ROLES:
             if not branch:
