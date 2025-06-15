@@ -22,6 +22,7 @@
               {{ profile_form|crispy }}
 
               <!-- Submit Button -->
+              <a href="{% url 'staff_list' %}" class="btn btn-primary">Back</a>
               <div class="text-center mt-4">
                 <button type="submit" class="btn btn-success btn-lg shadow-sm">Create Staff</button>
               </div>
@@ -33,39 +34,3 @@
   </div>
 {% endblock %}
 
-
-
-{% comment %} {% extends 'base.html' %}
-{% load crispy_forms_tags %}
-
-{% block content %}
-  <div class="container my-5" style="background-color: #f8f9fa;">
-    <div class="row justify-content-center">
-      <div class="col-md-8">
-        <div class="card shadow" style="background-color: #ffffff; border-radius: 10px;">
-          <div class="card-header text-center bg-primary text-white" style="border-radius: 10px 10px 0 0;">
-            <h3>Create New Staff</h3>
-          </div>
-          <div class="card-body" style="background-color: #fdfdfd;">
-            <form method="POST" enctype="multipart/form-data">
-              {% csrf_token %}
-
-              <!-- User Information Section -->
-              <h4 class="mb-3 text-secondary">User Information</h4>
-              {{ user_form|crispy }}
-
-              <!-- Staff Profile Information Section -->
-              <h4 class="mb-3 text-secondary">Staff Profile Information</h4>
-              {{ profile_form|crispy }}
-
-              <!-- Submit Button -->
-              <div class="text-center mt-4">
-                <button type="submit" class="btn btn-success btn-lg shadow-sm">Create Staff</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-{% endblock %} {% endcomment %}

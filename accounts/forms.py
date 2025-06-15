@@ -191,21 +191,21 @@ class StaffCreationForm(UserCreationForm):
 
 class StaffProfileForm(forms.ModelForm):
     primary_position = forms.ChoiceField(label="Primary Position", required=False)
-
+    
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
+        # Set initial value for primary_position from model instance
+        current_position = self.instance.primary_position  # This uses the GenericForeignKey
+        if current_position:
+            model_name = 'teaching' if isinstance(current_position, TeachingPosition) else 'non_teaching'
+            self.initial['primary_position'] = f"{model_name}:{current_position.id}"
+
         if not user or user.role not in ['superadmin', 'branch_admin']:
-            # Option 1: Hide the field
             self.fields['primary_position'].widget = forms.HiddenInput()
             self.fields['primary_position'].disabled = True
-
-            # Option 2 (alternative): Raise an error if unauthorized
-            # raise PermissionDenied("You are not authorized to assign staff positions.")
-
         else:
-            # Only superadmin or branch_admin can see and set primary_position
             teaching_positions = TeachingPosition.objects.all()
             non_teaching_positions = NonTeachingPosition.objects.all()
 
@@ -214,7 +214,7 @@ class StaffProfileForm(forms.ModelForm):
             choices += [(f"non_teaching:{p.id}", f"{p.name} (Non-Teaching)") for p in non_teaching_positions]
 
             self.fields['primary_position'].choices = choices
-            
+
             self.fields['managing_class'].required = False
             self.fields['managing_class_arm'].required = False
 

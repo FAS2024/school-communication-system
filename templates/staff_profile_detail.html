@@ -67,6 +67,13 @@
       </div>
     </div>
   </div>
+    <p><strong>Primary Position:</strong>
+      {% if staff_profile.primary_position %}
+        {{ staff_profile.primary_position.name }}
+      {% else %}
+        N/A
+      {% endif %}
+    </p>
 
   {% if user.teaching_positions.exists %}
   <div class="card mb-3">
