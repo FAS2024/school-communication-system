@@ -316,64 +316,6 @@ def non_teaching_position_delete(request, pk):
     return render(request, 'non_teaching_position_confirm_delete.html', {'non_teaching_position': non_teaching_position})
 
 
-# @login_required
-# def create_staff(request):
-#     current_user = request.user
-
-#     if current_user.role not in ['superadmin', 'branch_admin']:
-#         messages.error(request, "You are not authorized to create users.")
-#         return redirect('home')
-
-#     if request.method == 'POST':
-#         user_form = StaffCreationForm(request.POST, request.FILES, user=current_user)
-#         profile_form = StaffProfileForm(request.POST)
-
-#         if user_form.is_valid() and profile_form.is_valid():
-#             new_user = user_form.save(commit=False)
-#             selected_role = user_form.cleaned_data['role']
-
-#             # Branch admin can only assign their own branch
-#             if current_user.role == 'branch_admin':
-#                 new_user.branch = current_user.branch
-
-#             new_user.save()
-#             user_form.save_m2m()
-
-#             # Now update the existing StaffProfile
-#             try:
-#                 staff_profile = StaffProfile.objects.get(user=new_user)
-#                 staff_profile.phone_number = profile_form.cleaned_data['phone_number']
-#                 staff_profile.date_of_birth = profile_form.cleaned_data['date_of_birth']
-#                 staff_profile.qualification = profile_form.cleaned_data['qualification']
-#                 staff_profile.years_of_experience = profile_form.cleaned_data['years_of_experience']
-#                 staff_profile.address = profile_form.cleaned_data['address']
-#                 staff_profile.nationality = profile_form.cleaned_data['nationality']
-#                 staff_profile.state = profile_form.cleaned_data['state']
-#                 staff_profile.managing_class = profile_form.cleaned_data['managing_class']
-#                 staff_profile.managing_class_arm = profile_form.cleaned_data['managing_class_arm']
-#                 staff_profile.primary_position = profile_form.cleaned_data['primary_position']
-                
-#                 staff_profile.save()
-#             except StaffProfile.DoesNotExist:
-#                 messages.error(request, "Staff profile was not created properly.")
-#                 return redirect('create_staff')
-
-#             messages.success(
-#                 request,
-#                 f"{new_user.get_full_name()} ({selected_role.replace('_', ' ').title()}) created successfully."
-#             )
-#             return redirect('staff_list')
-#         else:
-#             messages.error(request, "Please correct the errors in the form.")
-#     else:
-#         user_form = StaffCreationForm(user=current_user)
-#         profile_form = StaffProfileForm()
-
-#     return render(request, 'staff_create.html', {
-#         'user_form': user_form,
-#         'profile_form': profile_form
-#     })
-
 
 @login_required
 def create_staff(request):
@@ -528,73 +470,6 @@ def update_staff_profile(request, staff_id):
         'profile_form': profile_form,
         'user_to_edit': user_to_edit,
     })
-
-
-# @login_required
-# def update_staff_profile(request, staff_id):
-#     current_user = request.user
-
-#     # Check if the user is editing their own profile
-#     if current_user.id == staff_id:
-#         user_to_edit = current_user
-#     else:
-#         # Only superadmin or branch_admin can edit other users
-#         if current_user.role not in ['superadmin', 'branch_admin']:
-#             messages.error(request, "You are not authorized to edit other users.")
-#             return redirect('home')
-
-#         user_to_edit = get_object_or_404(CustomUser, id=staff_id)
-
-#         # Branch admin can only edit users within their own branch
-#         if current_user.role == 'branch_admin' and user_to_edit.branch != current_user.branch:
-#             messages.error(request, "You are not authorized to edit this user.")
-#             return redirect('staff_list')
-
-#     # Get or create StaffProfile
-#     profile, created = StaffProfile.objects.get_or_create(user=user_to_edit)
-
-#     if request.method == 'POST':
-#         user_form = StaffCreationForm(
-#             request.POST, request.FILES,
-#             instance=user_to_edit,
-#             user=current_user  # Pass the logged-in user for permission logic
-#         )
-#         profile_form = StaffProfileForm(
-#             request.POST,
-#             instance=profile,
-#             user=current_user  # Pass current user here as well
-#         )
-
-#         if user_form.is_valid() and profile_form.is_valid():
-#             edited_user = user_form.save(commit=False)
-
-#             # Ensure branch consistency if edited by branch_admin
-#             if current_user.role == 'branch_admin' and current_user != user_to_edit:
-#                 edited_user.branch = current_user.branch
-
-#             edited_user.save()
-#             user_form.save_m2m()  # Save many-to-many fields like positions
-#             profile_form.save()
-
-#             messages.success(request, f"Staff {edited_user.get_full_name()} updated successfully.")
-#             return redirect('staff_detail', user_id=edited_user.id)
-#         else:
-#             messages.error(request, "Please correct the errors in the form.")
-#     else:
-#         user_form = StaffCreationForm(
-#             instance=user_to_edit,
-#             user=current_user  # still pass for GET
-#         )
-#         profile_form = StaffProfileForm(
-#             instance=profile,
-#             user=current_user
-#         )
-
-#     return render(request, 'staff_edit.html', {
-#         'user_form': user_form,
-#         'profile_form': profile_form,
-#         'user_to_edit': user_to_edit,
-#     })
 
 
 @login_required
@@ -1367,19 +1242,65 @@ def delete_class_arm(request, pk):
     return render(request, 'class-arms/confirm_delete_class_arm.html', {'class_arm': class_arm})
 
 
-
-# Helper function to return filtered queryset based on GET params (used in ajax views)
 # @login_required
-# def ajax_filtered_queryset(request, model, filter_field, filter_value_key='id', values_fields=None):
-#     filter_value = request.GET.get(filter_value_key)
-#     if filter_value:
-#         qs = model.objects.filter(**{f'{filter_field}': filter_value})
-#         if values_fields:
-#             qs = qs.values(*values_fields)
-#         else:
-#             qs = qs.values()
-#         return JsonResponse(list(qs), safe=False)
-#     return JsonResponse([], safe=False)
+# @require_GET
+# def ajax_get_filtered_users(request):
+#     # Define filter fields from the form
+#     filter_fields = CommunicationTargetGroupForm.Meta.fields
+
+#     # Extract raw GET parameters for filter fields
+#     raw_filter_values = {
+#         field: request.GET.get(field, None)
+#         for field in filter_fields
+#     }
+
+#     # If any filter field is present and has an empty string '', return empty result immediately
+#     if any(value == '' for value in raw_filter_values.values() if value is not None):
+#         return JsonResponse([], safe=False)
+
+#     # Clean and prepare data from GET parameters (convert empty strings to None)
+#     cleaned_data = {
+#         field: (value if value else None)
+#         for field, value in raw_filter_values.items()
+#         if value is not None
+#     }
+
+#     # Instantiate the form with user context
+#     form = CommunicationTargetGroupForm(user=request.user, data=cleaned_data)
+
+#     if not form.is_valid():
+#         return JsonResponse({'errors': form.errors}, status=400)
+
+#     try:
+#         # Get filtered recipients
+#         users_qs = form.get_filtered_recipients(form.cleaned_data)
+
+#         # Optimize DB queries (ensure related fields are prefetched)
+#         users_qs = users_qs.select_related('branch')  # if applicable
+
+#         users_list = []
+#         for user in users_qs:
+#             profile_picture_url = None
+#             if hasattr(user, 'profile_picture'):
+#                 profile_picture = user.profile_picture
+#                 if profile_picture and hasattr(profile_picture, 'url'):
+#                     profile_picture_url = profile_picture.url
+
+#             users_list.append({
+#                 'id': user.id,
+#                 'first_name': user.first_name,
+#                 'last_name': user.last_name,
+#                 'email': user.email,
+#                 'branch__name': getattr(user.branch, 'name', 'N/A') if hasattr(user, 'branch') else 'N/A',
+#                 'profile_picture': {
+#                     'url': profile_picture_url
+#                 }
+#             })
+
+#         return JsonResponse(users_list, safe=False)
+
+#     except ValidationError as e:
+#         return JsonResponse({'error': str(e)}, status=400)
 
 @login_required
 @require_GET
@@ -1387,43 +1308,35 @@ def ajax_get_filtered_users(request):
     # Define filter fields from the form
     filter_fields = CommunicationTargetGroupForm.Meta.fields
 
-    # Extract raw GET parameters for filter fields
+    # Extract raw GET parameters
     raw_filter_values = {
         field: request.GET.get(field, None)
         for field in filter_fields
     }
 
-    # If any filter field is present and has an empty string '', return empty result immediately
-    if any(value == '' for value in raw_filter_values.values() if value is not None):
-        return JsonResponse([], safe=False)
-
-    # Clean and prepare data from GET parameters (convert empty strings to None)
+    # Convert empty strings to None
     cleaned_data = {
-        field: (value if value else None)
+        field: (value if value not in [None, ''] else None)
         for field, value in raw_filter_values.items()
-        if value is not None
     }
 
-    # Instantiate the form with user context
+    # Instantiate form with cleaned data and user
     form = CommunicationTargetGroupForm(user=request.user, data=cleaned_data)
 
     if not form.is_valid():
-        return JsonResponse({'errors': form.errors}, status=400)
+        if settings.DEBUG:
+            return JsonResponse({'errors': form.errors}, status=400)
+        return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
     try:
         # Get filtered recipients
         users_qs = form.get_filtered_recipients(form.cleaned_data)
+        users_qs = users_qs.select_related('branch')  # optimize query
 
-        # Optimize DB queries (ensure related fields are prefetched)
-        users_qs = users_qs.select_related('branch')  # if applicable
-
+        # Build user list
         users_list = []
         for user in users_qs:
-            profile_picture_url = None
-            if hasattr(user, 'profile_picture'):
-                profile_picture = user.profile_picture
-                if profile_picture and hasattr(profile_picture, 'url'):
-                    profile_picture_url = profile_picture.url
+            profile_picture_url = getattr(getattr(user, 'profile_picture', None), 'url', None)
 
             users_list.append({
                 'id': user.id,
@@ -1431,16 +1344,13 @@ def ajax_get_filtered_users(request):
                 'last_name': user.last_name,
                 'email': user.email,
                 'branch__name': getattr(user.branch, 'name', 'N/A') if hasattr(user, 'branch') else 'N/A',
-                'profile_picture': {
-                    'url': profile_picture_url
-                }
+                'profile_picture': {'url': profile_picture_url}
             })
 
         return JsonResponse(users_list, safe=False)
 
     except ValidationError as e:
         return JsonResponse({'error': str(e)}, status=400)
-
 
 
 @login_required
@@ -1456,10 +1366,28 @@ def communication_index(request):
     return render(request, 'communications/communication_form.html', context)
 
 
+# @login_required
+# def get_filtered_users(request):
+#     form = CommunicationTargetGroupForm(request.GET, user=request.user)
+    
+#     if form.is_valid():
+#         recipients = form.get_filtered_recipients(form.cleaned_data)
+#         users = recipients.values(
+#             'id', 'first_name', 'last_name', 'email',
+#             'branch__name', 'profile_picture'
+#         )
+#         return JsonResponse(list(users), safe=False)
+    
+#     # Return detailed form errors only in DEBUG mode
+#     if settings.DEBUG:
+#         return JsonResponse({'errors': form.errors}, status=400)
+
+#     return JsonResponse({'error': 'Invalid filter data'}, status=400)
+
 @login_required
 def get_filtered_users(request):
     form = CommunicationTargetGroupForm(request.GET, user=request.user)
-    
+
     if form.is_valid():
         recipients = form.get_filtered_recipients(form.cleaned_data)
         users = recipients.values(
@@ -1468,12 +1396,15 @@ def get_filtered_users(request):
         )
         return JsonResponse(list(users), safe=False)
     
-    # Return detailed form errors only in DEBUG mode
+    # Always show all form errors (including non-field errors) in DEBUG
     if settings.DEBUG:
-        return JsonResponse({'errors': form.errors}, status=400)
+        error_response = {
+            'field_errors': form.errors,
+            'non_field_errors': form.non_field_errors(),
+        }
+        return JsonResponse({'errors': error_response}, status=400)
 
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
-
 
 
 # @method_decorator([login_required, require_POST], name='dispatch')
