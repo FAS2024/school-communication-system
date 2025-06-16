@@ -1354,37 +1354,6 @@ def ajax_get_filtered_users(request):
 
 
 @login_required
-def communication_index(request):
-    
-    context = {
-        'communication_form': CommunicationForm(user=request.user),
-        'target_group_form': CommunicationTargetGroupForm(user=request.user),
-        'attachment_formset': AttachmentFormSet(),
-        'user_role': request.user.role,
-        'user_branch_id': request.user.branch.id if request.user.branch else '',
-    }
-    return render(request, 'communications/communication_form.html', context)
-
-
-# @login_required
-# def get_filtered_users(request):
-#     form = CommunicationTargetGroupForm(request.GET, user=request.user)
-    
-#     if form.is_valid():
-#         recipients = form.get_filtered_recipients(form.cleaned_data)
-#         users = recipients.values(
-#             'id', 'first_name', 'last_name', 'email',
-#             'branch__name', 'profile_picture'
-#         )
-#         return JsonResponse(list(users), safe=False)
-    
-#     # Return detailed form errors only in DEBUG mode
-#     if settings.DEBUG:
-#         return JsonResponse({'errors': form.errors}, status=400)
-
-#     return JsonResponse({'error': 'Invalid filter data'}, status=400)
-
-@login_required
 def get_filtered_users(request):
     form = CommunicationTargetGroupForm(request.GET, user=request.user)
 
@@ -1406,6 +1375,43 @@ def get_filtered_users(request):
 
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
+
+# @login_required
+# def communication_index(request):
+    
+#     context = {
+#         'communication_form': CommunicationForm(user=request.user),
+#         'target_group_form': CommunicationTargetGroupForm(user=request.user),
+#         'attachment_formset': AttachmentFormSet(),
+#         'user_role': request.user.role,
+#         'user_branch_id': request.user.branch.id if request.user.branch else '',
+#     }
+#     return render(request, 'communications/communication_form.html', context)
+
+@login_required
+def communication_index(request):
+    communication_data = request.session.pop('communication_form_data', None)
+    target_group_data = request.session.pop('target_group_form_data', None)
+    attachment_data = request.session.pop('attachment_formset_data', None)
+    non_field_errors = request.session.pop('non_field_errors', None)
+
+    communication_form = CommunicationForm(data=communication_data, user=request.user) if communication_data else CommunicationForm(user=request.user)
+    target_group_form = CommunicationTargetGroupForm(data=target_group_data, user=request.user) if target_group_data else CommunicationTargetGroupForm(user=request.user)
+    attachment_formset = AttachmentFormSet(data=attachment_data) if attachment_data else AttachmentFormSet()
+
+    # Re-inject non-field errors if available
+    if non_field_errors:
+        for err_msg in non_field_errors:
+            communication_form.add_error(None, err_msg)
+
+    context = {
+        'communication_form': communication_form,
+        'target_group_form': target_group_form,
+        'attachment_formset': attachment_formset,
+        'user_role': request.user.role,
+        'user_branch_id': request.user.branch.id if request.user.branch else '',
+    }
+    return render(request, 'communications/communication_form.html', context)
 
 # @method_decorator([login_required, require_POST], name='dispatch')
 # class SendCommunicationView(View):
@@ -1533,91 +1539,117 @@ def get_filtered_users(request):
 #         messages.error(request, "There was an error with your submission.")
 #         return redirect('communication_index')
 
-
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
-
     def _get_allowed_recipients(self, target_group_form, user):
+        # Exclude the sender themselves from recipient list
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
-        
-        print('rrrrrrrrrrrrrrrrrrrrrr:',recipients)
         return recipients.exclude(id=user.id)
-    
 
     def _get_selected_recipients(self, request, allowed_recipients):
+        # 'selected_recipients' must be the exact name attribute of your checkboxes in the form
         selected_ids = request.POST.getlist('selected_recipients')
-        print('rrrrrrrrrrrrrrrrrrrrrr:',selected_ids)
+        
+        print("POST data:", request.POST)
+        # Filter to only allowed recipients by their ids
         return allowed_recipients.filter(id__in=selected_ids)
 
     def _parse_manual_emails(self, email_string):
         emails = [email.strip() for email in email_string.split(',') if email.strip()]
         valid_emails = []
-        print('rrrrrrrrrrrrrrrrrrrrrr:',valid_emails)
-
         for email in emails:
             try:
                 validate_email(email)
-                valid_emails.append(email)
+                valid_emails.append(email.lower())  # normalize to lowercase for comparison
             except ValidationError:
-                messages.warning(self.request, f"Invalid email skipped: {email}")
+                messages.warning(self.request, f"Invalid manual email skipped: {email}")
         return valid_emails
 
-    def _check_conflicts(self, selected_recipients, manual_emails, form):
+    def _check_for_duplicate_emails(self, selected_recipients, manual_emails, form):
         if selected_recipients.exists():
-            selected_emails = set(selected_recipients.values_list('email', flat=True))
-            conflicting = selected_emails.intersection(manual_emails)
-            if conflicting:
+            selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
+            duplicates = selected_emails.intersection(set(manual_emails))
+            if duplicates:
                 form.add_error(
                     None,
-                    f"The following manual email(s) are already among selected recipients: {', '.join(conflicting)}"
+                    f"The following manual email(s) are already among selected recipients: {', '.join(duplicates)}"
                 )
                 return False
         return True
 
+    # def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
+        # messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+        # return render(
+        #     self.request,
+        #     'communications/communication_form.html',
+        #     {
+        #         'communication_form': communication_form,
+        #         'target_group_form': target_group_form,
+        #         'attachment_formset': attachment_formset,
+        #     }
+        # )
+
     def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
-        return render(
-            self.request,
-            'communications/communication_form.html',  # Use your actual template path
-            {
-                'communication_form': communication_form,
-                'target_group_form': target_group_form,
-                'attachment_formset': attachment_formset,
-            }
-        )
+        self.request.session['communication_form_data'] = self.request.POST.dict()
+        self.request.session['target_group_form_data'] = self.request.POST.dict()
+        self.request.session['attachment_formset_data'] = self.request.POST.dict()
+        
+        # Convert non-field errors to plain list of strings
+        non_field_errors = communication_form.non_field_errors()
+        self.request.session['non_field_errors'] = [str(error) for error in non_field_errors]
+
+        self.request.session['form_error'] = True
+        messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+        return redirect('communication_index')
+
 
     def post(self, request):
         self.request = request
+
         communication_form = CommunicationForm(request.POST, user=request.user)
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
+        # Validate all forms first
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # For student or parent users, force the branch to be the user's branch
+        # Adjust branch for students/parents if needed
         if request.user.role in ['student', 'parent']:
-            # Set cleaned_data branch to user's branch instance
-            target_group_form.cleaned_data['branch'] = request.user.branch
-            # Also, if the form instance exists, set the branch attribute too (for later save if any)
+            branch = request.user.branch
+            target_group_form.cleaned_data['branch'] = branch
             if hasattr(target_group_form, 'instance'):
-                target_group_form.instance.branch = request.user.branch
-        
+                target_group_form.instance.branch = branch
+
         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
+        print("Allowed Recipients:", allowed_recipients)
+
         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
+        print("Selected Recipients:", selected_recipients)
+
 
         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
-        manual_email_set = set(valid_manual_emails)
 
+        # Check at least one recipient selected or valid manual email provided
         if not selected_recipients.exists() and not valid_manual_emails:
-            communication_form.add_error(
-                None, "Please select at least one recipient or provide a valid manual email."
-            )
+            if request.user.role in ['student', 'parent']:
+                communication_form.add_error(
+                    None,
+                    "Please select at least one recipient."
+                )
+            else:  # For superadmin, branch_admin, or staff
+                communication_form.add_error(
+                    None,
+                    "Please select at least one recipient or provide a valid manual email."
+                )
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        if not self._check_conflicts(selected_recipients, manual_email_set, communication_form):
+        # Ensure no duplicates between selected user emails and manual emails
+        if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
+        # Save communication
         communication = communication_form.save(commit=False)
         communication.sender = request.user
         communication.sent = False
@@ -1625,30 +1657,23 @@ class SendCommunicationView(View):
 
         # Save attachments
         for form in attachment_formset:
-            if form.cleaned_data and form.cleaned_data.get('file'):
+            if form.cleaned_data.get('file'):
                 form.instance.communication = communication
                 form.save()
 
-        # Immediate send or schedule
+        # Save recipients and send or schedule communication
         if communication.is_due():
             with transaction.atomic():
-                for user_recipient in selected_recipients:
-                    CommunicationRecipient.objects.create(
-                        communication=communication,
-                        recipient=user_recipient
-                    )
+                for recipient in selected_recipients:
+                    CommunicationRecipient.objects.create(communication=communication, recipient=recipient)
                 for email in valid_manual_emails:
-                    CommunicationRecipient.objects.create(
-                        communication=communication,
-                        email=email
-                    )
+                    CommunicationRecipient.objects.create(communication=communication, email=email)
 
             send_communication_to_recipients(communication)
             communication.sent = True
             communication.save()
             messages.success(request, "Communication sent immediately.")
         else:
-            # Scheduled: handled by background process
             messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
 
         return redirect('communication_success')
