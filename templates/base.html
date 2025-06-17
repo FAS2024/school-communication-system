@@ -52,42 +52,67 @@
     {% comment %} i JUST ADDED THE CODE below {% endcomment %}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
-      <style>
-        #django-messages {
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          z-index: 9999;
-          width: auto;
-          max-width: 300px;
-        }
 
-        .django-message {
-          padding: 15px;
-          margin-bottom: 10px;
-          border-radius: 5px;
-          color: white;
-          font-weight: bold;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          transition: opacity 1s ease-out;
-        }
+    <style>
+      #django-messages {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        width: auto;
+        max-width: 300px;
+      }
 
-        .django-message.success {
-          background-color: #28a745; /* Green */
-        }
+      .django-message {
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transition: opacity 1s ease-out;
+      }
 
-        .django-message.error {
-          background-color: #dc3545; /* Red */
-        }
+      .django-message.success {
+        background-color: #28a745; /* Green */
+      }
 
-        .django-message.warning {
-          background-color: #ff9800; /* Amber */
-        }
+      .django-message.error {
+        background-color: #dc3545; /* Red */
+      }
 
-        .django-message.info {
-          background-color: #17a2b8; /* Teal/Blue */
-        }
-      </style>
+      .django-message.warning {
+        background-color: #ff9800; /* Amber */
+      }
+
+      .django-message.info {
+        background-color: #17a2b8; /* Teal/Blue */
+      }
+    </style>
+    
+    <!-- for 12 Hours Time and Date -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_green.css">
+    <style>
+      .flatpickr-input {
+      background-color: white !important;
+      color: #212529 !important;
+      cursor: text !important;
+      border: 1px solid #ced4da !important;
+      border-radius: 0.375rem !important;
+      padding: 0.5rem 0.75rem !important;
+      font-size: 1rem;
+      opacity: 1 !important; /* This is key to remove the "faded" look */
+    }
+
+    .flatpickr-input:focus {
+      border-color: #80bdff !important;
+      outline: 0;
+      box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+
+    </style>
+    <!-- End for 12 Hours Time and Date -->
+
 
       {% block extra_css %}{% endblock %}
 
@@ -951,6 +976,19 @@
       {% comment %} <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script> {% endcomment %}
       <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> 
 
+      <!-- for 12 Hours Time and Date -->
+      <!-- Flatpickr JS -->
+      <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+      <script>
+          flatpickr("#scheduledTimePicker", {
+            enableTime: true,
+            dateFormat: "d-m-Y h:i K",  // DD-MM-YYYY h:mm AM/PM
+            time_24hr: false,
+            allowInput: true
+          });
+      </script>
+      <!-- End for 12 Hours Time and Date -->
 
   </body>
 </html>

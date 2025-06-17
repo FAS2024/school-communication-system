@@ -1537,25 +1537,47 @@ def communication_success(request):
     return render(request, 'communications/communication_success.html')
 
 
+# def communication_scheduled(request):
+#     scheduled_time_str = request.GET.get('scheduled_time', None)
+#     scheduled_time = None
+#     is_sent = False
+
+#     if scheduled_time_str:
+#         # Parse scheduled_time string to datetime object
+#         try:
+#             scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
+#             scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+#         except ValueError:
+#             scheduled_time = None
+
+#     if scheduled_time:
+#         # If scheduled_time has passed, consider it sent
+#         is_sent = timezone.now() >= scheduled_time
+
+#     context = {
+#         'scheduled_time': scheduled_time,  # This is now a datetime object
+#         'is_sent': is_sent,
+#     }
+#     return render(request, 'communications/scheduled_success.html', context)
+
 def communication_scheduled(request):
     scheduled_time_str = request.GET.get('scheduled_time', None)
     scheduled_time = None
     is_sent = False
 
     if scheduled_time_str:
-        # Parse scheduled_time string to datetime object
         try:
+            # Parse as local time (since that's how it was saved and sent via GET param)
             scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
             scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
         except ValueError:
             scheduled_time = None
 
     if scheduled_time:
-        # If scheduled_time has passed, consider it sent
         is_sent = timezone.now() >= scheduled_time
 
     context = {
-        'scheduled_time': scheduled_time_str,
+        'scheduled_time': scheduled_time,
         'is_sent': is_sent,
     }
     return render(request, 'communications/scheduled_success.html', context)

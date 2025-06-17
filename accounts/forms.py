@@ -861,7 +861,18 @@ class CommunicationForm(forms.ModelForm):
         }),
         help_text="Add emails manually (e.g., external contacts)"
     )
-
+    scheduled_time = forms.DateTimeField(
+        input_formats=['%d-%m-%Y %I:%M %p'],
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'text',
+                'id': 'scheduledTimePicker',
+                'class': 'form-control',
+                'placeholder': 'You can schedule in this format 01-01-2025 9:10 AM'
+            }
+        ),
+        required=False
+    )
     class Meta:
         model = Communication
         fields = [
@@ -871,9 +882,6 @@ class CommunicationForm(forms.ModelForm):
             'is_draft',
             'scheduled_time',
         ]
-        widgets = {
-            'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-        }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -908,25 +916,6 @@ class CommunicationForm(forms.ModelForm):
             self.fields['title'].required = True  
             self.fields['body'].required = True  
 
-    # def clean(self):
-    #     cleaned_data = super().clean()
-    #     message_type = cleaned_data.get('message_type')
-    #     title = cleaned_data.get('title')
-    #     body = cleaned_data.get('body')
-
-    #     # Check for required fields manually to improve clarity
-    #     if not message_type:
-    #         self.add_error('message_type', "Message type is required.")
-    #     if not title:
-    #         self.add_error('title', "Title is required.")
-    #     if not body:
-    #         self.add_error('body', "Body is required.")
-
-    #     # Raise global form error if any of the above is missing
-    #     if self.errors:
-    #         raise ValidationError("Please correct the required fields.")
-
-    #     return cleaned_data
     def clean(self):
         cleaned_data = super().clean()
         message_type = cleaned_data.get('message_type')
