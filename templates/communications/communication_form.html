@@ -484,15 +484,17 @@
       }
 
       // Extra safeguard for student role — avoid sending request if student_class or class_arm is empty
-      if (fields.role.val() === "student") {
-        const studentClass = fields.studentClass.val();
-        const classArm = fields.classArm.val();
+      if (userRole === "student") {
+        if (fields.role.val() === "student") {
+          const studentClass = fields.studentClass.val();
+          const classArm = fields.classArm.val();
 
-        if (!studentClass || !classArm) {
-          recipientsTable.clear().draw();
-          $selectAll.prop("checked", false);
-          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
-          return;
+          if (!studentClass || !classArm) {
+            recipientsTable.clear().draw();
+            $selectAll.prop("checked", false);
+            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+            return;
+          }
         }
       }
 
@@ -648,17 +650,31 @@
       const filterFieldNames = ["branch", "role", "staff_type", "teaching_positions", "non_teaching_positions", "student_class", "class_arm"];
 
       filterFieldNames.forEach(function (name) {
-        const val = $("#target-group-form [name='" + name + "']").val();
-        if (val !== undefined && val !== null && val !== "") {
-          $("<input>", {
-            type: "hidden",
-            name: name,
-            value: val,
-            class: "injected-filter-field"
-          }).appendTo($communicationForm);
+        const $fields = $("#target-group-form [name='" + name + "']");
+
+        if ($fields.length && $fields[0].type === "checkbox") {
+          // Multiple checkboxes: inject each checked value
+          $fields.filter(":checked").each(function () {
+            $("<input>", {
+              type: "hidden",
+              name: name,
+              value: $(this).val(),
+              class: "injected-filter-field"
+            }).appendTo($communicationForm);
+          });
+        } else {
+          // Single select/text/etc.
+          const val = $fields.val();
+          if (val !== undefined && val !== null && val !== "") {
+            $("<input>", {
+              type: "hidden",
+              name: name,
+              value: val,
+              class: "injected-filter-field"
+            }).appendTo($communicationForm);
+          }
         }
       });
-
       // 3. Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
 
