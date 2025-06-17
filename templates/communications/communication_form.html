@@ -653,7 +653,7 @@
         const $fields = $("#target-group-form [name='" + name + "']");
 
         if ($fields.length && $fields[0].type === "checkbox") {
-          // Multiple checkboxes: inject each checked value
+          // Case: Multiple checkboxes
           $fields.filter(":checked").each(function () {
             $("<input>", {
               type: "hidden",
@@ -663,9 +663,21 @@
             }).appendTo($communicationForm);
           });
         } else {
-          // Single select/text/etc.
+          // Case: dropdowns (single or multiple select), or other fields
           const val = $fields.val();
-          if (val !== undefined && val !== null && val !== "") {
+
+          if (Array.isArray(val)) {
+            // Handle multi-select dropdown (multiple values)
+            val.forEach(function (item) {
+              $("<input>", {
+                type: "hidden",
+                name: name,
+                value: item,
+                class: "injected-filter-field"
+              }).appendTo($communicationForm);
+            });
+          } else if (val !== undefined && val !== null && val !== "") {
+            // Single value input
             $("<input>", {
               type: "hidden",
               name: name,
@@ -675,6 +687,7 @@
           }
         }
       });
+
       // 3. Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
 

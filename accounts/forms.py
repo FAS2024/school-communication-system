@@ -26,6 +26,8 @@ from django.db.models import Q
 from django.utils.timezone import localtime
 import re
 from django.contrib.contenttypes.models import ContentType
+from django.http import QueryDict
+
 
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
@@ -774,7 +776,6 @@ class StudentCreationForm(UserCreationForm):
             user.save()
         return user
 
-
 class StudentProfileForm(forms.ModelForm):
     parent = forms.ModelChoiceField(queryset=ParentProfile.objects.none(), required=True)
     phone_number = forms.CharField(max_length=15, required=False, label="Phone Number", help_text="Optional: Include country code.")
@@ -848,68 +849,7 @@ class StudentProfileForm(forms.ModelForm):
             raise ValidationError("This admission number has already been assigned to another student.")
 
         return admission_number
-
-# class CommunicationForm(forms.ModelForm):
-#     # send_to_all = forms.BooleanField(required=False, label="Send to all users")
-#     manual_emails = forms.CharField(
-#         required=False,
-#         label="Add manual emails",
-#         widget=forms.Textarea(attrs={
-#             "placeholder": "Comma-separated emails",
-#             "rows": 2,  # reduce height
-#             "cols": 40  # optional: adjust width
-#         }),
-#         help_text="Add emails manually (e.g., external contacts)"
-#     )
-
-#     class Meta:
-#         model = Communication
-#         fields = [
-#             'message_type',
-#             'title',
-#             'body',
-#             'is_draft',
-#             'scheduled_time',
-#             # 'send_to_all',
-#         ]
-#         widgets = {
-#             'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-#         }
-
-#     def __init__(self, *args, user=None, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.user = user
-
-#         if self.instance and self.instance.scheduled_time:
-#             local_dt = localtime(self.instance.scheduled_time)
-#             self.initial['scheduled_time'] = local_dt.strftime('%Y-%m-%dT%H:%M')
-#             self.fields['scheduled_time'].label = "Scheduled time (24-hour clock)"
-
-#         # Restrict message_type choices depending on sender role
-#         if 'message_type' in self.fields:
-#             all_message_types = [
-#                 ('announcement', 'Announcement'),
-#                 ('post', 'Post'),
-#                 ('notification', 'Notification'),
-#                 ('news', 'News'),
-#                 ('personal', 'Personal'),
-#                 ('group', 'Group'),
-#             ]
-
-#             if self.user.role in ['student', 'parent']:
-#                 allowed_types = ['post', 'personal', 'group']
-#                 filtered_choices = [
-#                     (value, label) for value, label in all_message_types if value in allowed_types
-#                 ]
-#                 # Remove manual_emails field so students and parents don't see it
-#                 self.fields.pop('manual_emails', None)
-#             else:
-#                 filtered_choices = all_message_types
-
-#             self.fields['message_type'].choices = filtered_choices
-#             self.fields['message_type'].choices = [('', 'Select a message type')] + filtered_choices
-
-
+    
 class CommunicationForm(forms.ModelForm):
     manual_emails = forms.CharField(
         required=False,
@@ -988,163 +928,6 @@ class CommunicationForm(forms.ModelForm):
 
         return cleaned_data
 
-# class CommunicationTargetGroupForm(forms.ModelForm):
-#     class Meta:
-#         model = CommunicationTargetGroup
-#         fields = [
-#             'branch',
-#             'role',
-#             'staff_type',
-#             'teaching_positions',
-#             'non_teaching_positions',
-#             'student_class',
-#             'class_arm',
-#         ]
-#         widgets = {
-#             'teaching_positions': forms.CheckboxSelectMultiple(),
-#             'non_teaching_positions': forms.CheckboxSelectMultiple(),
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         self.user = kwargs.pop('user', None)
-#         super().__init__(*args, **kwargs)
-
-#         if self.user:
-#             if self.user.role in ['student', 'parent']:
-#                 self.fields.pop('branch', None)
-#             else:
-#                 self.fields['branch'].queryset = Branch.objects.all()
-
-#             if 'role' in self.fields:
-#                 if self.user.role in ['student', 'parent']:
-#                     self.fields['role'].choices = [
-#                         ('', '------------'),
-#                         ('student', 'Student'),
-#                         ('staff', 'Staff'),
-#                         ('branch_admin', 'Branch Admin'),
-#                     ]
-#                 else:
-#                     self.fields['role'].choices = [
-#                         ('', '-----------'),
-#                         *CommunicationTargetGroup.ROLE_CHOICES,
-#                     ]
-
-#         self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
-#         self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
-#         self.fields['student_class'].queryset = StudentClass.objects.all()
-#         self.fields['class_arm'].queryset = ClassArm.objects.all()
-
-#     def clean(self):
-#         cleaned_data = super().clean()
-#         staff_type = cleaned_data.get('staff_type')
-#         teaching_positions = cleaned_data.get('teaching_positions')
-#         non_teaching_positions = cleaned_data.get('non_teaching_positions')
-
-#         if staff_type == 'teaching':
-#             if non_teaching_positions.exists():
-#                 raise ValidationError("Non-teaching positions must not be selected for teaching staff type.")
-#             if not teaching_positions.exists():
-#                 raise ValidationError("Please select at least one teaching position.")
-        
-#         elif staff_type == 'non_teaching':
-#             if teaching_positions.exists():
-#                 raise ValidationError("Teaching positions must not be selected for non-teaching staff type.")
-#             if not non_teaching_positions.exists():
-#                 raise ValidationError("Please select at least one non-teaching position.")
-        
-#         elif staff_type == 'both':
-#             if not (teaching_positions.exists() or non_teaching_positions.exists()):
-#                 raise ValidationError("At least one teaching or non-teaching position must be selected for 'both' staff type.")
-
-#         return cleaned_data
-    
-#     def get_filtered_recipients(self, target_group_data):
-#         from .models import CustomUser,StudentProfile
-#         from django.db.models import Q
-#         qs = CustomUser.objects.filter(is_active=True)
-
-
-#         user = self.user
-
-#         branch_id = target_group_data.get('branch')
-#         role_name = target_group_data.get('role')
-#         staff_type = target_group_data.get('staff_type')
-#         teaching_positions_ids = target_group_data.get('teaching_positions')
-#         non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
-#         student_class_id = target_group_data.get('student_class')
-#         class_arm_id = target_group_data.get('class_arm')
-#         search = target_group_data.get('search')
-
-#         def filter_staff(qs):
-#             if staff_type:
-#                 qs = qs.filter(staff_type=staff_type)
-#             if teaching_positions_ids:
-#                 qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
-#             if non_teaching_positions_ids:
-#                 qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
-#             return qs
-
-#         def filter_students(qs):
-#             if student_class_id:
-#                 qs = qs.filter(studentprofile__current_class_id=student_class_id)
-#             if class_arm_id:
-#                 qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
-#             return qs
-
-#         def apply_role_filters(qs):
-#             if role_name:
-#                 qs = qs.filter(role=role_name)
-
-#             if role_name in ['staff', 'branch_admin'] or role_name is None:
-#                 qs = filter_staff(qs)
-#             if role_name == 'student' or role_name is None:
-#                 qs = filter_students(qs)
-
-#             return qs
-
-#         if user.role == 'student':
-#             qs = CustomUser.objects.filter(
-#                 branch_id=user.branch_id,
-#                 role__in=['student', 'staff', 'branch_admin']
-#             ).exclude(id=user.id)
-#             if not role_name:
-#                 return CustomUser.objects.none()
-#             qs = apply_role_filters(qs)
-
-#         elif user.role == 'parent':
-#             children = StudentProfile.objects.filter(parent__user=user)
-#             child_class_ids = children.values_list('current_class_id', flat=True)
-
-#             children_users = CustomUser.objects.filter(id__in=children.values_list('user_id', flat=True))
-#             class_teacher_users = CustomUser.objects.filter(role='staff', class_teacher_of__id__in=child_class_ids)
-#             branch_admins = CustomUser.objects.filter(role='branch_admin', branch_id=user.branch_id)
-
-#             qs = (children_users | class_teacher_users | branch_admins).distinct()
-#             if not role_name:
-#                 return CustomUser.objects.none()
-#             qs = apply_role_filters(qs)
-
-#         elif user.role in ['staff', 'branch_admin', 'superadmin']:
-#             if not (role_name or branch_id):
-#                 return CustomUser.objects.none()
-#             qs = CustomUser.objects.all()
-#             if branch_id:
-#                 qs = qs.filter(branch_id=branch_id)
-#             qs = apply_role_filters(qs)
-
-#         else:
-#             return CustomUser.objects.none()
-
-#         # Apply search filter if present
-#         if search:
-#             qs = qs.filter(
-#                 Q(first_name__icontains=search) |
-#                 Q(last_name__icontains=search) |
-#                 Q(email__icontains=search)
-#             )
-
-#         return qs.exclude(id=user.id).distinct()
-
 
 class CommunicationTargetGroupForm(forms.ModelForm):
     STUDENT_ROLES = ['student', 'parent']
@@ -1163,8 +946,27 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        self.user = kwargs.pop('user', None)
-        # self.request = kwargs.pop('request', None)
+        self.user = kwargs.pop("user", None)
+        data = kwargs.get("data", None)
+
+        # Fix: only proceed if data exists
+        if data:
+            if not isinstance(data, QueryDict):
+                qd = QueryDict("", mutable=True)
+                qd.update(data)
+                data = qd
+            else:
+                data = data.copy()
+
+            # Defensive: wrap single string into list
+            for name in ["teaching_positions", "non_teaching_positions"]:
+                if name in data and isinstance(data.get(name), str):
+                    data.setlist(name, [data.get(name)])
+
+            # Replace data in kwargs (DO NOT pass again in *args)
+            kwargs["data"] = data
+
+        # Final: pass everything cleanly to parent
         super().__init__(*args, **kwargs)
         
         role = self.initial.get('role') or self.data.get('role')
