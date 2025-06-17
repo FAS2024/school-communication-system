@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  body {
+    background: linear-gradient(135deg, #fff0f5, #ffffff);
+  }
+
+  .scheduled-wrapper {
+    min-height: 75vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .scheduled-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 3rem 2.5rem;
+    max-width: 460px;
+    box-shadow: 0 10px 30px rgba(220, 53, 69, 0.1);
+    text-align: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .scheduled-emoji {
+    font-size: 5rem;
+    color: #dc3545;
+    margin-bottom: 1.5rem;
+  }
+
+  h2 {
+    font-weight: 800;
+    margin-bottom: 0.8rem;
+    font-size: 2.2rem;
+  }
+
+  /* Sent message heading — red */
+  h2.sent-message {
+    color: #c82333;
+  }
+
+  /* Scheduled message heading — green */
+  h2.scheduled-message {
+    color: #28a745 !important;
+  }
+
+  p.lead {
+    color: #495057;
+    font-size: 1.2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: nowrap;
+  }
+
+  .btn {
+    font-weight: 700;
+    padding: 0.7rem 2rem;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background-color: #dc3545;
+    border: none;
+    color: white;
+    box-shadow: 0 5px 12px rgba(220, 53, 69, 0.4);
+  }
+
+  .btn-primary:hover {
+    background-color: #bd2130;
+    box-shadow: 0 8px 20px rgba(189, 33, 48, 0.6);
+  }
+
+  .btn-outline {
+    background-color: transparent;
+    border: 2px solid #dc3545;
+    color: #dc3545;
+  }
+
+  .btn-outline:hover {
+    background-color: #dc3545;
+    color: white;
+  }
+</style>
+
+<div class="scheduled-wrapper">
+  <div class="scheduled-card" role="alert" aria-live="polite" aria-atomic="true">
+    <div class="scheduled-emoji" aria-hidden="true">🕓</div>
+
+    {% if is_sent %}
+      <h2 class="sent-message">Scheduled Message Submitted</h2>
+      <p class="lead">
+        Your communication scheduled for <strong>{{ scheduled_time }}</strong> has now been submitted successfully.
+      </p>
+      <div class="btn-group">
+        <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
+        <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
+      </div>
+    {% else %}
+      <h2 class="scheduled-message">Message Scheduled Successfully</h2>
+      <p class="lead">Your communication has been scheduled and will be delivered at the specified time.</p>
+      <div class="btn-group">
+        <a href="{% url 'communication_index' %}" class="btn btn-primary">Schedule Another</a>
+        <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
