@@ -908,13 +908,33 @@ class CommunicationForm(forms.ModelForm):
             self.fields['title'].required = True  
             self.fields['body'].required = True  
 
+    # def clean(self):
+    #     cleaned_data = super().clean()
+    #     message_type = cleaned_data.get('message_type')
+    #     title = cleaned_data.get('title')
+    #     body = cleaned_data.get('body')
+
+    #     # Check for required fields manually to improve clarity
+    #     if not message_type:
+    #         self.add_error('message_type', "Message type is required.")
+    #     if not title:
+    #         self.add_error('title', "Title is required.")
+    #     if not body:
+    #         self.add_error('body', "Body is required.")
+
+    #     # Raise global form error if any of the above is missing
+    #     if self.errors:
+    #         raise ValidationError("Please correct the required fields.")
+
+    #     return cleaned_data
     def clean(self):
         cleaned_data = super().clean()
         message_type = cleaned_data.get('message_type')
         title = cleaned_data.get('title')
         body = cleaned_data.get('body')
+        manual_emails = cleaned_data.get('manual_emails')
 
-        # Check for required fields manually to improve clarity
+        # Validate required fields
         if not message_type:
             self.add_error('message_type', "Message type is required.")
         if not title:
@@ -922,9 +942,21 @@ class CommunicationForm(forms.ModelForm):
         if not body:
             self.add_error('body', "Body is required.")
 
-        # Raise global form error if any of the above is missing
-        if self.errors:
-            raise ValidationError("Please correct the required fields.")
+        # Validate manual emails
+        if manual_emails:
+            emails = [e.strip() for e in manual_emails.split(',') if e.strip()]
+            registered_emails = CustomUser.objects.filter(email__in=emails).values_list('email', flat=True)
+
+            invalid_emails = []
+            for email in emails:
+                if email in registered_emails:
+                    self.add_error(
+                        'manual_emails',
+                        f"The email '{email}' belongs to a registered user. Please select them from the recipient list instead."
+                    )
+                elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+                    self.add_error('manual_emails', f"The email '{email}' is not a valid format.")
+                    invalid_emails.append(email)
 
         return cleaned_data
 

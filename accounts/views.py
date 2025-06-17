@@ -1577,18 +1577,6 @@ class SendCommunicationView(View):
                 return False
         return True
 
-    # def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
-        # messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
-        # return render(
-        #     self.request,
-        #     'communications/communication_form.html',
-        #     {
-        #         'communication_form': communication_form,
-        #         'target_group_form': target_group_form,
-        #         'attachment_formset': attachment_formset,
-        #     }
-        # )
-
     def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
         self.request.session['communication_form_data'] = self.request.POST.dict()
         self.request.session['target_group_form_data'] = self.request.POST.dict()
