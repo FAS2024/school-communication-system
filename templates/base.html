@@ -375,7 +375,6 @@
                 </li>
             
               {% endif %}
-                <li><a href="{% url 'communication_index' %}">Create Communication)</a></li>
               <!-- LOGOUT -->
               <li class="nav-item mt-4">
                 <a class="dropdown-item btn btn-primary text-white" href="{% url 'logout' %}" onclick="return confirm('Are you sure you want to logout?');">
@@ -913,13 +912,8 @@
       {% comment %} {% block extra_js %}{% endblock %} {% endcomment %}
 
       {% comment %} I just added the code below  {% endcomment %}
-      <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+      {% comment %} <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script> {% endcomment %}
       <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> 
-      {% comment %} <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css"> {% endcomment %}
-      {% comment %} <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> {% endcomment %}
-      {% comment %} <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> {% endcomment %}
-      {% comment %} <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script> {% endcomment %}
-      {% comment %} <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script> {% endcomment %}
 
 
   </body>

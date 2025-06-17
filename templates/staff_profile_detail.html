@@ -46,10 +46,34 @@
           <p><strong>Qualification:</strong> {{ staff_profile.qualification }}</p>
           <p><strong>Years of Experience:</strong> {{ staff_profile.years_of_experience }}</p>
           <p><strong>Address:</strong> {{ staff_profile.address }}</p>
+          <p><strong>Nationality:</strong> {{ staff_profile.nationality }}</p>
+          <p><strong>State:</strong> {{ staff_profile.state }}</p>
+          <p><strong>Staff Number:</strong> {{ staff_profile.staff_number }}</p>
+          <p><strong>Managing Class:</strong> 
+            {% if staff_profile.managing_class %}
+              {{ staff_profile.managing_class.name }}
+            {% else %}
+              N/A
+            {% endif %}
+          </p>
+          <p><strong>Managing Class Arm:</strong> 
+            {% if staff_profile.managing_class_arm %}
+              {{ staff_profile.managing_class_arm.name }}
+            {% else %}
+              N/A
+            {% endif %}
+          </p>
         </div>
       </div>
     </div>
   </div>
+    <p><strong>Primary Position:</strong>
+      {% if staff_profile.primary_position %}
+        {{ staff_profile.primary_position.name }}
+      {% else %}
+        N/A
+      {% endif %}
+    </p>
 
   {% if user.teaching_positions.exists %}
   <div class="card mb-3">

@@ -13,12 +13,27 @@
     <form method="post" class="bg-light p-4 rounded shadow-sm">
       {% csrf_token %}
 
-      <!-- Form Fields with Styling -->
+      <!-- Position Name -->
       <div class="form-group mb-4">
         <label for="{{ form.name.id_for_label }}" class="font-weight-bold">Position Name</label>
-        {{ form.name }} <!-- The 'form-control' class is automatically applied from the form definition -->
+        {{ form.name }}
+        {% if form.name.errors %}
+          <div class="text-danger">{{ form.name.errors }}</div>
+        {% endif %}
       </div>
 
+      <!-- Is Class Teacher -->
+      <div class="form-check mb-4">
+        {{ form.is_class_teacher }}
+        <label for="{{ form.is_class_teacher.id_for_label }}" class="form-check-label font-weight-bold">
+          Class Teacher
+        </label>
+        {% if form.is_class_teacher.errors %}
+          <div class="text-danger">{{ form.is_class_teacher.errors }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Buttons -->
       <div class="d-flex justify-content-between mt-4">
         <button type="submit" class="btn btn-success px-4 py-2">Save</button>
         <a href="{% url 'teaching_position_list' %}" class="btn btn-secondary px-4 py-2">Back to List</a>

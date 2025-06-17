@@ -7,6 +7,10 @@ from datetime import date
 
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from phonenumber_field.modelfields import PhoneNumberField
+from accounts.utils import generate_profile_number, get_prefix_for_user
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -31,6 +35,7 @@ class ClassArm(models.Model):
 
 class TeachingPosition(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    is_class_teacher = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -40,6 +45,7 @@ class NonTeachingPosition(models.Model):
 
     def __str__(self):
         return self.name
+    
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, username, password=None, **extra_fields):
         if not email:
@@ -143,23 +149,61 @@ class Branch(models.Model):
         return self.name
 
 class ParentProfile(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, limit_choices_to={'role': 'parent'},related_name='parentprofile')
-    phone_number = models.CharField(max_length=20)
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': 'parent'},
+        related_name='parentprofile'
+    )
+    phone_number = PhoneNumberField(blank=True, null=True)
     occupation = models.CharField(max_length=100, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
-    relationship_to_student = models.CharField(max_length=50)
+    relationship_to_student = models.CharField(
+        max_length=20,
+        choices=[
+            ('father', 'Father'),
+            ('mother', 'Mother'),
+            ('guardian', 'Guardian'),
+            ('other', 'Other'),
+        ],
+        default='father',
+        verbose_name="Relationship to Student",
+    )
+
     date_of_birth = models.DateField(null=True, blank=True)
-    preferred_contact_method = models.CharField(max_length=20, choices=[
-        ('phone', 'Phone'),
-        ('email', 'Email'),
-        ('sms', 'SMS')
-    ])
+    preferred_contact_method = models.CharField(
+        max_length=20,
+        choices=[
+            ('phone', 'Phone'),
+            ('email', 'Email'),
+            ('sms', 'SMS')
+        ],
+        default='phone' 
+    )
     nationality = models.CharField(max_length=50, default="Nigeria")
     state = models.CharField(max_length=50, default="Lagos")
-    
+    parent_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['user__last_name']
+        verbose_name = "Parent Profile"
+        verbose_name_plural = "Parent Profiles"
 
     def __str__(self):
         return self.user.get_full_name()
+    
+    def save(self, *args, **kwargs):
+        if self.user.role != 'parent':
+            raise ValidationError("User must have a 'parent' role.")
+
+        if not self.parent_number:
+            prefix = get_prefix_for_user(self.user)
+            self.parent_number = generate_profile_number(prefix, ParentProfile)
+
+        super().save(*args, **kwargs)
+
 
 class StudentProfile(models.Model):
     user = models.OneToOneField(
@@ -168,34 +212,83 @@ class StudentProfile(models.Model):
         limit_choices_to={'role': 'student'},
         related_name='studentprofile'
     )
-    admission_number = models.CharField(max_length=50, unique=True)
+    admission_number = models.CharField(max_length=50, unique=True, blank=False, null=False)
     current_class = models.ForeignKey('StudentClass', related_name='student_profiles', on_delete=models.SET_NULL, null=True)
     current_class_arm = models.ForeignKey('ClassArm', related_name='student_profiles', on_delete=models.SET_NULL, null=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = PhoneNumberField(blank=True, null=True)
     parent = models.ForeignKey('ParentProfile', on_delete=models.CASCADE, related_name='students')
     guardian_name = models.CharField(max_length=100, blank=True, null=True)
     nationality = models.CharField(max_length=50, default='Nigeria')  # temporary default
     state = models.CharField(max_length=50, default='Lagos') 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['user__last_name']
+        verbose_name = "Student Profile"
+        verbose_name_plural = "Student Profiles"
 
     def __str__(self):
         return self.admission_number
+
+    def save(self, *args, **kwargs):
+        if self.user.role != 'student':
+            raise ValidationError("User must have a 'student' role.")
+        if not self.admission_number:
+            prefix = get_prefix_for_user(self.user)  # This will return 'STU' for students
+            self.admission_number = generate_profile_number(prefix, StudentProfile)
+        super().save(*args, **kwargs)
+
     
 class StaffProfile(models.Model):
     user = models.OneToOneField(
         CustomUser,
         on_delete=models.CASCADE,
-        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']}
+        limit_choices_to={'role__in': ['staff', 'superadmin', 'branch_admin']},
+        related_name='staffprofile'
     )
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = PhoneNumberField(blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
     qualification = models.CharField(max_length=200, blank=True, null=True)
     years_of_experience = models.PositiveIntegerField(default=0)
     address = models.TextField(blank=True, null=True)
+    nationality = models.CharField(max_length=50, default="Nigeria")
+    state = models.CharField(max_length=50, default="Lagos")
+    staff_number = models.CharField(max_length=50, unique=True, null=True, blank=True)
+    managing_class = models.ForeignKey('StudentClass', related_name='staff_profiles', on_delete=models.SET_NULL, null=True)
+    managing_class_arm = models.ForeignKey('ClassArm', related_name='staff_profiles', on_delete=models.SET_NULL, null=True, blank=True)
+    # position = models.ForeignKey(TeachingPosition, on_delete=models.SET_NULL, null=True, blank=True)
+    # Generic foreign key fields
+    position_content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.SET_NULL,
+        null=True,
+        limit_choices_to=models.Q(app_label='accounts', model__in=['teachingposition', 'nonteachingposition']),
+    )
+    position_object_id = models.PositiveIntegerField(null=True)
+    primary_position = GenericForeignKey('position_content_type', 'position_object_id')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering = ['user__last_name']
+        verbose_name = "Staff Profile"
+        verbose_name_plural = "Staff Profiles"
 
     def __str__(self):
         return self.user.get_full_name()
+    
+    def save(self, *args, **kwargs):
+        if self.user.role not in ['staff', 'superadmin', 'branch_admin']:
+            raise ValidationError("Invalid user role for StaffProfile")
+
+        if not self.staff_number:
+            prefix = get_prefix_for_user(self.user)
+            self.staff_number = generate_profile_number(prefix, StaffProfile)
+
+        super().save(*args, **kwargs)
 
 class Communication(models.Model):
     MESSAGE_TYPE_CHOICES = [
@@ -263,7 +356,7 @@ class CommunicationTargetGroup(models.Model):
     communication = models.ForeignKey(
         Communication, on_delete=models.CASCADE, related_name='target_groups'
     )
-    branch = models.ForeignKey('Branch', null=True, blank=True, on_delete=models.SET_NULL, db_index=True)
+    branch = models.ForeignKey('Branch', null=False, blank=False, on_delete=models.CASCADE, db_index=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True, db_index=True)
     # Staff-specific
     staff_type = models.CharField(

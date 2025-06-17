@@ -1,320 +1,3 @@
-{% extends "base.html" %} {% load static %} {% block content %}
-<h2 style="margin-bottom: 1rem">Create Communication</h2>
-
-<style>
-  #form-fields-container {
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 1rem;
-    display: flex;
-    flex-wrap: wrap; /* allow wrapping */
-    gap: 1rem; /* spacing between fields */
-    justify-content: flex-start; /* align fields left */
-    align-items: flex-start; /* align items at top */
-    /* Remove scroll and nowrap */
-    overflow-x: visible;
-    white-space: normal;
-    /* New background color */
-    background-color: #f9f9fb; /* very light gray-blue */
-
-    /* Optional subtle shadow for nice depth */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  }
-
-  #form-fields-container legend {
-    font-weight: 600;
-    font-size: 1.1rem;
-    padding: 0 0.5rem;
-    flex-basis: 100%; /* make legend take full width on its own line */
-    margin-bottom: 1rem; /* space below legend */
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column; /* label on top of input */
-    min-width: 180px; /* minimum width for each group */
-    flex-grow: 1;
-    margin-top: -2rem;
-    /* fields can grow to fill space */
-  }
-
-  .form-label {
-    margin-bottom: 0.3rem;
-    font-weight: 500;
-  }
-</style>
-
-
-<form id="target-group-form" method="get" style="margin-bottom: 1rem">
-  <fieldset id="form-fields-container">
-    <legend>Select Target Group</legend>
-
-    {% if user_role != "student" and user_role != "parent" %}
-    <div id="branch-field" class="form-group">
-      <label for="id_branch" class="form-label">Branch:</label>
-      {{ target_group_form.branch }} {% if target_group_form.branch.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.branch.errors }}
-      </div>
-      {% endif %}
-    </div>
-    {% else %}
-    <input
-      type="hidden"
-      id="id_branch"
-      name="branch"
-      value="{{ user_branch_id }}"
-    />
-    {% endif %}
-
-    <div
-      id="role-field"
-      class="form-group"
-      style="{% if target_group_form.role.errors %}display: block{% else %}display: none{% endif %}"
-    >
-      <label for="id_role" class="form-label">Role:</label>
-      {{ target_group_form.role }} {% if target_group_form.role.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.role.errors }}
-      </div>
-      {% endif %}
-    </div>
-
-    <div id="staff-type-field" class="form-group" style="display: none">
-      <label for="id_staff_type" class="form-label">Staff Type:</label>
-      {{ target_group_form.staff_type }} 
-      {% if target_group_form.staff_type.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.staff_type.errors }}
-      </div>
-      {% endif %}
-    </div>
-
-    <div id="teaching-positions-field" class="form-group" style="display: none">
-      <label for="id_teaching_positions" class="form-label"
-        >Teaching Positions:</label
-      >
-      {{ target_group_form.teaching_positions }} 
-      {% if target_group_form.teaching_positions.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.teaching_positions.errors }}
-      </div>
-      {% endif %}
-    </div>
-
-    <div
-      id="non-teaching-positions-field"
-      class="form-group"
-      style="display: none"
-    >
-      <label for="id_non_teaching_positions" class="form-label"
-        >Non-Teaching Positions:</label
-      >
-      {{ target_group_form.non_teaching_positions }} 
-      {% if target_group_form.non_teaching_positions.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.non_teaching_positions.errors }}
-      </div>
-      {% endif %}
-    </div>
-
-    <div id="student-class-field" class="form-group" style="display: none">
-      <label for="id_student_class" class="form-label">Student Class:</label>
-      {{ target_group_form.student_class }} 
-      {% if target_group_form.student_class.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.student_class.errors }}
-      </div>
-      {% endif %}
-    </div>
-
-    <div id="class-arm-field" class="form-group" style="display: none">
-      <label for="id_class_arm" class="form-label">Class Arm:</label>
-      {{ target_group_form.class_arm }} 
-      {% if target_group_form.class_arm.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.class_arm.errors }}
-      </div>
-      {% endif %}
-    </div>
-  </fieldset>
-</form>
-
-
-{% if communication_form.non_field_errors %}
-  <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
-    {% for error in communication_form.non_field_errors %}
-      <div>{{ error }}</div>
-    {% endfor %}
-  </div>
-{% endif %}
-
-
-
-
-<h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
-<table
-  id="recipients-table"
-  class="table table-striped"
-  style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
->
-  <thead style="background-color: #007bff; color: white">
-    <tr>
-      <th style="padding: 0.5rem; text-align: center">
-        <input type="checkbox" id="select-all-recipients" />
-      </th>
-      <th style="padding: 0.5rem; text-align: center">S/N</th>
-      <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
-      <th style="padding: 0.5rem; text-align: center">Branch</th>
-      <th style="padding: 0.5rem; text-align: left">Name</th>
-      <th style="padding: 0.5rem; text-align: left">Email</th>
-    </tr>
-  </thead>
-  <tbody style="border: 1px solid #ddd">
-    <tr>
-      <td></td>
-      <td></td>
-      <td
-        colspan="6"
-        style="
-          padding: 1rem;
-          text-align: center;
-          font-style: italic;
-          color: #555;
-        "
-      >
-        Select filters above to view recipients.
-      </td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-  </tbody>
-</table>
-
-<form
-  id="communication-form"
-  method="post"
-  action="{% url 'send_communication' %}"
-  enctype="multipart/form-data"
-  style="max-width: 900px"
-  data-user-role="{{ request.user.role }}"
->
-  {% csrf_token %}
-
-  {% comment %} {% if communication_form.non_field_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ communication_form.non_field_errors }}
-  </div>
-  {% endif %} {% endcomment %}
-
-  {% if attachment_formset.non_form_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ attachment_formset.non_form_errors }}
-  </div>
-  {% endif %}
-
-  <div
-    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap"
-  >
-    <!-- Left Column: Message Details -->
-    <fieldset
-      style="
-        flex: 1 1 300px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 1rem;
-      "
-    >
-      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
-        Message Details
-      </legend>
-
-      {% for field in communication_form %}
-      <div
-        class="form-group"
-        style="margin-bottom: 1rem; display: flex; flex-direction: column"
-      >
-        <label
-          for="{{ field.id_for_label }}"
-          class="form-label"
-          style="font-weight: 600; margin-bottom: 0.25rem"
-        >
-          {{ field.label }}:
-        </label>
-        {{ field }}
-        {% if field.help_text %}
-        <small class="form-text text-muted" style="margin-top: 0.25rem">
-          {{ field.help_text }}
-        </small>
-        {% endif %}
-        {% if field.errors %}
-        <div class="text-danger" style="margin-top: 0.25rem">
-          {{ field.errors }}
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </fieldset>
-
-    <!-- Right Column: Attachments -->
-    <fieldset
-      style="
-        flex: 1 1 300px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 1rem;
-      "
-    >
-      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
-        Attachments
-      </legend>
-      {{ attachment_formset.management_form }}
-      <div id="attachments-container">
-        {% for form in attachment_formset.forms %}
-        <div
-          class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
-          style="margin-bottom: 1rem; position: relative"
-        >
-          {{ form.as_p }}
-          {% if forloop.counter > 2 %}
-          <button
-            type="button"
-            class="btn btn-danger remove-attachment"
-            style="position: absolute; top: 10px; right: 10px"
-          >
-            Remove
-          </button>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      <button
-        type="button"
-        id="add-attachment"
-        class="btn btn-success"
-        style="margin-top: 0.75rem"
-      >
-        Add More Files
-      </button>
-    </fieldset>
-  </div>
-
-  <input type="hidden" name="selected_recipients" id="selected-recipients" />
-  
-  <button
-    type="submit"
-    class="btn btn-primary"
-    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
-  >
-    Send Message
-  </button>
-</form>
-
-
-<!-- jQuery -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
 <script>
   $(document).ready(function () {
     const $form = $("#target-group-form");
@@ -484,17 +167,15 @@
       }
 
       // Extra safeguard for student role — avoid sending request if student_class or class_arm is empty
-      if (userRole === "student") {
-        if (fields.role.val() === "student") {
-          const studentClass = fields.studentClass.val();
-          const classArm = fields.classArm.val();
+      if (fields.role.val() === "student") {
+        const studentClass = fields.studentClass.val();
+        const classArm = fields.classArm.val();
 
-          if (!studentClass || !classArm) {
-            recipientsTable.clear().draw();
-            $selectAll.prop("checked", false);
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
-            return;
-          }
+        if (!studentClass || !classArm) {
+          recipientsTable.clear().draw();
+          $selectAll.prop("checked", false);
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+          return;
         }
       }
 
@@ -632,83 +313,30 @@
     });
 
     $communicationForm.on("submit", function (e) {
-      e.preventDefault(); // stop auto submit
-
-      // 1. Validations
       if (["staff", "branch_admin", "superadmin"].includes(userRole) && !fields.branch.val()) {
         alert("Please select a Branch before submitting the form.");
+        e.preventDefault();
         return false;
       }
 
       if (["student", "parent"].includes(userRole) && !fields.role.val()) {
         alert("Please select a Role before submitting the form.");
+        e.preventDefault();
         return false;
       }
 
-      // 2. Inject filters
-      $communicationForm.find(".injected-filter-field").remove();
-      const filterFieldNames = ["branch", "role", "staff_type", "teaching_positions", "non_teaching_positions", "student_class", "class_arm"];
+      clearFiltersStorage();
+      clearSelectedRecipients();
 
-      filterFieldNames.forEach(function (name) {
-        const $fields = $("#target-group-form [name='" + name + "']");
-
-        if ($fields.length && $fields[0].type === "checkbox") {
-          // Case: Multiple checkboxes
-          $fields.filter(":checked").each(function () {
-            $("<input>", {
-              type: "hidden",
-              name: name,
-              value: $(this).val(),
-              class: "injected-filter-field"
-            }).appendTo($communicationForm);
-          });
-        } else {
-          // Case: dropdowns (single or multiple select), or other fields
-          const val = $fields.val();
-
-          if (Array.isArray(val)) {
-            // Handle multi-select dropdown (multiple values)
-            val.forEach(function (item) {
-              $("<input>", {
-                type: "hidden",
-                name: name,
-                value: item,
-                class: "injected-filter-field"
-              }).appendTo($communicationForm);
-            });
-          } else if (val !== undefined && val !== null && val !== "") {
-            // Single value input
-            $("<input>", {
-              type: "hidden",
-              name: name,
-              value: val,
-              class: "injected-filter-field"
-            }).appendTo($communicationForm);
-          }
-        }
-      });
-
-      // 3. Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
-
-      console.log("Selected Recipients Array:", selectedRecipients);
 
       [...selectedRecipients].forEach(function (id) {
         $("<input>", {
           type: "hidden",
           name: "selected_recipients",
-          value: id
+          value: id,
         }).appendTo($communicationForm);
       });
-
-      // 4. Clear local storage filters immediately before submission
-      if (typeof clearFiltersStorage === "function") {
-        clearFiltersStorage();
-      }
-
-      // 4. Submit manually
-      $communicationForm.off("submit").submit();
-
     });
 
     // ===== Attachments =====
@@ -753,24 +381,3 @@
     loadRecipients();
   });
 </script> 
-
-<script>
-  let recipientsTable;
-
-  $(document).ready(function () {
-    recipientsTable = $("#recipients-table").DataTable({
-      columnDefs: [
-        {
-          targets: 0,
-          orderable: false,
-          searchable: false,
-        },
-      ],
-      order: [[1, "asc"]],
-    });
-  });
-  
-
-</script>
-
-{% endblock %}

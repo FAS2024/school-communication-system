@@ -44,7 +44,6 @@
   }
 </style>
 
-
 <form id="target-group-form" method="get" style="margin-bottom: 1rem">
   <fieldset id="form-fields-container">
     <legend>Select Target Group</legend>
@@ -82,8 +81,8 @@
 
     <div id="staff-type-field" class="form-group" style="display: none">
       <label for="id_staff_type" class="form-label">Staff Type:</label>
-      {{ target_group_form.staff_type }} 
-      {% if target_group_form.staff_type.errors %}
+      {{ target_group_form.staff_type }} {% if
+      target_group_form.staff_type.errors %}
       <div class="text-danger" style="color: red; margin-top: 0.25rem">
         {{ target_group_form.staff_type.errors }}
       </div>
@@ -94,8 +93,8 @@
       <label for="id_teaching_positions" class="form-label"
         >Teaching Positions:</label
       >
-      {{ target_group_form.teaching_positions }} 
-      {% if target_group_form.teaching_positions.errors %}
+      {{ target_group_form.teaching_positions }} {% if
+      target_group_form.teaching_positions.errors %}
       <div class="text-danger" style="color: red; margin-top: 0.25rem">
         {{ target_group_form.teaching_positions.errors }}
       </div>
@@ -110,8 +109,8 @@
       <label for="id_non_teaching_positions" class="form-label"
         >Non-Teaching Positions:</label
       >
-      {{ target_group_form.non_teaching_positions }} 
-      {% if target_group_form.non_teaching_positions.errors %}
+      {{ target_group_form.non_teaching_positions }} {% if
+      target_group_form.non_teaching_positions.errors %}
       <div class="text-danger" style="color: red; margin-top: 0.25rem">
         {{ target_group_form.non_teaching_positions.errors }}
       </div>
@@ -120,8 +119,8 @@
 
     <div id="student-class-field" class="form-group" style="display: none">
       <label for="id_student_class" class="form-label">Student Class:</label>
-      {{ target_group_form.student_class }} 
-      {% if target_group_form.student_class.errors %}
+      {{ target_group_form.student_class }} {% if
+      target_group_form.student_class.errors %}
       <div class="text-danger" style="color: red; margin-top: 0.25rem">
         {{ target_group_form.student_class.errors }}
       </div>
@@ -130,8 +129,8 @@
 
     <div id="class-arm-field" class="form-group" style="display: none">
       <label for="id_class_arm" class="form-label">Class Arm:</label>
-      {{ target_group_form.class_arm }} 
-      {% if target_group_form.class_arm.errors %}
+      {{ target_group_form.class_arm }} {% if target_group_form.class_arm.errors
+      %}
       <div class="text-danger" style="color: red; margin-top: 0.25rem">
         {{ target_group_form.class_arm.errors }}
       </div>
@@ -139,18 +138,6 @@
     </div>
   </fieldset>
 </form>
-
-
-{% if communication_form.non_field_errors %}
-  <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
-    {% for error in communication_form.non_field_errors %}
-      <div>{{ error }}</div>
-    {% endfor %}
-  </div>
-{% endif %}
-
-
-
 
 <h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
 <table
@@ -192,6 +179,7 @@
   </tbody>
 </table>
 
+
 <form
   id="communication-form"
   method="post"
@@ -201,19 +189,6 @@
   data-user-role="{{ request.user.role }}"
 >
   {% csrf_token %}
-
-  {% comment %} {% if communication_form.non_field_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ communication_form.non_field_errors }}
-  </div>
-  {% endif %} {% endcomment %}
-
-  {% if attachment_formset.non_form_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ attachment_formset.non_form_errors }}
-  </div>
-  {% endif %}
-
   <div
     style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap"
   >
@@ -242,13 +217,11 @@
         >
           {{ field.label }}:
         </label>
-        {{ field }}
-        {% if field.help_text %}
-        <small class="form-text text-muted" style="margin-top: 0.25rem">
-          {{ field.help_text }}
-        </small>
-        {% endif %}
-        {% if field.errors %}
+        {{ field }} {% if field.help_text %}
+        <small class="form-text text-muted" style="margin-top: 0.25rem"
+          >{{ field.help_text }}</small
+        >
+        {% endif %} {% if field.errors %}
         <div class="text-danger" style="margin-top: 0.25rem">
           {{ field.errors }}
         </div>
@@ -276,8 +249,7 @@
           class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
           style="margin-bottom: 1rem; position: relative"
         >
-          {{ form.as_p }}
-          {% if forloop.counter > 2 %}
+          {{ form.as_p }} {% if forloop.counter > 2 %}
           <button
             type="button"
             class="btn btn-danger remove-attachment"
@@ -301,7 +273,6 @@
   </div>
 
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-  
   <button
     type="submit"
     class="btn btn-primary"
@@ -310,7 +281,6 @@
     Send Message
   </button>
 </form>
-
 
 <!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -484,17 +454,15 @@
       }
 
       // Extra safeguard for student role — avoid sending request if student_class or class_arm is empty
-      if (userRole === "student") {
-        if (fields.role.val() === "student") {
-          const studentClass = fields.studentClass.val();
-          const classArm = fields.classArm.val();
+      if (fields.role.val() === "student") {
+        const studentClass = fields.studentClass.val();
+        const classArm = fields.classArm.val();
 
-          if (!studentClass || !classArm) {
-            recipientsTable.clear().draw();
-            $selectAll.prop("checked", false);
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
-            return;
-          }
+        if (!studentClass || !classArm) {
+          recipientsTable.clear().draw();
+          $selectAll.prop("checked", false);
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+          return;
         }
       }
 
@@ -632,83 +600,30 @@
     });
 
     $communicationForm.on("submit", function (e) {
-      e.preventDefault(); // stop auto submit
-
-      // 1. Validations
       if (["staff", "branch_admin", "superadmin"].includes(userRole) && !fields.branch.val()) {
         alert("Please select a Branch before submitting the form.");
+        e.preventDefault();
         return false;
       }
 
       if (["student", "parent"].includes(userRole) && !fields.role.val()) {
         alert("Please select a Role before submitting the form.");
+        e.preventDefault();
         return false;
       }
 
-      // 2. Inject filters
-      $communicationForm.find(".injected-filter-field").remove();
-      const filterFieldNames = ["branch", "role", "staff_type", "teaching_positions", "non_teaching_positions", "student_class", "class_arm"];
+      clearFiltersStorage();
+      clearSelectedRecipients();
 
-      filterFieldNames.forEach(function (name) {
-        const $fields = $("#target-group-form [name='" + name + "']");
-
-        if ($fields.length && $fields[0].type === "checkbox") {
-          // Case: Multiple checkboxes
-          $fields.filter(":checked").each(function () {
-            $("<input>", {
-              type: "hidden",
-              name: name,
-              value: $(this).val(),
-              class: "injected-filter-field"
-            }).appendTo($communicationForm);
-          });
-        } else {
-          // Case: dropdowns (single or multiple select), or other fields
-          const val = $fields.val();
-
-          if (Array.isArray(val)) {
-            // Handle multi-select dropdown (multiple values)
-            val.forEach(function (item) {
-              $("<input>", {
-                type: "hidden",
-                name: name,
-                value: item,
-                class: "injected-filter-field"
-              }).appendTo($communicationForm);
-            });
-          } else if (val !== undefined && val !== null && val !== "") {
-            // Single value input
-            $("<input>", {
-              type: "hidden",
-              name: name,
-              value: val,
-              class: "injected-filter-field"
-            }).appendTo($communicationForm);
-          }
-        }
-      });
-
-      // 3. Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
-
-      console.log("Selected Recipients Array:", selectedRecipients);
 
       [...selectedRecipients].forEach(function (id) {
         $("<input>", {
           type: "hidden",
           name: "selected_recipients",
-          value: id
+          value: id,
         }).appendTo($communicationForm);
       });
-
-      // 4. Clear local storage filters immediately before submission
-      if (typeof clearFiltersStorage === "function") {
-        clearFiltersStorage();
-      }
-
-      // 4. Submit manually
-      $communicationForm.off("submit").submit();
-
     });
 
     // ===== Attachments =====
