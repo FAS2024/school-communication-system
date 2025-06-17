@@ -1,0 +1,27 @@
+<h1>{{ message.title }}</h1>
+<p><strong>From:</strong> {{ message.sender.username }}</p>
+<p>{{ message.body }}</p>
+
+<h3>Attachments</h3>
+<ul>
+  {% for attachment in message.attachments.all %}
+    <li><a href="{{ attachment.file.url }}">{{ attachment.file.name }}</a></li>
+  {% empty %}
+    <li>No attachments.</li>
+  {% endfor %}
+</ul>
+
+<h3>Comments</h3>
+<ul>
+  {% for comment in comments %}
+    <li>{{ comment.commenter.username }}: {{ comment.comment }}</li>
+  {% empty %}
+    <li>No comments yet.</li>
+  {% endfor %}
+</ul>
+
+<form method="post" action="{% url 'messaging:add_comment' message.id %}">
+  {% csrf_token %}
+  {{ comment_form.as_p }}
+  <button type="submit">Add Comment</button>
+</form>

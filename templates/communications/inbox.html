@@ -1,0 +1,18 @@
+<h1>Inbox</h1>
+<ul>
+  {% for entry in received_messages %}
+    <li>
+      <a href="{% url 'messaging:message_detail' entry.communication.id %}">
+        {% if not entry.read %}<strong>{% endif %}
+        {{ entry.communication.title }} from {{ entry.communication.sender.username }}
+        {% if not entry.read %}</strong>{% endif %}
+      </a>
+      <form method="post" action="{% url 'messaging:delete_received_message' entry.communication.id %}">
+        {% csrf_token %}
+        <button type="submit">Delete</button>
+      </form>
+    </li>
+  {% empty %}
+    <li>No messages in your inbox.</li>
+  {% endfor %}
+</ul>

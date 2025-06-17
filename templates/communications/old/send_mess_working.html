@@ -1,0 +1,1418 @@
+{% extends "base.html" %} {% load static %} {% block content %}
+<h2 style="margin-bottom: 1rem">Create Communication</h2>
+
+<form id="target-group-form" method="get" style="margin-bottom: 2rem">
+  <fieldset style="border: 1px solid #ccc; border-radius: 8px; padding: 1rem">
+    <legend style="padding: 0 0.5rem; font-weight: 600; font-size: 1.1rem">
+      Select Target Group
+    </legend>
+
+    {% if user_role != "student" and user_role != "parent" %}
+    <div id="branch-field" class="form-group">
+      <label for="id_branch" class="form-label">Branch:</label>
+      {{ target_group_form.branch }}
+    </div>
+    {% else %}
+    <input
+      type="hidden"
+      id="id_branch"
+      name="branch"
+      value="{{ user_branch_id }}"
+    />
+    {% endif %}
+
+    <div id="role-field" class="form-group" style="display: none">
+      <label for="id_role" class="form-label">Role:</label>
+      {{ target_group_form.role }}
+    </div>
+
+    <div id="staff-type-field" class="form-group" style="display: none">
+      <label for="id_staff_type" class="form-label">Staff Type:</label>
+      {{ target_group_form.staff_type }}
+    </div>
+
+    <div id="teaching-positions-field" class="form-group" style="display: none">
+      <label for="id_teaching_positions" class="form-label"
+        >Teaching Positions:</label
+      >
+      {{ target_group_form.teaching_positions }}
+    </div>
+
+    <div
+      id="non-teaching-positions-field"
+      class="form-group"
+      style="display: none"
+    >
+      <label for="id_non_teaching_positions" class="form-label"
+        >Non-Teaching Positions:</label
+      >
+      {{ target_group_form.non_teaching_positions }}
+    </div>
+
+    <div id="student-class-field" class="form-group" style="display: none">
+      <label for="id_student_class" class="form-label">Student Class:</label>
+      {{ target_group_form.student_class }}
+    </div>
+
+    <div id="class-arm-field" class="form-group" style="display: none">
+      <label for="id_class_arm" class="form-label">Class Arm:</label>
+      {{ target_group_form.class_arm }}
+    </div>
+  </fieldset>
+</form>
+
+<h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
+<table
+  id="recipients-table"
+  class="table table-striped"
+  style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
+>
+  <thead style="background-color: #007bff; color: white">
+    <tr>
+      <th style="padding: 0.5rem; text-align: center">
+        <input type="checkbox" id="select-all-recipients" />
+      </th>
+      <th style="padding: 0.5rem; text-align: center">S/N</th>
+      <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
+      <th style="padding: 0.5rem; text-align: center">Branch</th>
+      <th style="padding: 0.5rem; text-align: left">Name</th>
+      <th style="padding: 0.5rem; text-align: left">Email</th>
+    </tr>
+  </thead>
+  <tbody style="border: 1px solid #ddd">
+    <tr>
+      <td
+        colspan="6"
+        style="
+          padding: 1rem;
+          text-align: center;
+          font-style: italic;
+          color: #555;
+        "
+      >
+        Select filters above to view recipients.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<form
+  id="communication-form"
+  method="post"
+  enctype="multipart/form-data"
+  style="max-width: 900px"
+>
+  {% csrf_token %}
+  <div
+    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap"
+  >
+    <!-- Left Column: Message Details -->
+    <fieldset
+      style="
+        flex: 1 1 300px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Message Details
+      </legend>
+
+      {% for field in communication_form %}
+      <div
+        class="form-group"
+        style="margin-bottom: 1rem; display: flex; flex-direction: column"
+      >
+        <label
+          for="{{ field.id_for_label }}"
+          class="form-label"
+          style="font-weight: 600; margin-bottom: 0.25rem"
+        >
+          {{ field.label }}:
+        </label>
+        {{ field }} {% if field.help_text %}
+        <small class="form-text text-muted" style="margin-top: 0.25rem"
+          >{{ field.help_text }}</small
+        >
+        {% endif %} {% if field.errors %}
+        <div class="text-danger" style="margin-top: 0.25rem">
+          {{ field.errors }}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+
+    <!-- Right Column: Attachments -->
+    <fieldset
+      style="
+        flex: 1 1 300px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Attachments
+      </legend>
+      {{ attachment_formset.management_form }}
+      <div id="attachments-container">
+        {% for form in attachment_formset.forms %}
+        <div
+          class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
+          style="margin-bottom: 1rem; position: relative"
+        >
+          {{ form.as_p }} {% if forloop.counter > 2 %}
+          <button
+            type="button"
+            class="btn btn-danger remove-attachment"
+            style="position: absolute; top: 10px; right: 10px"
+          >
+            Remove
+          </button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <button
+        type="button"
+        id="add-attachment"
+        class="btn btn-success"
+        style="margin-top: 0.75rem"
+      >
+        Add More Files
+      </button>
+    </fieldset>
+  </div>
+
+  <input type="hidden" name="selected_recipients" id="selected-recipients" />
+  <button
+    type="submit"
+    class="btn btn-primary"
+    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
+  >
+    Send Message
+  </button>
+</form>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+
+<script>
+  $(document).ready(function () {
+    const $form = $("#target-group-form");
+    const $recipientsTableBody = $("#recipients-table tbody");
+    const $selectAll = $("#select-all-recipients");
+    const $communicationForm = $("#communication-form");
+
+    const fields = {
+      branch: $("#id_branch"),
+      role: $("#id_role"),
+      staffType: $("#id_staff_type"),
+      teaching: $("#id_teaching_positions"),
+      nonTeaching: $("#id_non_teaching_positions"),
+      studentClass: $("#id_student_class"),
+      classArm: $("#id_class_arm"),
+    };
+
+    let selectedRecipients = new Set();
+
+    function saveFilters() {
+      const filters = {};
+      $form.find("select, input[type=checkbox]").each(function () {
+        const $el = $(this);
+        filters[$el.attr("id")] = $el.is(":checkbox")
+          ? $el.prop("checked")
+          : $el.val();
+      });
+      localStorage.setItem("targetGroupFilters", JSON.stringify(filters));
+    }
+
+    function clearFiltersStorage() {
+      localStorage.removeItem("targetGroupFilters");
+    }
+
+    function clearSelectedRecipients() {
+      selectedRecipients.clear();
+      localStorage.removeItem("selectedRecipients");
+    }
+
+    function loadFilters() {
+      const saved = localStorage.getItem("targetGroupFilters");
+      if (!saved) return;
+      const filters = JSON.parse(saved);
+      for (const id in filters) {
+        const $el = $("#" + id);
+        if ($el.length) {
+          $el.is(":checkbox")
+            ? $el.prop("checked", filters[id])
+            : $el.val(filters[id]);
+        }
+      }
+    }
+
+    function updateBranchVisibility() {
+      if (fields.branch.val()) {
+        $("#role-field").show();
+      } else {
+        $(
+          "#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
+        ).hide();
+        resetFields([
+          "role",
+          "staffType",
+          "teaching",
+          "nonTeaching",
+          "studentClass",
+          "classArm",
+        ]);
+      }
+    }
+
+    function updateRoleVisibility() {
+      const role = fields.role.val();
+      if (role === "staff") {
+        $("#staff-type-field").show();
+        $("#student-class-field, #class-arm-field").hide();
+        resetFields(["studentClass", "classArm"]);
+        updateStaffTypeVisibility();
+      } else if (role === "student") {
+        $(
+          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field"
+        ).hide();
+        resetFields(["staffType", "teaching", "nonTeaching"]);
+        $("#student-class-field").show();
+        updateStudentClassVisibility();
+      } else {
+        $(
+          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
+        ).hide();
+        resetFields([
+          "staffType",
+          "teaching",
+          "nonTeaching",
+          "studentClass",
+          "classArm",
+        ]);
+      }
+    }
+
+    function updateStaffTypeVisibility() {
+      const type = fields.staffType.val();
+      const $teachingField = $("#teaching-positions-field");
+      const $nonTeachingField = $("#non-teaching-positions-field");
+
+      switch (type) {
+        case "teaching":
+          $teachingField.show();
+          $nonTeachingField.hide();
+          fields.nonTeaching
+            .find("input[type=checkbox]")
+            .prop("checked", false);
+          break;
+        case "non_teaching":
+          $teachingField.hide();
+          $nonTeachingField.show();
+          fields.teaching.find("input[type=checkbox]").prop("checked", false);
+          break;
+        case "both":
+          $teachingField.show();
+          $nonTeachingField.show();
+          break;
+        default:
+          $teachingField.hide();
+          $nonTeachingField.hide();
+          fields.teaching.find("input[type=checkbox]").prop("checked", false);
+          fields.nonTeaching
+            .find("input[type=checkbox]")
+            .prop("checked", false);
+      }
+    }
+
+    function updateStudentClassVisibility() {
+      const show = !!fields.studentClass.val();
+      $("#class-arm-field").toggle(show);
+      if (!show) fields.classArm.val("");
+    }
+
+    function resetFields(keys) {
+      keys.forEach((key) => {
+        const field = fields[key];
+        if (field.is("select")) {
+          field.val("");
+        } else {
+          field.find("input[type=checkbox]").prop("checked", false);
+        }
+      });
+    }
+
+    function saveSelectedRecipients() {
+      localStorage.setItem(
+        "selectedRecipients",
+        JSON.stringify([...selectedRecipients])
+      );
+    }
+
+    function loadSelectedRecipients() {
+      selectedRecipients = new Set(
+        JSON.parse(localStorage.getItem("selectedRecipients") || "[]")
+      );
+    }
+
+    function updateRecipientTableCheckboxStates() {
+      $(".recipient-checkbox").each(function () {
+        const id = $(this).val();
+        $(this).prop("checked", selectedRecipients.has(id));
+      });
+      $selectAll.prop(
+        "checked",
+        $(".recipient-checkbox:checked").length ===
+          $(".recipient-checkbox").length
+      );
+    }
+
+    function loadRecipients() {
+      $.get(
+        "{% url 'get_filtered_users' %}",
+        $form.serialize(),
+        function (response) {
+          $recipientsTableBody.empty();
+          if (response.length === 0) {
+            $recipientsTableBody.append(
+              '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
+            );
+            $selectAll.prop("checked", false);
+            return;
+          }
+
+          response.forEach((user, index) => {
+            const profilePic =
+              user.profile_picture || "/static/assets/img/profile-pic.png";
+            const isChecked = selectedRecipients.has(user.id.toString())
+              ? "checked"
+              : "";
+            const row = `
+            <tr style="border-bottom: 1px solid #eee;">
+              <td class="text-center"><input type="checkbox" class="recipient-checkbox" value="${
+                user.id
+              }" ${isChecked}></td>
+              <td class="text-center">${index + 1}</td>
+              <td class="text-center"><img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;"></td>
+              <td class="text-center">${user.branch__name}</td>
+              <td>${user.first_name} ${user.last_name}</td>
+              <td>${user.email}</td>
+            </tr>`;
+            $recipientsTableBody.append(row);
+          });
+
+          updateRecipientTableCheckboxStates();
+        }
+      );
+    }
+
+    function handleDependencyChange() {
+      clearSelectedRecipients();
+      $selectAll.prop("checked", false);
+      saveFilters();
+      loadRecipients();
+    }
+
+    // === Event Bindings ===
+    fields.branch.on("change", () => {
+      updateBranchVisibility();
+      updateRoleVisibility();
+      handleDependencyChange();
+    });
+
+    fields.role.on("change", () => {
+      updateRoleVisibility();
+      handleDependencyChange();
+    });
+
+    fields.staffType.on("change", () => {
+      updateStaffTypeVisibility();
+      handleDependencyChange();
+    });
+
+    fields.studentClass.on("change", () => {
+      updateStudentClassVisibility();
+      handleDependencyChange();
+    });
+
+    $form
+      .find("select, input[type=checkbox]")
+      .not("#select-all-recipients")
+      .on("change", handleDependencyChange);
+
+    $recipientsTableBody.on("change", ".recipient-checkbox", function () {
+      const id = $(this).val();
+      $(this).is(":checked")
+        ? selectedRecipients.add(id)
+        : selectedRecipients.delete(id);
+      saveSelectedRecipients();
+      updateRecipientTableCheckboxStates();
+    });
+
+    $selectAll.on("change", function () {
+      const checked = this.checked;
+      $(".recipient-checkbox").each(function () {
+        $(this).prop("checked", checked);
+        const id = $(this).val();
+        checked ? selectedRecipients.add(id) : selectedRecipients.delete(id);
+      });
+      saveSelectedRecipients();
+    });
+
+    $communicationForm.on("submit", function () {
+      // Clear filters and recipients on submit
+      clearFiltersStorage();
+      clearSelectedRecipients();
+      localStorage.removeItem("selectedRecipients");
+
+      // Remove any old hidden inputs
+      $communicationForm.find('input[name="selected_recipients"]').remove();
+
+      [...selectedRecipients].forEach(function (id) {
+        $("<input>", {
+          type: "hidden",
+          name: "selected_recipients",
+          value: id,
+        }).appendTo($communicationForm);
+      });
+    });
+
+    // === Attachments ===
+
+    const maxAttachments = 10;
+    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
+
+    $("#add-attachment").on("click", function () {
+      if (totalForms >= maxAttachments)
+        return alert("Maximum attachments reached.");
+
+      const $newForm = $(".attachment-form:first").clone();
+      $newForm.find("input, select, textarea").each(function () {
+        const name = $(this).attr("name").replace("-0-", `-${totalForms}-`);
+        const id = "id_" + name;
+        $(this).attr({ name, id }).val("");
+        if ($(this).is(":checkbox, :radio")) $(this).prop("checked", false);
+      });
+
+      $newForm.find(".remove-attachment").remove();
+      $newForm.append(
+        '<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>'
+      );
+      $("#attachments-container").append($newForm);
+
+      totalForms++;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+    $("#attachments-container").on("click", ".remove-attachment", function () {
+      $(this).closest(".attachment-form").remove();
+      totalForms--;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+    // === Initial Setup ===
+    loadFilters();
+    loadSelectedRecipients();
+    updateBranchVisibility();
+    updateRoleVisibility();
+    updateStaffTypeVisibility();
+    updateStudentClassVisibility();
+    loadRecipients();
+  });
+</script>
+
+
+{% endblock %} 
+
+
+{% comment %} ///////////////////////////////////////////////////// {% endcomment %}
+
+
+{% comment %} <script>
+  $(document).ready(function () {
+    const $form = $("#target-group-form");
+    const $recipientsTableBody = $("#recipients-table tbody");
+    const $selectAll = $("#select-all-recipients");
+
+    function loadRecipients() {
+      const data = $form.serialize();
+      $.get("{% url 'get_filtered_users' %}", data, function (response) {
+        $recipientsTableBody.empty();
+
+        if (response.length === 0) {
+          $recipientsTableBody.append('<tr><td colspan="6" style="text-align:center; padding: 1rem;">No users found.</td></tr>');
+          return;
+        }
+
+        let index = 1;
+        for (const user of response) {
+          const row = `
+            <tr style="border-bottom: 1px solid #eee;">
+              <td style="text-align:center;">
+                <input type="checkbox" class="recipient-checkbox" value="${user.id}">
+              </td>
+              <td style="text-align:center;">${index}</td>
+              <td style="text-align:center;">
+                <img src="${user.profile_picture ? user.profile_picture : '/static/assets/img/profile-pic.png'}"
+                     alt="Profile Picture" width="30" height="30"
+                     style="border-radius: 50%; object-fit: cover;">
+              </td>
+              <td style="text-align:center;">${user.branch__name}</td>
+              <td>${user.first_name} ${user.last_name}</td>
+              <td>${user.email}</td>
+            </tr>`;
+          $recipientsTableBody.append(row);
+          index++;
+        }
+
+        $selectAll.prop("checked", false);
+      });
+    }
+
+    $form.find("select, input[type=checkbox]").on("change", loadRecipients);
+
+    $selectAll.on("change", function () {
+      $(".recipient-checkbox").prop("checked", this.checked);
+    });
+
+    $("#communication-form").on("submit", function () {
+      // Remove existing hidden inputs before adding new ones
+      $('#communication-form input[name="selected_recipients"]').remove();
+
+      $(".recipient-checkbox:checked").each(function () {
+        $("<input>")
+          .attr({ type: "hidden", name: "selected_recipients", value: this.value })
+          .appendTo("#communication-form");
+      });
+    });
+
+    const roleField = $("#id_role");
+    const staffTypeField = $("#id_staff_type");
+    const teachingField = $("#id_teaching_positions");
+    const nonTeachingField = $("#id_non_teaching_positions");
+    const studentClassField = $("#id_student_class");
+    const classArmField = $("#id_class_arm");
+
+    {% if user_role == "student" or user_role == "parent" %}
+      $("#role-field").show();
+    {% else %}
+      $("#id_branch").on("change", function () {
+        if ($(this).val()) {
+          $("#role-field").show();
+        } else {
+          $("#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field").hide();
+        }
+      });
+    {% endif %}
+
+    roleField.on("change", function () {
+      const selectedRole = $(this).val();
+      if (selectedRole === "staff") {
+        $("#staff-type-field").show();
+        $("#student-class-field, #class-arm-field").hide();
+      } else if (selectedRole === "student") {
+        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field").hide();
+        $("#student-class-field").show();
+      } else {
+        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field").hide();
+      }
+    });
+
+    staffTypeField.on("change", function () {
+      const staffType = $(this).val();
+      if (staffType === "teaching") {
+        $("#teaching-positions-field").show();
+        $("#non-teaching-positions-field").hide();
+      } else if (staffType === "non-teaching") {
+        $("#teaching-positions-field").hide();
+        $("#non-teaching-positions-field").show();
+      } else {
+        $("#teaching-positions-field, #non-teaching-positions-field").hide();
+      }
+    });
+
+    studentClassField.on("change", function () {
+      if ($(this).val()) {
+        $("#class-arm-field").show();
+      } else {
+        $("#class-arm-field").hide();
+      }
+    });
+
+    // Attachment formset dynamic add/remove functionality
+    const maxAttachments = 10;
+    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
+
+    $("#add-attachment").on("click", function () {
+      if (totalForms >= maxAttachments) {
+        alert("Maximum attachments reached.");
+        return;
+      }
+
+      const newForm = $(".attachment-form:first").clone();
+      newForm.find("input, select, textarea").each(function () {
+        const name = $(this).attr("name").replace("-0-", `-${totalForms}-`);
+        const id = "id_" + name;
+        $(this).attr({ name: name, id: id }).val("");
+        if ($(this).is(":checkbox") || $(this).is(":radio")) {
+          $(this).prop("checked", false);
+        }
+      });
+      newForm.find(".remove-attachment").remove();
+      newForm.append('<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>');
+
+      $("#attachments-container").append(newForm);
+      totalForms++;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+    $("#attachments-container").on("click", ".remove-attachment", function () {
+      $(this).closest(".attachment-form").remove();
+      totalForms--;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+  });
+</script>   {% endcomment %}
+
+
+
+
+
+class CommunicationTargetGroupForm(forms.ModelForm):
+    class Meta:
+        model = CommunicationTargetGroup
+        fields = [
+            'branch',
+            'role',
+            'staff_type',
+            'teaching_positions',
+            'non_teaching_positions',
+            'student_class',
+            'class_arm',
+        ]
+        widgets = {
+            'teaching_positions': forms.CheckboxSelectMultiple(),
+            'non_teaching_positions': forms.CheckboxSelectMultiple(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.user:
+            if self.user.role in ['student', 'parent']:
+                self.fields.pop('branch', None)
+            else:
+                self.fields['branch'].queryset = Branch.objects.all()
+
+            if 'role' in self.fields:
+                if self.user.role in ['student', 'parent']:
+                    self.fields['role'].choices = [
+                        ('', '------------'),
+                        ('student', 'Student'),
+                        ('staff', 'Staff'),
+                        ('branch_admin', 'Branch Admin'),
+                    ]
+                else:
+                    self.fields['role'].choices = [
+                        ('', '-----------'),
+                        *CommunicationTargetGroup.ROLE_CHOICES,
+                    ]
+
+        self.fields['teaching_positions'].queryset = TeachingPosition.objects.all()
+        self.fields['non_teaching_positions'].queryset = NonTeachingPosition.objects.all()
+        self.fields['student_class'].queryset = StudentClass.objects.all()
+        self.fields['class_arm'].queryset = ClassArm.objects.all()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        staff_type = cleaned_data.get('staff_type')
+        teaching_positions = cleaned_data.get('teaching_positions')
+        non_teaching_positions = cleaned_data.get('non_teaching_positions')
+
+        if staff_type == 'teaching':
+            if non_teaching_positions.exists():
+                raise ValidationError("Non-teaching positions must not be selected for teaching staff type.")
+            if not teaching_positions.exists():
+                raise ValidationError("Please select at least one teaching position.")
+        
+        elif staff_type == 'non_teaching':
+            if teaching_positions.exists():
+                raise ValidationError("Teaching positions must not be selected for non-teaching staff type.")
+            if not non_teaching_positions.exists():
+                raise ValidationError("Please select at least one non-teaching position.")
+        
+        elif staff_type == 'both':
+            if not (teaching_positions.exists() or non_teaching_positions.exists()):
+                raise ValidationError("At least one teaching or non-teaching position must be selected for 'both' staff type.")
+
+        return cleaned_data
+
+
+
+
+
+
+
+      def get_filtered_recipients(self, target_group_data):
+        user = self.user
+
+        branch_id = target_group_data.get('branch')
+        role_name = target_group_data.get('role')
+        staff_type = target_group_data.get('staff_type')
+        teaching_positions_ids = target_group_data.get('teaching_positions')
+        non_teaching_positions_ids = target_group_data.get('non_teaching_positions')
+        student_class_id = target_group_data.get('student_class')
+        class_arm_id = target_group_data.get('class_arm')
+
+        def filter_staff(qs):
+            if staff_type:
+                qs = qs.filter(staff_type=staff_type)
+            if teaching_positions_ids:
+                qs = qs.filter(teaching_positions__id__in=teaching_positions_ids)
+            if non_teaching_positions_ids:
+                qs = qs.filter(non_teaching_positions__id__in=non_teaching_positions_ids)
+            return qs
+
+        def filter_students(qs):
+            if student_class_id:
+                qs = qs.filter(studentprofile__current_class_id=student_class_id)
+            if class_arm_id:
+                qs = qs.filter(studentprofile__current_class_arm_id=class_arm_id)
+            return qs
+
+        def apply_role_filters(qs):
+            if role_name:
+                qs = qs.filter(role=role_name)
+            # Use corrected 'branch_admin' here:
+            if role_name in ['staff', 'branch_admin'] or role_name is None:
+                qs = filter_staff(qs)
+            if role_name == 'student' or role_name is None:
+                qs = filter_students(qs)
+            return qs
+
+        if user.role == 'student':
+            qs = CustomUser.objects.filter(
+                branch_id=user.branch_id,
+                role__in=['student', 'staff', 'branch_admin']
+            ).exclude(id=user.id)
+
+            if role_name:
+                qs = apply_role_filters(qs)
+            else:
+                return CustomUser.objects.none()
+
+        elif user.role == 'parent':
+            children = StudentProfile.objects.filter(parent__user=user)
+            child_class_ids = children.values_list('current_class_id', flat=True)
+
+            children_users = CustomUser.objects.filter(id__in=children.values_list('user_id', flat=True))
+            class_teacher_users = CustomUser.objects.filter(role='staff', class_teacher_of__id__in=child_class_ids)
+            branch_admins = CustomUser.objects.filter(role='branch_admin', branch_id=user.branch_id)
+
+            qs = (children_users | class_teacher_users | branch_admins).distinct()
+
+            if role_name:
+                qs = apply_role_filters(qs)
+            else:
+                return CustomUser.objects.none()
+
+        elif user.role in ['staff', 'branch_admin', 'superadmin']:
+            qs = CustomUser.objects.all()
+
+            if role_name or branch_id:
+                qs = apply_role_filters(qs.filter(branch_id=branch_id))
+            else:
+                return CustomUser.objects.none()
+        else:
+            return CustomUser.objects.none()
+
+        return qs.exclude(id=user.id).distinct()
+
+
+
+
+
+
+
+
+{% comment %} ////////////////////////////////////////////////////////////////// {% endcomment %}
+
+{% extends "base.html" %} {% load static %} {% block content %}
+<h2 style="margin-bottom: 1rem">Create Communication</h2>
+
+<style>
+  #form-fields-container {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap; /* allow wrapping */
+    gap: 1rem; /* spacing between fields */
+    justify-content: flex-start; /* align fields left */
+    align-items: flex-start; /* align items at top */
+    /* Remove scroll and nowrap */
+    overflow-x: visible;
+    white-space: normal;
+    /* New background color */
+    background-color: #f9f9fb; /* very light gray-blue */
+
+    /* Optional subtle shadow for nice depth */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  #form-fields-container legend {
+    font-weight: 600;
+    font-size: 1.1rem;
+    padding: 0 0.5rem;
+    flex-basis: 100%; /* make legend take full width on its own line */
+    margin-bottom: 1rem; /* space below legend */
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column; /* label on top of input */
+    min-width: 180px; /* minimum width for each group */
+    flex-grow: 1;
+    margin-top: -2rem;
+    /* fields can grow to fill space */
+  }
+
+  .form-label {
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+  }
+</style>
+
+<form id="target-group-form" method="get" style="margin-bottom: 1rem">
+  <fieldset id="form-fields-container">
+    <legend>Select Target Group</legend>
+
+    {% if user_role != "student" and user_role != "parent" %}
+    <div id="branch-field" class="form-group">
+      <label for="id_branch" class="form-label">Branch:</label>
+      {{ target_group_form.branch }}
+    </div>
+    {% else %}
+    <input
+      type="hidden"
+      id="id_branch"
+      name="branch"
+      value="{{ user_branch_id }}"
+    />
+    {% endif %}
+
+    <div id="role-field" class="form-group" style="display: none">
+      <label for="id_role" class="form-label">Role:</label>
+      {{ target_group_form.role }}
+    </div>
+
+    <div id="staff-type-field" class="form-group" style="display: none">
+      <label for="id_staff_type" class="form-label">Staff Type:</label>
+      {{ target_group_form.staff_type }}
+    </div>
+
+    <div id="teaching-positions-field" class="form-group" style="display: none">
+      <label for="id_teaching_positions" class="form-label"
+        >Teaching Positions:</label
+      >
+      {{ target_group_form.teaching_positions }}
+    </div>
+
+    <div
+      id="non-teaching-positions-field"
+      class="form-group"
+      style="display: none"
+    >
+      <label for="id_non_teaching_positions" class="form-label"
+        >Non-Teaching Positions:</label
+      >
+      {{ target_group_form.non_teaching_positions }}
+    </div>
+
+    <div id="student-class-field" class="form-group" style="display: none">
+      <label for="id_student_class" class="form-label">Student Class:</label>
+      {{ target_group_form.student_class }}
+    </div>
+
+    <div id="class-arm-field" class="form-group" style="display: none">
+      <label for="id_class_arm" class="form-label">Class Arm:</label>
+      {{ target_group_form.class_arm }}
+    </div>
+  </fieldset>
+</form>
+
+<h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
+<table
+  id="recipients-table"
+  class="table table-striped"
+  style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
+>
+  <thead style="background-color: #007bff; color: white">
+    <tr>
+      <th style="padding: 0.5rem; text-align: center">
+        <input type="checkbox" id="select-all-recipients" />
+      </th>
+      <th style="padding: 0.5rem; text-align: center">S/N</th>
+      <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
+      <th style="padding: 0.5rem; text-align: center">Branch</th>
+      <th style="padding: 0.5rem; text-align: left">Name</th>
+      <th style="padding: 0.5rem; text-align: left">Email</th>
+    </tr>
+  </thead>
+  <tbody style="border: 1px solid #ddd">
+    <tr>
+      <td
+        colspan="6"
+        style="
+          padding: 1rem;
+          text-align: center;
+          font-style: italic;
+          color: #555;
+        "
+      >
+        Select filters above to view recipients.
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<form
+  id="communication-form"
+  method="post"
+  enctype="multipart/form-data"
+  style="max-width: 900px"
+>
+  {% csrf_token %}
+  <div
+    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap"
+  >
+    <!-- Left Column: Message Details -->
+    <fieldset
+      style="
+        flex: 1 1 300px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Message Details
+      </legend>
+
+      {% for field in communication_form %}
+      <div
+        class="form-group"
+        style="margin-bottom: 1rem; display: flex; flex-direction: column"
+      >
+        <label
+          for="{{ field.id_for_label }}"
+          class="form-label"
+          style="font-weight: 600; margin-bottom: 0.25rem"
+        >
+          {{ field.label }}:
+        </label>
+        {{ field }} {% if field.help_text %}
+        <small class="form-text text-muted" style="margin-top: 0.25rem"
+          >{{ field.help_text }}</small
+        >
+        {% endif %} {% if field.errors %}
+        <div class="text-danger" style="margin-top: 0.25rem">
+          {{ field.errors }}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+
+    <!-- Right Column: Attachments -->
+    <fieldset
+      style="
+        flex: 1 1 300px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Attachments
+      </legend>
+      {{ attachment_formset.management_form }}
+      <div id="attachments-container">
+        {% for form in attachment_formset.forms %}
+        <div
+          class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
+          style="margin-bottom: 1rem; position: relative"
+        >
+          {{ form.as_p }} {% if forloop.counter > 2 %}
+          <button
+            type="button"
+            class="btn btn-danger remove-attachment"
+            style="position: absolute; top: 10px; right: 10px"
+          >
+            Remove
+          </button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <button
+        type="button"
+        id="add-attachment"
+        class="btn btn-success"
+        style="margin-top: 0.75rem"
+      >
+        Add More Files
+      </button>
+    </fieldset>
+  </div>
+
+  <input type="hidden" name="selected_recipients" id="selected-recipients" />
+  <button
+    type="submit"
+    class="btn btn-primary"
+    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
+  >
+    Send Message
+  </button>
+</form>
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+  $(document).ready(function () {
+    const $form = $("#target-group-form");
+    const $recipientsTableBody = $("#recipients-table tbody");
+    const $selectAll = $("#select-all-recipients");
+    const $communicationForm = $("#communication-form");
+
+    const fields = {
+      branch: $("#id_branch"),
+      role: $("#id_role"),
+      staffType: $("#id_staff_type"),
+      teaching: $("#id_teaching_positions"),
+      nonTeaching: $("#id_non_teaching_positions"),
+      studentClass: $("#id_student_class"),
+      classArm: $("#id_class_arm"),
+    };
+
+    let selectedRecipients = new Set();
+
+    function saveFilters() {
+      const filters = {};
+      $form.find("select, input[type=checkbox]").each(function () {
+        const $el = $(this);
+        filters[$el.attr("id")] = $el.is(":checkbox")
+          ? $el.prop("checked")
+          : $el.val();
+      });
+      localStorage.setItem("targetGroupFilters", JSON.stringify(filters));
+    }
+
+    function clearFiltersStorage() {
+      localStorage.removeItem("targetGroupFilters");
+    }
+
+    function clearSelectedRecipients() {
+      selectedRecipients.clear();
+      localStorage.removeItem("selectedRecipients");
+    }
+
+    function loadFilters() {
+      const saved = localStorage.getItem("targetGroupFilters");
+      if (!saved) return;
+      const filters = JSON.parse(saved);
+      for (const id in filters) {
+        const $el = $("#" + id);
+        if ($el.length) {
+          $el.is(":checkbox")
+            ? $el.prop("checked", filters[id])
+            : $el.val(filters[id]);
+        }
+      }
+    }
+
+    function updateBranchVisibility() {
+      if (fields.branch.val()) {
+        $("#role-field").show();
+      } else {
+        $(
+          "#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
+        ).hide();
+        resetFields([
+          "role",
+          "staffType",
+          "teaching",
+          "nonTeaching",
+          "studentClass",
+          "classArm",
+        ]);
+      }
+    }
+
+    function updateRoleVisibility() {
+      const role = fields.role.val();
+      if (role === "staff") {
+        $("#staff-type-field").show();
+        $("#student-class-field, #class-arm-field").hide();
+        resetFields(["studentClass", "classArm"]);
+        updateStaffTypeVisibility();
+      } else if (role === "student") {
+        $(
+          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field"
+        ).hide();
+        resetFields(["staffType", "teaching", "nonTeaching"]);
+        $("#student-class-field").show();
+        updateStudentClassVisibility();
+      } else {
+        $(
+          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
+        ).hide();
+        resetFields([
+          "staffType",
+          "teaching",
+          "nonTeaching",
+          "studentClass",
+          "classArm",
+        ]);
+      }
+    }
+
+    function updateStaffTypeVisibility() {
+      const type = fields.staffType.val();
+      const $teachingField = $("#teaching-positions-field");
+      const $nonTeachingField = $("#non-teaching-positions-field");
+
+      switch (type) {
+        case "teaching":
+          $teachingField.show();
+          $nonTeachingField.hide();
+          fields.nonTeaching
+            .find("input[type=checkbox]")
+            .prop("checked", false);
+          break;
+        case "non_teaching":
+          $teachingField.hide();
+          $nonTeachingField.show();
+          fields.teaching.find("input[type=checkbox]").prop("checked", false);
+          break;
+        case "both":
+          $teachingField.show();
+          $nonTeachingField.show();
+          break;
+        default:
+          $teachingField.hide();
+          $nonTeachingField.hide();
+          fields.teaching.find("input[type=checkbox]").prop("checked", false);
+          fields.nonTeaching
+            .find("input[type=checkbox]")
+            .prop("checked", false);
+      }
+    }
+
+    function updateStudentClassVisibility() {
+      const show = !!fields.studentClass.val();
+      $("#class-arm-field").toggle(show);
+      if (!show) fields.classArm.val("");
+    }
+
+    function resetFields(keys) {
+      keys.forEach((key) => {
+        const field = fields[key];
+        if (field.is("select")) {
+          field.val("");
+        } else {
+          field.find("input[type=checkbox]").prop("checked", false);
+        }
+      });
+    }
+
+    function saveSelectedRecipients() {
+      localStorage.setItem(
+        "selectedRecipients",
+        JSON.stringify([...selectedRecipients])
+      );
+    }
+
+    function loadSelectedRecipients() {
+      selectedRecipients = new Set(
+        JSON.parse(localStorage.getItem("selectedRecipients") || "[]")
+      );
+    }
+
+    function updateRecipientTableCheckboxStates() {
+      $(".recipient-checkbox").each(function () {
+        const id = $(this).val();
+        $(this).prop("checked", selectedRecipients.has(id));
+      });
+      $selectAll.prop(
+        "checked",
+        $(".recipient-checkbox:checked").length ===
+          $(".recipient-checkbox").length
+      );
+    }
+
+    function loadRecipients() {
+      $.get(
+        "{% url 'get_filtered_users' %}",
+        $form.serialize(),
+        function (response) {
+          $recipientsTableBody.empty();
+          if (response.length === 0) {
+            $recipientsTableBody.append(
+              '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
+            );
+            $selectAll.prop("checked", false);
+            return;
+          }
+
+          response.forEach((user, index) => {
+            const profilePic =
+              (user.profile_picture && user.profile_picture.url) ||
+              "/static/assets/img/profile-pic.png";
+            const isChecked = selectedRecipients.has(user.id.toString())
+              ? "checked"
+              : "";
+            const row = `
+            <tr style="border-bottom: 1px solid #eee;">
+              <td class="text-center"><input type="checkbox" class="recipient-checkbox" value="${
+                user.id
+              }" ${isChecked}></td>
+              <td class="text-center">${index + 1}</td>
+              <td class="text-center"><img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;"></td>
+              <td class="text-center">${user.branch__name}</td>
+              <td>${user.first_name} ${user.last_name}</td>
+              <td>${user.email}</td>
+            </tr>`;
+            $recipientsTableBody.append(row);
+          });
+
+          updateRecipientTableCheckboxStates();
+        }
+      );
+    }
+
+    function handleDependencyChange() {
+      clearSelectedRecipients();
+      $selectAll.prop("checked", false);
+      saveFilters();
+      loadRecipients();
+    }
+
+    // === Event Bindings ===
+    fields.branch.on("change", () => {
+      updateBranchVisibility();
+      updateRoleVisibility();
+      handleDependencyChange();
+    });
+
+    fields.role.on("change", () => {
+      updateRoleVisibility();
+      handleDependencyChange();
+    });
+
+    fields.staffType.on("change", () => {
+      updateStaffTypeVisibility();
+      handleDependencyChange();
+    });
+
+    fields.studentClass.on("change", () => {
+      updateStudentClassVisibility();
+      handleDependencyChange();
+    });
+
+    $form
+      .find("select, input[type=checkbox]")
+      .not("#select-all-recipients")
+      .on("change", handleDependencyChange);
+
+    $recipientsTableBody.on("change", ".recipient-checkbox", function () {
+      const id = $(this).val();
+      $(this).is(":checked")
+        ? selectedRecipients.add(id)
+        : selectedRecipients.delete(id);
+      saveSelectedRecipients();
+      updateRecipientTableCheckboxStates();
+    });
+
+    $selectAll.on("change", function () {
+      const checked = this.checked;
+      $(".recipient-checkbox").each(function () {
+        $(this).prop("checked", checked);
+        const id = $(this).val();
+        checked ? selectedRecipients.add(id) : selectedRecipients.delete(id);
+      });
+      saveSelectedRecipients();
+    });
+
+    $communicationForm.on("submit", function () {
+      // Clear filters and recipients on submit
+      clearFiltersStorage();
+      clearSelectedRecipients();
+      localStorage.removeItem("selectedRecipients");
+
+      // Remove any old hidden inputs
+      $communicationForm.find('input[name="selected_recipients"]').remove();
+
+      [...selectedRecipients].forEach(function (id) {
+        $("<input>", {
+          type: "hidden",
+          name: "selected_recipients",
+          value: id,
+        }).appendTo($communicationForm);
+      });
+    });
+
+    // === Attachments ===
+
+    const maxAttachments = 10;
+    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
+
+    $("#add-attachment").on("click", function () {
+      if (totalForms >= maxAttachments)
+        return alert("Maximum attachments reached.");
+
+      const $newForm = $(".attachment-form:first").clone();
+      $newForm.find("input, select, textarea").each(function () {
+        const name = $(this).attr("name").replace("-0-", `-${totalForms}-`);
+        const id = "id_" + name;
+        $(this).attr({ name, id }).val("");
+        if ($(this).is(":checkbox, :radio")) $(this).prop("checked", false);
+      });
+
+      $newForm.find(".remove-attachment").remove();
+      $newForm.append(
+        '<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>'
+      );
+      $("#attachments-container").append($newForm);
+
+      totalForms++;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+    $("#attachments-container").on("click", ".remove-attachment", function () {
+      $(this).closest(".attachment-form").remove();
+      totalForms--;
+      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+    });
+
+    // === Initial Setup ===
+    loadFilters();
+    loadSelectedRecipients();
+    updateBranchVisibility();
+    updateRoleVisibility();
+    updateStaffTypeVisibility();
+    updateStudentClassVisibility();
+    loadRecipients();
+  });
+</script>
+
+{% endblock %}

@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'crispy_forms',
     'crispy_bootstrap4',
+    'phonenumber_field',
 ]
 
 
@@ -116,13 +117,25 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
+# LANGUAGE_CODE = 'en-us'
+
+# TIME_ZONE = 'UTC'
+
+# USE_I18N = True
+
+# USE_TZ = True
+
+
+
+
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Lagos' 
 
 USE_I18N = True
 
 USE_TZ = True
+
 
 
 # Static files (CSS, JavaScript, Images)
@@ -131,13 +144,17 @@ USE_TZ = True
 
 # URL to use when referring to static files
 
-# Static files (CSS, JavaScript, images)
-STATIC_URL = '/static/'
+# # Static files (CSS, JavaScript, images)
+# STATIC_URL = '/static/'
 
-# If you're deploying to production, specify the location for static files
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # Default static folder
-]
+# # If you're deploying to production, specify the location for static files
+# STATICFILES_DIRS = [
+#     os.path.join(BASE_DIR, 'static'),  # Default static folder
+# ]
+
+
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # This is where static files will be collected into during deployment
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Only needed in production
@@ -146,13 +163,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Only needed in production
 # STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'  # For custom storage backends
 
 
-# Media files (uploads from users)
-MEDIA_URL = '/media/'  # The URL where media files will be accessible
+# # Media files (uploads from users)
+# MEDIA_URL = '/media/'  # The URL where media files will be accessible
 
-# The file system path to store uploaded files
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # The directory where user-uploaded files will be stored
+# # The file system path to store uploaded files
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # The directory where user-uploaded files will be stored
 
-
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 
 # Default primary key field type
@@ -162,3 +180,31 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 LOGIN_URL = 'login'  # This assumes the 'login' URL name exists
+
+
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'send-due-communications-every-minute': {
+        'task': 'communications.tasks.send_due_communications',  # path to your task
+        'schedule': crontab(minute='*/1'),  # every minute
+    },
+}
+
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+
+# # settings.py
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.example.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your_email@example.com'
+# EMAIL_HOST_PASSWORD = 'your_password'
+# DEFAULT_FROM_EMAIL = 'Your App Name <noreply@example.com>'

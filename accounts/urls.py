@@ -76,5 +76,28 @@ urlpatterns = [
     path('list/', views.class_arm_list, name='class_arm_list'),
     
     
+    
+    # Communication
+    # path('communications/create/', views.CommunicationCreateView.as_view(), name='communication-create'),
+    # path('communications/create/ajax/', views.CommunicationCreateAjaxView.as_view(), name='communication-create-ajax'),
+    
+    # path('inbox/', views.inbox, name='inbox'),
+    # path('sent/', views.sent_messages, name='sent_messages'),
+    # path('message/<int:pk>/', views.message_detail, name='message_detail'),
+    # path('send-message/', views.CommunicationCreateView.as_view(), name='send_message'),
+    # path('ajax/get-target-users/', views.get_recipients, name='get_target_users'),
+    # path('message/<int:pk>/comment/', views.add_comment, name='add_comment'),
+    # path('message/<int:pk>/delete_received/', views.delete_received_message, name='delete_received_message'),
+    # path('message/<int:pk>/delete_sent/', views.delete_sent_message, name='delete_sent_message'),
+
+
+    path('communications/', views.communication_index, name='communication_index'),
+    # path('communications/ajax/get_student_classes/', views.get_student_classes, name='get_student_classes'),
+    # path('communications/ajax/get_class_arms/', views.get_class_arms, name='get_class_arms'),
+    path('communications/ajax/get_filtered_users/', views.get_filtered_users, name='get_filtered_users'),
+    path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
+    path('communication/sent/', views.communication_success, name='communication_success')
+
+
 ]
 

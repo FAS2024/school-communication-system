@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  body {
+    background: linear-gradient(135deg, #e0f7e9, #ffffff);
+  }
+
+  .success-wrapper {
+    min-height: 75vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .success-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 3rem 2.5rem;
+    max-width: 460px;
+    box-shadow: 0 10px 30px rgba(40, 167, 69, 0.15);
+    text-align: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .success-emoji {
+    font-size: 5rem;
+    color: #28a745;
+    margin-bottom: 1.5rem;
+  }
+
+  h2 {
+    font-weight: 800;
+    color: #218838;
+    margin-bottom: 0.8rem;
+    font-size: 2.2rem;
+  }
+
+  p.lead {
+    color: #495057;
+    font-size: 1.2rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .btn-group {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: nowrap;
+  }
+
+  .btn {
+    font-weight: 700;
+    padding: 0.7rem 2rem;
+    border-radius: 30px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .btn-primary {
+    background-color: #28a745;
+    border: none;
+    color: white;
+    box-shadow: 0 5px 12px rgba(40, 167, 69, 0.4);
+  }
+
+  .btn-primary:hover {
+    background-color: #1e7e34;
+    box-shadow: 0 8px 20px rgba(30, 126, 52, 0.6);
+  }
+
+  .btn-outline {
+    background-color: transparent;
+    border: 2px solid #28a745;
+    color: #28a745;
+  }
+
+  .btn-outline:hover {
+    background-color: #28a745;
+    color: white;
+  }
+</style>
+
+<div class="success-wrapper">
+  <div class="success-card" role="alert" aria-live="polite" aria-atomic="true">
+    <div class="success-emoji" aria-hidden="true">✔️</div>
+    <h2>Message Sent Successfully</h2>
+    <p class="lead">Your communication has been delivered to the selected recipients.</p>
+    <div class="btn-group">
+      <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
