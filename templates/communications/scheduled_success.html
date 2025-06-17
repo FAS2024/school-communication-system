@@ -101,7 +101,7 @@
     {% if is_sent %}
       <h2 class="sent-message">Scheduled Message Submitted</h2>
       <p class="lead">
-        Your communication scheduled for <strong>{{ scheduled_time }}</strong> has now been submitted successfully.
+        Your communication scheduled for <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong> has now been submitted successfully.
       </p>
       <div class="btn-group">
         <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
