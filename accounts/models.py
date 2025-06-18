@@ -11,6 +11,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from accounts.utils import generate_profile_number, get_prefix_for_user
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+import os
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -329,6 +330,7 @@ class Communication(models.Model):
     #         recipient_count=self.communicationrecipient_set.count()
     #     )
 
+
 class CommunicationAttachment(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='attachments')
     file = models.FileField(upload_to='communication_attachments/', blank=True, null=True)
@@ -336,7 +338,10 @@ class CommunicationAttachment(models.Model):
 
     def __str__(self):
         return self.file.name
-
+    
+    @property
+    def basename(self):
+        return os.path.basename(self.file.name)
 
 class CommunicationTargetGroup(models.Model):
     ROLE_CHOICES = [

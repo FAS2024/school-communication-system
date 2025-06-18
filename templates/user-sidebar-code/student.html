@@ -9,7 +9,7 @@
 
   /* Highlight submenu active link */
   #studentMessages .nav-link.active {
-    background-color: #f8f9fa;
+    background-color:rgb(0, 0, 0);
     color: black !important;
     font-weight: bold;
   }
@@ -77,12 +77,18 @@
     </a>
     <div class="collapse ps-4" id="studentMessages">
       <ul class="nav flex-column mt-2">
-        <li class="nav-item">
+        {% comment %} <li class="nav-item">
           <a class="nav-link" href="#">Sent to School (Outbox)</a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="#">Received from School (Inbox)</a>
-        </li>
+        </li> {% endcomment %}
+        <li class="nav-item"><a class="nav-link" href="#">Important</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Sent(Outbox)</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Inbox</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Scheduled</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Drafts</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Trash</a></li>
       </ul>
     </div>
   </li>

@@ -1,18 +1,183 @@
-<h1>Inbox</h1>
-<ul>
-  {% for entry in received_messages %}
-    <li>
-      <a href="{% url 'messaging:message_detail' entry.communication.id %}">
-        {% if not entry.read %}<strong>{% endif %}
-        {{ entry.communication.title }} from {{ entry.communication.sender.username }}
-        {% if not entry.read %}</strong>{% endif %}
-      </a>
-      <form method="post" action="{% url 'messaging:delete_received_message' entry.communication.id %}">
-        {% csrf_token %}
-        <button type="submit">Delete</button>
-      </form>
-    </li>
-  {% empty %}
-    <li>No messages in your inbox.</li>
-  {% endfor %}
-</ul>
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">📥 Inbox</h2>
+    <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="fas fa-edit me-1"></i> Compose
+    </a>
+  </div>
+
+  {% if received_messages %}
+  <div class="card shadow rounded-4">
+    <div class="card-body p-0">
+
+      <!-- Scroll Sync Wrapper -->
+      <div class="position-relative">
+        <!-- Top Scrollbar -->
+        <div class="overflow-auto mb-0" style="overflow-y: hidden; max-width: 100%;" id="top-scroll">
+          <div style="width: max-content; visibility: hidden; height: 1px;"></div>
+        </div>
+
+        <!-- Bottom Scrollable Table -->
+        <div class="overflow-auto" style="overflow-y: hidden;" id="bottom-scroll">
+          <table id="inbox-table" class="table table-striped align-middle mb-0" style="min-width: 1000px;">
+            <thead class="table-light">
+              <tr class="text-center">
+                <th>S/N</th>
+                <th>Title & Message</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>Sent</th>
+                <th>Attachments</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in received_messages %}
+              <tr class="{% if not item.read %}fw-bold{% else %}text-muted{% endif %}">
+                <td class="text-center"></td>  <!-- S/N will be handled by DataTables -->
+
+                <td>
+                  <a href="{% url 'read_message' item.pk %}"
+                     class="d-inline-block {% if not item.read %}text-primary fw-semibold{% else %}text-secondary{% endif %}"
+                     style="text-decoration: none;"
+                     onmouseover="this.style.textDecoration='underline';"
+                     onmouseout="this.style.textDecoration='none';">
+                    {% if not item.read %}
+                      <i class="fas fa-envelope text-primary me-1"></i>
+                    {% else %}
+                      <i class="fas fa-envelope-open text-danger me-1"></i>
+                    {% endif %}
+                    {{ item.communication.title|default:"(Untitled)" }}
+                  </a>
+                  <div class="small text-muted">{{ item.communication.short_body }}</div>
+                </td>
+
+                <td class="text-center">
+                  {% if not item.read %}
+                    <span class="badge bg-primary">Unread</span>
+                  {% else %}
+                    <span class="badge bg-danger">Read</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-center">
+                  <span class="badge bg-info text-dark text-capitalize">{{ item.communication.message_type }}</span>
+                </td>
+
+                <td>
+                  {% if student.profile_picture %}
+                    <img src="{{ student.profile_picture.url }}" alt="Profile" height="20"
+                         style="border-radius: 50%; object-fit: cover"/>
+                  {% else %}
+                    <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
+                         style="border-radius: 50%; object-fit: cover"/>
+                  {% endif %}
+                  {{ item.communication.sender.get_full_name|default:item.communication.sender.username }}
+                  <span class="text-muted small">({{ item.communication.sender.role|capfirst }})</span>
+                </td>
+
+                <td>{{ item.communication.created_at|date:"M d, Y H:i" }}</td>
+
+                <td class="text-center">
+                  {% if item.communication.attachments.exists %}
+                    <i class="fas fa-paperclip text-secondary"></i> {{ item.communication.attachments.count }}
+                  {% else %}
+                    <span class="text-muted small">None</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-center">
+                  <form method="post" action="{% url 'delete_message' item.pk %}" class="delete-form d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info text-center mt-4">No messages found.</div>
+  {% endif %}
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<script>
+  $(document).ready(function () {
+    const table = $('#inbox-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[1, 'asc']],  // Default sort by Title column
+      language: {
+        searchPlaceholder: "🔍 Search messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false }, // S/N
+        { targets: 7, orderable: false } // Actions
+      ],
+      drawCallback: function (settings) {
+        const api = this.api();
+        api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+          cell.innerHTML = i + 1;
+        });
+      }
+    });
+
+    // Scroll sync
+    const topScroll = document.getElementById('top-scroll');
+    const bottomScroll = document.getElementById('bottom-scroll');
+    const ghostDiv = topScroll.querySelector('div');
+    const realTable = document.querySelector('#inbox-table');
+
+    bottomScroll.addEventListener('scroll', () => {
+      topScroll.scrollLeft = bottomScroll.scrollLeft;
+    });
+    topScroll.addEventListener('scroll', () => {
+      bottomScroll.scrollLeft = topScroll.scrollLeft;
+    });
+    ghostDiv.style.width = realTable.scrollWidth + 'px';
+
+    // SweetAlert for delete
+    $(".delete-form").on("submit", function (e) {
+      e.preventDefault();
+      const form = this;
+
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This message will be permanently deleted!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+  });
+</script>
+
+{% endblock %}

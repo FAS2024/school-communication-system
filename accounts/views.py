@@ -40,7 +40,7 @@ import json
 from datetime import datetime
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import JsonResponse,FileResponse,Http404
 from django.utils.timezone import make_aware
 from django.views.generic import TemplateView
 
@@ -50,7 +50,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponseForbidden
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
-from django.http import Http404
+# from django.http import Http404
 
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.urls import reverse_lazy
@@ -81,7 +81,7 @@ from .utils import send_communication_to_recipients
 from django.conf import settings  # Make sure this is imported at the top
 from django.urls import reverse
 from django.utils.http import urlencode
-
+import os
 
 def home(request):
     return render(request, 'home.html')
@@ -1377,18 +1377,6 @@ def get_filtered_users(request):
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
 
-# @login_required
-# def communication_index(request):
-    
-#     context = {
-#         'communication_form': CommunicationForm(user=request.user),
-#         'target_group_form': CommunicationTargetGroupForm(user=request.user),
-#         'attachment_formset': AttachmentFormSet(),
-#         'user_role': request.user.role,
-#         'user_branch_id': request.user.branch.id if request.user.branch else '',
-#     }
-#     return render(request, 'communications/communication_form.html', context)
-
 @login_required
 def communication_index(request):
     communication_data = request.session.pop('communication_form_data', None)
@@ -1537,29 +1525,6 @@ def communication_success(request):
     return render(request, 'communications/communication_success.html')
 
 
-# def communication_scheduled(request):
-#     scheduled_time_str = request.GET.get('scheduled_time', None)
-#     scheduled_time = None
-#     is_sent = False
-
-#     if scheduled_time_str:
-#         # Parse scheduled_time string to datetime object
-#         try:
-#             scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
-#             scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
-#         except ValueError:
-#             scheduled_time = None
-
-#     if scheduled_time:
-#         # If scheduled_time has passed, consider it sent
-#         is_sent = timezone.now() >= scheduled_time
-
-#     context = {
-#         'scheduled_time': scheduled_time,  # This is now a datetime object
-#         'is_sent': is_sent,
-#     }
-#     return render(request, 'communications/scheduled_success.html', context)
-
 def communication_scheduled(request):
     scheduled_time_str = request.GET.get('scheduled_time', None)
     scheduled_time = None
@@ -1590,3 +1555,121 @@ def communication_scheduled(request):
 #     from_email = 'no-reply@example.com'
 #     recipient_list = [recipient.email]
 #     send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+
+
+@login_required
+def inbox_view(request):
+    received_messages = CommunicationRecipient.objects.filter(
+        recipient=request.user,
+        deleted=False
+    ).select_related('communication', 'communication__sender').order_by('-communication__created_at')
+
+    return render(request, 'communications/inbox.html', {
+        'received_messages': received_messages
+    })
+
+
+# def read_message(request, pk):
+#     recipient_entry = get_object_or_404(
+#         CommunicationRecipient,
+#         pk=pk,
+#         recipient=request.user,
+#         deleted=False
+#     )
+#     recipient_entry.mark_as_read()
+
+#     return render(request, 'communications/message_detail.html', {
+#         'message': recipient_entry.communication,
+#         'recipient_entry': recipient_entry
+#     })
+
+
+# @login_required
+# def delete_message(request, pk):
+#     recipient_message = get_object_or_404(
+#         CommunicationRecipient, pk=pk, recipient=request.user
+#     )
+
+#     if request.method == 'POST':
+#         recipient_message.deleted = True
+#         recipient_message.save()
+#         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+#             return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
+#         messages.success(request, "Message deleted successfully.")
+#         return redirect('inbox')  # Replace with your actual inbox URL name
+
+#     # If accessed via GET, don't delete. Optionally redirect.
+#     return redirect('inbox')
+
+
+# def download_attachment(request, pk):
+#     try:
+#         attachment = CommunicationAttachment.objects.get(pk=pk)
+#         response = FileResponse(
+#             attachment.file.open('rb'),
+#             as_attachment=True,
+#             filename=attachment.basename  # safely uses the property
+#         )
+#         return response
+#     except CommunicationAttachment.DoesNotExist:
+#         raise Http404("Attachment not found.")
+
+@login_required
+def read_message(request, pk):
+    recipient_entry = get_object_or_404(
+        CommunicationRecipient,
+        pk=pk,
+        recipient=request.user,
+        deleted=False
+    )
+    recipient_entry.mark_as_read()
+
+    return render(request, 'communications/message_detail.html', {
+        'message': recipient_entry.communication,
+        'recipient_entry': recipient_entry
+    })
+
+
+@login_required
+@require_POST  # Only allow POST for delete operation
+def delete_message(request, pk):
+    recipient_message = get_object_or_404(
+        CommunicationRecipient,
+        pk=pk,
+        recipient=request.user,
+        deleted=False
+    )
+
+    recipient_message.deleted = True
+    recipient_message.save()
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
+
+    messages.success(request, "Message deleted successfully.")
+    return redirect('inbox')
+
+
+@login_required
+def download_attachment(request, pk):
+    attachment = get_object_or_404(CommunicationAttachment, pk=pk)
+
+    # Optional: Check if user has permission to access the attachment here,
+    # for example by verifying ownership or related communication permissions.
+
+    try:
+        # Ensure file exists and can be opened
+        file_handle = attachment.file.open('rb')
+    except FileNotFoundError:
+        raise Http404("Attachment file not found on the server.")
+    except Exception as e:
+        # Log the error if you have logging set up
+        # logger.error(f"Error opening attachment {pk}: {e}")
+        raise Http404("Unable to access the attachment.")
+
+    response = FileResponse(
+        file_handle,
+        as_attachment=True,
+        filename=os.path.basename(attachment.basename)
+    )
+    return response
