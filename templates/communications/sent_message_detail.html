@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="card shadow-sm rounded-4 border-0">
+
+    <!-- Header -->
+    <div class="px-4 py-3 rounded-top-4" style="background-color:#2c2c2c; color:#f5f5f5;">
+      <h4 class="mb-0 d-flex align-items-center gap-2" style="font-weight: 600;">
+        <i class="fas fa-envelope-open-text" style="color:#f5a623;"></i>
+        {{ sent_message.title|default:"(Untitled)" }}
+      </h4>
+    </div>
+
+    <div class="card-body px-5 py-4" style="background-color:#ddd;">
+
+      <!-- Recipient Info -->
+      <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
+        {% if sent_message.recipient.profile_picture %}
+          <img src="{{ sent_message.recipient.profile_picture.url }}" alt="Recipient" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+        {% else %}
+          <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+        {% endif %}
+        <div>
+          <p class="mb-1" style="font-weight: 600; color:black;">
+            {{ sent_message.recipient.get_full_name|default:"(No name)" }}
+          </p>
+          <small class="text-muted text-capitalize" style="display:block;">
+            {{ sent_message.recipient.role|default:"Unknown role" }}
+          </small>
+          <small class="text-muted d-block mt-1" style="font-size:0.9rem;">
+            <strong>Email:</strong> {{ sent_message.recipient.email|default:"N/A" }}<br/>
+            {% if sent_message.recipient.branch %}
+              <strong>Branch:</strong> {{ sent_message.recipient.branch.name }}
+            {% endif %}
+          </small>
+        </div>
+      </section>
+
+      <!-- Dates & Type -->
+      <section class="d-flex flex-wrap gap-4 text-muted small mb-4" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <div>
+          <i class="fas fa-clock me-1"></i>
+          Sent: {{ sent_message.created_at|date:"D, M d, Y - h:i A" }}
+        </div>
+        {% if sent_message.scheduled_time %}
+          <div>
+            <i class="fas fa-calendar-alt me-1"></i>
+            Scheduled: {{ sent_message.scheduled_time|date:"D, M d, Y - h:i A" }}
+          </div>
+        {% endif %}
+        <div>
+          <i class="fas fa-tag me-1"></i>
+          Type: <span style="background:#f5a623; color:#222; padding: 2px 10px; border-radius: 15px; font-weight: 600; text-transform: capitalize;">
+            {{ sent_message.message_type|default:"general" }}
+          </span>
+        </div>
+      </section>
+
+      <!-- Message Body -->
+      <article class="p-4 rounded-3 mb-4" style="background:white; border:1px solid #ccc; font-size: 1rem; line-height: 1.5; color:#444; white-space: pre-wrap;">
+        {{ sent_message.body|linebreaks }}
+      </article>
+
+      <!-- Attachments -->
+      {% if sent_message.attachments.exists %}
+      <section class="mb-4">
+        <h6 style="color:black; font-weight: 600; margin-bottom: 0.75rem;">
+          <i class="fas fa-paperclip me-2" style="color:green;"></i><strong>Attachments</strong>
+        </h6>
+        <ul class="list-unstyled ps-3">
+          {% for attachment in sent_message.attachments.all %}
+          <li class="mb-2">
+            <a href="{% url 'download_attachment' attachment.pk %}" class="text-decoration-none d-flex align-items-center gap-1" style="color:#007bff;">
+              <i class="fas fa-file-alt" style="color:#0056b3;"></i>
+              <span>{{ attachment.basename }}</span>
+              <i class="fas fa-download ms-2" style="color:#007bff;"></i>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      <!-- Actions -->
+      <div class="d-flex flex-wrap gap-3 justify-content-start">
+        {% if sent_message.is_deleted_by_sender %}
+          <button class="btn btn-outline-secondary" disabled>
+            <i class="fas fa-trash-alt"></i> Message Deleted
+          </button>
+        {% else %}
+          <form method="post" action="{% url 'delete_sent_message' sent_message.pk %}" class="delete-form m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-2" style="font-weight: 600;">
+              <i class="fas fa-trash-alt"></i> Delete Message
+            </button>
+          </form>
+        {% endif %}
+        <a href="{% url 'outbox' %}" class="btn btn-outline-secondary d-flex align-items-center gap-2" style="font-weight: 600;">
+          <i class="fas fa-arrow-left"></i> Back to Outbox
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- SweetAlert2 Script -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".delete-form").forEach(form => {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        Swal.fire({
+          title: "Are you sure?",
+          text: "This message will be permanently deleted!",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#d33",
+          cancelButtonColor: "#3085d6",
+          confirmButtonText: "Yes, delete it!",
+          reverseButtons: true
+        }).then(result => {
+          if (result.isConfirmed) {
+            form.submit();
+          }
+        });
+      });
+    });
+  });
+</script>
+{% endblock %}

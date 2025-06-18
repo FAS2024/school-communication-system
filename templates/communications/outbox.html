@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">📤 Outbox</h2>
+    <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="fas fa-edit me-1"></i> Compose
+    </a>
+  </div>
+
+  {% if sent_messages %}
+  <div class="card shadow rounded-4">
+    <div class="card-body p-0">
+
+      <!-- Scroll Sync Wrapper -->
+      <div class="position-relative">
+        <!-- Top Scrollbar -->
+        <div class="overflow-auto mb-0" style="overflow-y: hidden; max-width: 100%;" id="top-scroll">
+          <div style="width: max-content; visibility: hidden; height: 1px;"></div>
+        </div>
+
+        <!-- Bottom Scrollable Table -->
+        <div class="overflow-auto" style="overflow-y: hidden;" id="bottom-scroll">
+          <table id="outbox-table" class="table table-striped align-middle mb-0" style="min-width: 1000px;">
+            <thead class="table-light">
+              <tr class="text-center">
+                <th>S/N</th>
+                <th>Title & Message</th>
+                <th>Type</th>
+                <th>To</th>
+                <th>Sent</th>
+                <th>Attachments</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for msg in sent_messages %}
+              <tr>
+                <td class="text-center"></td>  <!-- S/N handled by DataTables -->
+
+                <td>
+                  <a href="{% url 'read_sent_message' msg.pk %}"
+                     class="d-inline-block text-primary fw-semibold"
+                     style="text-decoration: none;"
+                     onmouseover="this.style.textDecoration='underline';"
+                     onmouseout="this.style.textDecoration='none';">
+                    <i class="fas fa-paper-plane text-primary me-1"></i>
+                    {{ msg.title|default:"(Untitled)" }}
+                  </a>
+                  <div class="small text-muted">{{ msg.short_body }}</div>
+                </td>
+
+                <td class="text-center">
+                  <span class="badge bg-info text-dark text-capitalize">{{ msg.message_type }}</span>
+                </td>
+
+                <td>
+                  {% with recipients=msg.communicationrecipient_set.all %}
+                    {% for recipient in recipients %}
+                      {% if recipient.recipient.profile_picture %}
+                        <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" height="20"
+                             style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                      {% else %}
+                        <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
+                             style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                      {% endif %}
+                      <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
+                      {% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  {% endwith %}
+                </td>
+
+                <td>{{ msg.created_at|date:"M d, Y H:i" }}</td>
+
+                <td class="text-center">
+                  {% if msg.attachments.exists %}
+                    <i class="fas fa-paperclip text-secondary"></i> {{ msg.attachments.count }}
+                  {% else %}
+                    <span class="text-muted small">None</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-center">
+                  <form method="post" action="{% url 'delete_sent_message' msg.pk %}" class="delete-form d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info text-center mt-4">No sent messages found.</div>
+  {% endif %}
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+
+<script>
+  $(document).ready(function () {
+    const table = $('#outbox-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[1, 'asc']],  // Default sort by Title column
+      language: {
+        searchPlaceholder: "🔍 Search sent messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false }, // S/N
+        { targets: 6, orderable: false } // Actions
+      ],
+      drawCallback: function (settings) {
+        const api = this.api();
+        api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+          cell.innerHTML = i + 1;
+        });
+      }
+    });
+
+    // Scroll sync
+    const topScroll = document.getElementById('top-scroll');
+    const bottomScroll = document.getElementById('bottom-scroll');
+    const ghostDiv = topScroll.querySelector('div');
+    const realTable = document.querySelector('#outbox-table');
+
+    bottomScroll.addEventListener('scroll', () => {
+      topScroll.scrollLeft = bottomScroll.scrollLeft;
+    });
+    topScroll.addEventListener('scroll', () => {
+      bottomScroll.scrollLeft = topScroll.scrollLeft;
+    });
+    ghostDiv.style.width = realTable.scrollWidth + 'px';
+
+    // SweetAlert for delete
+    $(".delete-form").on("submit", function (e) {
+      e.preventDefault();
+      const form = this;
+
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This message will be permanently deleted from your sent messages!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+  });
+</script>
+
+{% endblock %}

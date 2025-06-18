@@ -102,7 +102,9 @@ urlpatterns = [
     path('communications/inbox/read/<int:pk>/', views.read_message, name='read_message'),
     path('communication/<int:pk>/delete/', views.delete_message, name='delete_message'),
     path('communication/attachments/download/<int:pk>/', views.download_attachment, name='download_attachment'),
-
+    path('communications/outbox/', views.outbox_view, name='outbox'),
+    path('communications/outbox/read/<int:pk>/', views.read_sent_message, name='read_sent_message'),
+    path('communications/outbox/delete/<int:pk>/', views.delete_sent_message, name='delete_sent_message'),
 
 
 ]

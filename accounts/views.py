@@ -1557,62 +1557,29 @@ def communication_scheduled(request):
 #     send_mail(subject, message, from_email, recipient_list, fail_silently=True)
 
 
+from django.http import HttpResponseServerError
+import logging
+
+logger = logging.getLogger(__name__)
+
 @login_required
+@require_GET
 def inbox_view(request):
-    received_messages = CommunicationRecipient.objects.filter(
-        recipient=request.user,
-        deleted=False
-    ).select_related('communication', 'communication__sender').order_by('-communication__created_at')
+    try:
+        received_messages = CommunicationRecipient.objects.filter(
+            recipient=request.user,
+            deleted=False
+        ).select_related('communication', 'communication__sender').order_by('-communication__created_at')
 
-    return render(request, 'communications/inbox.html', {
-        'received_messages': received_messages
-    })
-
-
-# def read_message(request, pk):
-#     recipient_entry = get_object_or_404(
-#         CommunicationRecipient,
-#         pk=pk,
-#         recipient=request.user,
-#         deleted=False
-#     )
-#     recipient_entry.mark_as_read()
-
-#     return render(request, 'communications/message_detail.html', {
-#         'message': recipient_entry.communication,
-#         'recipient_entry': recipient_entry
-#     })
+        return render(request, 'communications/inbox.html', {
+            'received_messages': received_messages
+        })
+    except Exception as e:
+        logger.error(f"Error loading inbox for user {request.user.pk}: {e}", exc_info=True)
+        # Optionally, you can render a custom error page
+        return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
 
 
-# @login_required
-# def delete_message(request, pk):
-#     recipient_message = get_object_or_404(
-#         CommunicationRecipient, pk=pk, recipient=request.user
-#     )
-
-#     if request.method == 'POST':
-#         recipient_message.deleted = True
-#         recipient_message.save()
-#         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-#             return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
-#         messages.success(request, "Message deleted successfully.")
-#         return redirect('inbox')  # Replace with your actual inbox URL name
-
-#     # If accessed via GET, don't delete. Optionally redirect.
-#     return redirect('inbox')
-
-
-# def download_attachment(request, pk):
-#     try:
-#         attachment = CommunicationAttachment.objects.get(pk=pk)
-#         response = FileResponse(
-#             attachment.file.open('rb'),
-#             as_attachment=True,
-#             filename=attachment.basename  # safely uses the property
-#         )
-#         return response
-#     except CommunicationAttachment.DoesNotExist:
-#         raise Http404("Attachment not found.")
 
 @login_required
 def read_message(request, pk):
@@ -1673,3 +1640,80 @@ def download_attachment(request, pk):
         filename=os.path.basename(attachment.basename)
     )
     return response
+
+
+
+@login_required
+@require_GET
+def outbox_view(request):
+    try:
+        # Get IDs of messages the user has deleted from sent
+        deleted_message_ids = SentMessageDelete.objects.filter(
+            sender=request.user,
+            deleted=True
+        ).values_list('communication_id', flat=True)
+
+        sent_messages = Communication.objects.filter(
+            sender=request.user
+        ).exclude(
+            id__in=deleted_message_ids
+        ).select_related('sender').prefetch_related('attachments').order_by('-created_at')
+
+        return render(request, 'communications/outbox.html', {
+            'sent_messages': sent_messages
+        })
+    except Exception as e:
+        logger.error(f"Error loading outbox for user {request.user.pk}: {e}", exc_info=True)
+        return HttpResponseServerError("Sorry, there was an error loading your outbox. Please try again later.")
+
+
+@login_required
+def read_sent_message(request, pk):
+    # Get the sent communication by the logged-in user that is not deleted
+    communication = get_object_or_404(
+        Communication,
+        pk=pk,
+        sender=request.user
+    )
+
+    # Check if the sender has marked this message as deleted
+    sent_delete_entry = SentMessageDelete.objects.filter(
+        communication=communication,
+        sender=request.user,
+        deleted=True
+    ).first()
+
+    if sent_delete_entry:
+        # Optionally, you can raise 404 if the message is deleted by sender
+        raise Http404("This message was deleted.")
+
+    return render(request, 'communications/sent_message_detail.html', {
+        'sent_message': communication,
+    })
+
+
+
+
+@login_required
+def delete_sent_message(request, pk):
+    if request.method == 'POST':
+        communication = get_object_or_404(Communication, pk=pk, sender=request.user)
+
+        sent_delete_entry, created = SentMessageDelete.objects.get_or_create(
+            communication=communication,
+            sender=request.user,
+            defaults={'deleted': True}
+        )
+
+        if not created:
+            sent_delete_entry.deleted = True
+            sent_delete_entry.save()
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
+
+        messages.success(request, "Sent message deleted successfully.")
+        return redirect('outbox')  # Replace 'outbox' with your actual outbox URL name
+
+    # If GET or other method, redirect back or show error
+    return redirect('outbox')
