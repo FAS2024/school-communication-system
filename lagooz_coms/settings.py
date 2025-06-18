@@ -183,19 +183,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'  # This assumes the 'login' URL name exists
 
 
-CELERY_BEAT_SCHEDULE = {
-    'send-due-communications-every-minute': {
-        'task': 'communications.tasks.send_due_communications',  # path to your task
-        'schedule': crontab(minute='*/1'),  # every minute
-    },
-}
-
-
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+# Optional for timezone-aware scheduling
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = 'Africa/Lagos'
+
+CELERY_BEAT_SCHEDULE = {
+    'send-scheduled-communications-every-minute': {
+        'task': 'accounts.tasks.send_scheduled_communications',  # Correct path!
+        'schedule': crontab(minute='*/1'),  # every minute
+    },
+}
+
 
 
 # # settings.py

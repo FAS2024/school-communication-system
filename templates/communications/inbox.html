@@ -3,26 +3,30 @@
 
 {% block content %}
 <div class="container py-5">
+
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">📥 Inbox</h2>
-    <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm">
-      <i class="fas fa-edit me-1"></i> Compose
-    </a>
+    <div>
+      <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm me-2">
+        <i class="fas fa-edit me-1"></i> Compose
+      </a>
+      {% if received_messages %}
+      <a href="#" id="delete-all-btn" class="btn btn-danger btn-sm shadow-sm">
+        <i class="fas fa-trash-alt me-1"></i> Delete All
+      </a>
+      {% endif %}
+    </div>
   </div>
 
   {% if received_messages %}
   <div class="card shadow rounded-4">
     <div class="card-body p-0">
-
-      <!-- Scroll Sync Wrapper -->
       <div class="position-relative">
-        <!-- Top Scrollbar -->
         <div class="overflow-auto mb-0" style="overflow-y: hidden; max-width: 100%;" id="top-scroll">
           <div style="width: max-content; visibility: hidden; height: 1px;"></div>
         </div>
 
-        <!-- Bottom Scrollable Table -->
         <div class="overflow-auto" style="overflow-y: hidden;" id="bottom-scroll">
           <table id="inbox-table" class="table table-striped align-middle mb-0" style="min-width: 1000px;">
             <thead class="table-light">
@@ -40,7 +44,7 @@
             <tbody>
               {% for item in received_messages %}
               <tr class="{% if not item.read %}fw-bold{% else %}text-muted{% endif %}">
-                <td class="text-center"></td>  <!-- S/N will be handled by DataTables -->
+                <td class="text-center"></td>
 
                 <td>
                   <a href="{% url 'read_message' item.pk %}"
@@ -106,7 +110,6 @@
           </table>
         </div>
       </div>
-
     </div>
   </div>
   {% else %}
@@ -114,17 +117,23 @@
   {% endif %}
 </div>
 
+<!-- Delete All Hidden Form -->
+<form method="post" action="{% url 'delete_all_inbox_messages' %}" id="delete-all-form" style="display: none;">
+  {% csrf_token %}
+</form>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
   $(document).ready(function () {
     const table = $('#inbox-table').DataTable({
       paging: true,
       responsive: true,
-      order: [[1, 'asc']],  // Default sort by Title column
+      order: [[1, 'asc']],
       language: {
         searchPlaceholder: "🔍 Search messages...",
         search: "",
@@ -132,8 +141,8 @@
         info: "Showing _START_ to _END_ of _TOTAL_ messages",
       },
       columnDefs: [
-        { targets: 0, orderable: false, searchable: false }, // S/N
-        { targets: 7, orderable: false } // Actions
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 7, orderable: false }
       ],
       drawCallback: function (settings) {
         const api = this.api();
@@ -143,7 +152,6 @@
       }
     });
 
-    // Scroll sync
     const topScroll = document.getElementById('top-scroll');
     const bottomScroll = document.getElementById('bottom-scroll');
     const ghostDiv = topScroll.querySelector('div');
@@ -157,7 +165,7 @@
     });
     ghostDiv.style.width = realTable.scrollWidth + 'px';
 
-    // SweetAlert for delete
+    // SweetAlert for delete single
     $(".delete-form").on("submit", function (e) {
       e.preventDefault();
       const form = this;
@@ -177,7 +185,26 @@
         }
       });
     });
+
+    // SweetAlert for delete all inbox
+    $("#delete-all-btn").on("click", function (e) {
+      e.preventDefault();
+
+      Swal.fire({
+        title: "Delete All Messages?",
+        text: "⚠️ This will soft-delete all your inbox messages. You won’t be able to undo this.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $("#delete-all-form").submit();
+        }
+      });
+    });
   });
 </script>
-
 {% endblock %}

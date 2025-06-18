@@ -1347,6 +1347,110 @@ def communication_index(request):
     }
     return render(request, 'communications/communication_form.html', context)
 
+# @method_decorator([login_required, require_POST], name='dispatch')
+# class SendCommunicationView(View):
+#     def _get_allowed_recipients(self, target_group_form, user):
+#         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
+#         return recipients.exclude(id=user.id)
+
+#     def _get_selected_recipients(self, request, allowed_recipients):
+#         selected_ids = request.POST.getlist('selected_recipients')
+#         return allowed_recipients.filter(id__in=selected_ids)
+
+#     def _parse_manual_emails(self, email_string):
+#         emails = [email.strip() for email in email_string.split(',') if email.strip()]
+#         valid_emails = []
+#         for email in emails:
+#             try:
+#                 validate_email(email)
+#                 valid_emails.append(email.lower())
+#             except ValidationError:
+#                 messages.warning(self.request, f"Invalid manual email skipped: {email}")
+#         return valid_emails
+
+#     def _check_for_duplicate_emails(self, selected_recipients, manual_emails, form):
+#         if selected_recipients.exists():
+#             selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
+#             duplicates = selected_emails.intersection(set(manual_emails))
+#             if duplicates:
+#                 form.add_error(None, f"Duplicate manual email(s): {', '.join(duplicates)}")
+#                 return False
+#         return True
+
+#     def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
+#         self.request.session['communication_form_data'] = self.request.POST.dict()
+#         self.request.session['target_group_form_data'] = self.request.POST.dict()
+#         self.request.session['attachment_formset_data'] = self.request.POST.dict()
+#         non_field_errors = communication_form.non_field_errors()
+#         self.request.session['non_field_errors'] = [str(error) for error in non_field_errors]
+#         self.request.session['form_error'] = True
+#         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+#         return redirect('communication_index')
+
+#     def post(self, request):
+#         self.request = request
+
+#         communication_form = CommunicationForm(request.POST, user=request.user)
+#         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
+#         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
+
+#         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         if request.user.role in ['student', 'parent']:
+#             branch = request.user.branch
+#             target_group_form.cleaned_data['branch'] = branch
+#             if hasattr(target_group_form, 'instance'):
+#                 target_group_form.instance.branch = branch
+
+#         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
+#         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
+
+#         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+#         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
+
+#         if not selected_recipients.exists() and not valid_manual_emails:
+#             error_msg = "Please select at least one recipient."
+#             if request.user.role not in ['student', 'parent']:
+#                 error_msg += " Or provide a valid manual email."
+#             communication_form.add_error(None, error_msg)
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         communication = communication_form.save(commit=False)
+#         communication.sender = request.user
+#         communication.sent = False
+#         communication.save()
+
+#         for form in attachment_formset:
+#             if form.cleaned_data.get('file'):
+#                 form.instance.communication = communication
+#                 form.save()
+
+#         # with transaction.atomic():
+#         #     for recipient in selected_recipients:
+#         #         CommunicationRecipient.objects.create(communication=communication, recipient=recipient)
+#         #     for email in valid_manual_emails:
+#         #         CommunicationRecipient.objects.create(communication=communication, email=email)
+
+#         if communication.is_due():
+#             send_communication_to_recipients(communication)
+#             communication.sent = True
+#             communication.sent_at = timezone.now()  
+#             communication.save()
+#             messages.success(request, "Communication sent successfully.")
+#             return redirect('communication_success')
+#         else:
+#             url = reverse('communication_scheduled')
+#             query_string = urlencode({
+#                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %H:%M:%S'),
+#                 'sent': 'false'
+#             })
+#             url_with_params = f"{url}?{query_string}"
+#             messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
+#             return redirect(url_with_params)
 
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
@@ -1420,39 +1524,41 @@ class SendCommunicationView(View):
         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
+        # Save the communication
         communication = communication_form.save(commit=False)
         communication.sender = request.user
         communication.sent = False
         communication.save()
 
+        # Save attachments
         for form in attachment_formset:
             if form.cleaned_data.get('file'):
                 form.instance.communication = communication
                 form.save()
 
-        with transaction.atomic():
-            for recipient in selected_recipients:
-                CommunicationRecipient.objects.create(communication=communication, recipient=recipient)
-            for email in valid_manual_emails:
-                CommunicationRecipient.objects.create(communication=communication, email=email)
-
+        # Immediate send
         if communication.is_due():
-            send_communication_to_recipients(communication)
+            send_communication_to_recipients(
+                communication=communication,
+                selected_recipients=selected_recipients,
+                manual_emails=valid_manual_emails
+            )
             communication.sent = True
-            communication.sent_at = timezone.now()  
+            communication.sent_at = timezone.now()
             communication.save()
+
             messages.success(request, "Communication sent successfully.")
             return redirect('communication_success')
+
         else:
+            # Scheduled for later
             url = reverse('communication_scheduled')
             query_string = urlencode({
-                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M %p'),
                 'sent': 'false'
             })
-            url_with_params = f"{url}?{query_string}"
-            messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
-            return redirect(url_with_params)
-
+            messages.success(request, f"Communication scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+            return redirect(f"{url}?{query_string}")
 
 
 def communication_success(request):
@@ -1489,17 +1595,21 @@ def inbox_view(request):
     try:
         received_messages = CommunicationRecipient.objects.filter(
             recipient=request.user,
-            deleted=False
-        ).select_related('communication', 'communication__sender').order_by('-communication__created_at')
+            deleted=False,
+            communication__sent=True  
+        ).select_related(
+            'communication', 'communication__sender'
+        ).order_by(
+            F('communication__sent_at').desc(nulls_last=True),
+            '-communication__created_at'
+        )
 
         return render(request, 'communications/inbox.html', {
             'received_messages': received_messages
         })
     except Exception as e:
         logger.error(f"Error loading inbox for user {request.user.pk}: {e}", exc_info=True)
-        # Optionally, you can render a custom error page
         return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
-
 
 
 @login_required
@@ -1567,29 +1677,30 @@ def download_attachment(request, pk):
 @require_GET
 def outbox_view(request):
     try:
-        deleted_message_ids = SentMessageDelete.objects.filter(
-            sender=request.user, deleted=True
-        ).values_list('communication_id', flat=True)
-
+        # Fetch sent messages excluding soft-deleted ones
         sent_messages = Communication.objects.filter(
             sender=request.user,
             sent=True,
-            is_draft=False,
+            is_draft=False
         ).exclude(
-            id__in=deleted_message_ids
-        ).filter(
-            Q(scheduled_time__isnull=True) | Q(scheduled_time__lte=timezone.now())
+            sent_deletes__sender=request.user,
+            sent_deletes__deleted=True
         ).select_related(
             'sender'
         ).prefetch_related(
-            'attachments', 'recipients__recipient'
+            'attachments',
+            'recipients__recipient'
         ).order_by(
-            F('sent_at').desc(nulls_last=True), F('created_at').desc()
+            F('sent_at').desc(nulls_last=True),
+            F('created_at').desc()
         )
+
+        logger.info(f"[OUTBOX] User {request.user} has {sent_messages.count()} sent messages (excluding deleted).")
 
         return render(request, 'communications/outbox.html', {
             'sent_messages': sent_messages
         })
+
     except Exception as e:
         logger.error(f"Error loading outbox for user {request.user.pk}: {e}", exc_info=True)
         return HttpResponseServerError("Sorry, there was an error loading your outbox. Please try again later.")
@@ -1621,7 +1732,6 @@ def read_sent_message(request, pk):
 
 
 
-
 @login_required
 def delete_sent_message(request, pk):
     if request.method == 'POST':
@@ -1644,4 +1754,28 @@ def delete_sent_message(request, pk):
         return redirect('outbox')  # Replace 'outbox' with your actual outbox URL name
 
     # If GET or other method, redirect back or show error
+    return redirect('outbox')
+
+
+@login_required
+def delete_all_inbox_messages(request):
+    if request.method == "POST":
+        user = request.user
+        CommunicationRecipient.objects.filter(recipient=user, deleted=False).update(deleted=True)
+        messages.success(request, "All your inbox messages have been deleted.")
+    return redirect('inbox') 
+
+
+@login_required
+def delete_all_sent_messages(request):
+    if request.method == "POST":
+        user = request.user
+        sent_messages = Communication.objects.filter(sender=user, sent=True)
+
+        for msg in sent_messages:
+            SentMessageDelete.objects.update_or_create(
+                communication=msg,
+                sender=user,
+                defaults={'deleted': True}
+            )
     return redirect('outbox')

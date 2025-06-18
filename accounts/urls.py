@@ -105,6 +105,9 @@ urlpatterns = [
     path('communications/outbox/', views.outbox_view, name='outbox'),
     path('communications/outbox/read/<int:pk>/', views.read_sent_message, name='read_sent_message'),
     path('communications/outbox/delete/<int:pk>/', views.delete_sent_message, name='delete_sent_message'),
+    path('communications/inbox/delete-all/', views.delete_all_inbox_messages, name='delete_all_inbox_messages'),
+    path('communications/sent/delete-all/', views.delete_all_sent_messages, name='delete_all_outbox_messages'),
+
 
 
 ]

@@ -6,15 +6,21 @@
   <!-- Header -->
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2 class="mb-0">📤 Outbox</h2>
-    <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm">
-      <i class="fas fa-edit me-1"></i> Compose
-    </a>
+    <div>
+      <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm me-2">
+        <i class="fas fa-edit me-1"></i> Compose
+      </a>
+      {% if sent_messages %}
+      <a href="#" id="delete-all-outbox-btn" class="btn btn-danger btn-sm shadow-sm">
+        <i class="fas fa-trash-alt me-1"></i> Delete All
+      </a>
+      {% endif %}
+    </div>
   </div>
 
   {% if sent_messages %}
   <div class="card shadow rounded-4">
     <div class="card-body p-0">
-
       <!-- Scroll Sync Wrapper -->
       <div class="position-relative">
         <!-- Top Scrollbar -->
@@ -39,7 +45,7 @@
             <tbody>
               {% for msg in sent_messages %}
               <tr>
-                <td class="text-center"></td>  <!-- S/N handled by DataTables -->
+                <td class="text-center"></td>
 
                 <td>
                   <a href="{% url 'read_sent_message' msg.pk %}"
@@ -57,30 +63,30 @@
                   <span class="badge bg-info text-dark text-capitalize">{{ msg.message_type }}</span>
                 </td>
 
-            <td>
-                {% with recipients=msg.recipients.all %}
+                <td>
+                  {% with recipients=msg.recipients.all %}
                     {% for recipient in recipients %}
-                    {% if recipient.recipient %}
+                      {% if recipient.recipient %}
                         {% if recipient.recipient.profile_picture %}
-                        <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" height="20"
-                            style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                          <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" height="20"
+                               style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
                         {% else %}
-                        <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
-                            style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                          <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
+                               style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
                         {% endif %}
                         <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
-                    {% elif recipient.email %}
+                      {% elif recipient.email %}
                         <span class="small">{{ recipient.email }}</span>
-                    {% else %}
+                      {% else %}
                         <span class="small text-muted">Unknown recipient</span>
-                    {% endif %}
-                    {% if not forloop.last %}, {% endif %}
+                      {% endif %}
+                      {% if not forloop.last %}, {% endif %}
                     {% endfor %}
-                {% endwith %}
+                  {% endwith %}
                 </td>
 
-                <td>{{ msg.sent_at|date:"D, M d, Y - h:i A" }}
-    
+                <td>{{ msg.sent_at|date:"D, M d, Y - h:i A" }}</td>
+
                 <td class="text-center">
                   {% if msg.attachments.exists %}
                     <i class="fas fa-paperclip text-secondary"></i> {{ msg.attachments.count }}
@@ -103,7 +109,6 @@
           </table>
         </div>
       </div>
-
     </div>
   </div>
   {% else %}
@@ -111,17 +116,23 @@
   {% endif %}
 </div>
 
+<!-- Hidden Delete All Form -->
+<form method="post" action="{% url 'delete_all_outbox_messages' %}" id="delete-all-outbox-form" style="display: none;">
+  {% csrf_token %}
+</form>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
   $(document).ready(function () {
     const table = $('#outbox-table').DataTable({
       paging: true,
       responsive: true,
-      order: [[1, 'asc']],  // Default sort by Title column
+      order: [[1, 'asc']],
       language: {
         searchPlaceholder: "🔍 Search sent messages...",
         search: "",
@@ -129,8 +140,8 @@
         info: "Showing _START_ to _END_ of _TOTAL_ messages",
       },
       columnDefs: [
-        { targets: 0, orderable: false, searchable: false }, // S/N
-        { targets: 6, orderable: false } // Actions
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 6, orderable: false }
       ],
       drawCallback: function (settings) {
         const api = this.api();
@@ -154,7 +165,7 @@
     });
     ghostDiv.style.width = realTable.scrollWidth + 'px';
 
-    // SweetAlert for delete
+    // SweetAlert for delete single
     $(".delete-form").on("submit", function (e) {
       e.preventDefault();
       const form = this;
@@ -174,7 +185,26 @@
         }
       });
     });
+
+    // SweetAlert for delete all outbox
+    $("#delete-all-outbox-btn").on("click", function (e) {
+      e.preventDefault();
+
+      Swal.fire({
+        title: "Delete All Sent Messages?",
+        text: "⚠️ This will remove all messages from your outbox. This action is irreversible.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $("#delete-all-outbox-form").submit();
+        }
+      });
+    });
   });
 </script>
-
 {% endblock %}
