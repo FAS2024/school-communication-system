@@ -69,16 +69,22 @@
                       {% if recipient.recipient %}
                         {% if recipient.recipient.profile_picture %}
                           <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" height="20"
-                               style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                              style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
                         {% else %}
                           <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
-                               style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                              style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
                         {% endif %}
-                        <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
+                        <span class="small">
+                          {% if recipient.recipient.get_full_name %}
+                            {{ recipient.recipient.get_full_name }}
+                          {% else %}
+                            {{ recipient.recipient.username }}
+                          {% endif %}
+                        </span>
                       {% elif recipient.email %}
                         <span class="small">{{ recipient.email }}</span>
                       {% else %}
-                        <span class="small text-muted">Unknown recipient</span>
+                        <span class="small text-muted">Recipient info not available</span>
                       {% endif %}
                       {% if not forloop.last %}, {% endif %}
                     {% endfor %}

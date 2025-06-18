@@ -13,6 +13,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 import os
 
+
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
     arms = models.ManyToManyField('ClassArm', related_name='student_classes')
@@ -311,6 +312,9 @@ class Communication(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    selected_recipient_ids = models.JSONField(blank=True, default=list)
+    manual_emails = models.JSONField(blank=True, default=list)
+
 
     def short_body(self):
         return self.body[:75] + "..." if len(self.body) > 75 else self.body
