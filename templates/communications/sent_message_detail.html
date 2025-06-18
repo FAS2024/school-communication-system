@@ -15,34 +15,51 @@
 
     <div class="card-body px-5 py-4" style="background-color:#ddd;">
 
-      <!-- Recipient Info -->
-      <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
-        {% if sent_message.recipient.profile_picture %}
-          <img src="{{ sent_message.recipient.profile_picture.url }}" alt="Recipient" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
-        {% else %}
-          <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
-        {% endif %}
-        <div>
-          <p class="mb-1" style="font-weight: 600; color:black;">
-            {{ sent_message.recipient.get_full_name|default:"(No name)" }}
-          </p>
-          <small class="text-muted text-capitalize" style="display:block;">
-            {{ sent_message.recipient.role|default:"Unknown role" }}
-          </small>
-          <small class="text-muted d-block mt-1" style="font-size:0.9rem;">
-            <strong>Email:</strong> {{ sent_message.recipient.email|default:"N/A" }}<br/>
-            {% if sent_message.recipient.branch %}
-              <strong>Branch:</strong> {{ sent_message.recipient.branch.name }}
+    <!-- Recipient Info -->
+        {% for r in sent_message.recipients.all %}
+            {% if r.recipient %}
+                <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
+                {% if r.recipient.profile_picture %}
+                    <img src="{{ r.recipient.profile_picture.url }}" alt="Recipient" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+                {% else %}
+                    <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+                {% endif %}
+                <div>
+                    <p class="mb-1" style="font-weight: 600; color:black;">
+                    {{ r.recipient.get_full_name|default:"(No name)" }}
+                    </p>
+                    <small class="text-muted text-capitalize d-block">
+                    {{ r.recipient.role|default:"Unknown role" }}
+                    </small>
+                    <small class="text-muted d-block mt-1" style="font-size:0.9rem;">
+                    <strong>Email:</strong> {{ r.recipient.email|default:"N/A" }}<br/>
+                    {% if r.recipient.branch %}
+                        <strong>Branch:</strong> {{ r.recipient.branch.name }}
+                    {% endif %}
+                    </small>
+                </div>
+                </section>
+            {% elif r.email %}
+                <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
+                <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+                <div>
+                    <p class="mb-1 fw-bold" style="color:black;">External Recipient</p>
+                    <small class="text-muted d-block">
+                    <strong>Email:</strong> {{ r.email }}
+                    </small>
+                </div>
+                </section>
             {% endif %}
-          </small>
-        </div>
-      </section>
+            {% empty %}
+            <p class="text-muted">No recipients found.</p>
+        {% endfor %}
+
 
       <!-- Dates & Type -->
       <section class="d-flex flex-wrap gap-4 text-muted small mb-4" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
         <div>
           <i class="fas fa-clock me-1"></i>
-          Sent: {{ sent_message.created_at|date:"D, M d, Y - h:i A" }}
+          Sent: {{ sent_message.sent_at|date:"D, M d, Y - h:i A" }}
         </div>
         {% if sent_message.scheduled_time %}
           <div>

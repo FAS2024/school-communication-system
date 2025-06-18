@@ -57,24 +57,30 @@
                   <span class="badge bg-info text-dark text-capitalize">{{ msg.message_type }}</span>
                 </td>
 
-                <td>
-                  {% with recipients=msg.communicationrecipient_set.all %}
+            <td>
+                {% with recipients=msg.recipients.all %}
                     {% for recipient in recipients %}
-                      {% if recipient.recipient.profile_picture %}
+                    {% if recipient.recipient %}
+                        {% if recipient.recipient.profile_picture %}
                         <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" height="20"
-                             style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
-                      {% else %}
+                            style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                        {% else %}
                         <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default Profile" width="20" height="20"
-                             style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
-                      {% endif %}
-                      <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
-                      {% if not forloop.last %}, {% endif %}
+                            style="border-radius: 50%; object-fit: cover; margin-right: 2px;"/>
+                        {% endif %}
+                        <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
+                    {% elif recipient.email %}
+                        <span class="small">{{ recipient.email }}</span>
+                    {% else %}
+                        <span class="small text-muted">Unknown recipient</span>
+                    {% endif %}
+                    {% if not forloop.last %}, {% endif %}
                     {% endfor %}
-                  {% endwith %}
+                {% endwith %}
                 </td>
 
-                <td>{{ msg.created_at|date:"M d, Y H:i" }}</td>
-
+                <td>{{ msg.sent_at|date:"D, M d, Y - h:i A" }}
+    
                 <td class="text-center">
                   {% if msg.attachments.exists %}
                     <i class="fas fa-paperclip text-secondary"></i> {{ msg.attachments.count }}

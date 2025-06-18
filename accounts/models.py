@@ -301,34 +301,25 @@ class Communication(models.Model):
         ('group', 'Group'),
     ]
 
-    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_communications')
+    sender = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='sent_communications')
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPE_CHOICES)
     title = models.CharField(max_length=255, blank=True, null=True)
     body = models.TextField()
     is_draft = models.BooleanField(default=False)
     scheduled_time = models.DateTimeField(blank=True, null=True)
     sent = models.BooleanField(default=False)
-    # send_to_all = models.BooleanField(blank=True, null=True)
+    sent_at = models.DateTimeField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def short_body(self):
         return self.body[:75] + "..." if len(self.body) > 75 else self.body
-    
+
     def is_due(self):
         return self.scheduled_time is None or self.scheduled_time <= timezone.now()
 
     def __str__(self):
         return f"{self.message_type.title()} from {self.sender.username}"
-    
-    # def log_sent(self, user):
-    #     # Example simple audit logging, extend as needed
-    #     CommunicationAuditLog.objects.create(
-    #         communication=self,
-    #         sent_by=user,
-    #         sent_at=timezone.now(),
-    #         recipient_count=self.communicationrecipient_set.count()
-    #     )
 
 
 class CommunicationAttachment(models.Model):

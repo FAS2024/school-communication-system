@@ -32,7 +32,7 @@
                 <th>Status</th>
                 <th>Type</th>
                 <th>From</th>
-                <th>Sent</th>
+                <th>Sent At</th>
                 <th>Attachments</th>
                 <th>Actions</th>
               </tr>
@@ -82,7 +82,7 @@
                   <span class="text-muted small">({{ item.communication.sender.role|capfirst }})</span>
                 </td>
 
-                <td>{{ item.communication.created_at|date:"M d, Y H:i" }}</td>
+                <td>{{ item.communication.sent_at|date:"M d, Y h:i A" }}</td>
 
                 <td class="text-center">
                   {% if item.communication.attachments.exists %}

@@ -1,6 +1,6 @@
 from celery import shared_task
 from django.utils import timezone
-from .models import Communication, CommunicationRecipient
+from .models import Communication
 from .utils import send_communication_to_recipients
 
 
@@ -10,4 +10,5 @@ def send_scheduled_communications():
     for comm in due_comms:
         send_communication_to_recipients(comm)
         comm.sent = True
+        comm.sent_at = timezone.now()  
         comm.save()

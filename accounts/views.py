@@ -65,7 +65,7 @@ from django.core.exceptions import PermissionDenied
 
 CustomUser = get_user_model()
 
-from django.db.models import Q
+from django.db.models import Q, F
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
@@ -82,6 +82,11 @@ from django.conf import settings  # Make sure this is imported at the top
 from django.urls import reverse
 from django.utils.http import urlencode
 import os
+
+from django.http import HttpResponseServerError
+import logging
+
+logger = logging.getLogger(__name__)
 
 def home(request):
     return render(request, 'home.html')
@@ -1243,66 +1248,6 @@ def delete_class_arm(request, pk):
     return render(request, 'class-arms/confirm_delete_class_arm.html', {'class_arm': class_arm})
 
 
-# @login_required
-# @require_GET
-# def ajax_get_filtered_users(request):
-#     # Define filter fields from the form
-#     filter_fields = CommunicationTargetGroupForm.Meta.fields
-
-#     # Extract raw GET parameters for filter fields
-#     raw_filter_values = {
-#         field: request.GET.get(field, None)
-#         for field in filter_fields
-#     }
-
-#     # If any filter field is present and has an empty string '', return empty result immediately
-#     if any(value == '' for value in raw_filter_values.values() if value is not None):
-#         return JsonResponse([], safe=False)
-
-#     # Clean and prepare data from GET parameters (convert empty strings to None)
-#     cleaned_data = {
-#         field: (value if value else None)
-#         for field, value in raw_filter_values.items()
-#         if value is not None
-#     }
-
-#     # Instantiate the form with user context
-#     form = CommunicationTargetGroupForm(user=request.user, data=cleaned_data)
-
-#     if not form.is_valid():
-#         return JsonResponse({'errors': form.errors}, status=400)
-
-#     try:
-#         # Get filtered recipients
-#         users_qs = form.get_filtered_recipients(form.cleaned_data)
-
-#         # Optimize DB queries (ensure related fields are prefetched)
-#         users_qs = users_qs.select_related('branch')  # if applicable
-
-#         users_list = []
-#         for user in users_qs:
-#             profile_picture_url = None
-#             if hasattr(user, 'profile_picture'):
-#                 profile_picture = user.profile_picture
-#                 if profile_picture and hasattr(profile_picture, 'url'):
-#                     profile_picture_url = profile_picture.url
-
-#             users_list.append({
-#                 'id': user.id,
-#                 'first_name': user.first_name,
-#                 'last_name': user.last_name,
-#                 'email': user.email,
-#                 'branch__name': getattr(user.branch, 'name', 'N/A') if hasattr(user, 'branch') else 'N/A',
-#                 'profile_picture': {
-#                     'url': profile_picture_url
-#                 }
-#             })
-
-#         return JsonResponse(users_list, safe=False)
-
-#     except ValidationError as e:
-#         return JsonResponse({'error': str(e)}, status=400)
-
 @login_required
 @require_GET
 def ajax_get_filtered_users(request):
@@ -1406,16 +1351,11 @@ def communication_index(request):
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
     def _get_allowed_recipients(self, target_group_form, user):
-        # Exclude the sender themselves from recipient list
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
         return recipients.exclude(id=user.id)
 
     def _get_selected_recipients(self, request, allowed_recipients):
-        # 'selected_recipients' must be the exact name attribute of your checkboxes in the form
         selected_ids = request.POST.getlist('selected_recipients')
-        
-        print("POST data:", request.POST)
-        # Filter to only allowed recipients by their ids
         return allowed_recipients.filter(id__in=selected_ids)
 
     def _parse_manual_emails(self, email_string):
@@ -1424,7 +1364,7 @@ class SendCommunicationView(View):
         for email in emails:
             try:
                 validate_email(email)
-                valid_emails.append(email.lower())  # normalize to lowercase for comparison
+                valid_emails.append(email.lower())
             except ValidationError:
                 messages.warning(self.request, f"Invalid manual email skipped: {email}")
         return valid_emails
@@ -1434,10 +1374,7 @@ class SendCommunicationView(View):
             selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
             duplicates = selected_emails.intersection(set(manual_emails))
             if duplicates:
-                form.add_error(
-                    None,
-                    f"The following manual email(s) are already among selected recipients: {', '.join(duplicates)}"
-                )
+                form.add_error(None, f"Duplicate manual email(s): {', '.join(duplicates)}")
                 return False
         return True
 
@@ -1445,11 +1382,8 @@ class SendCommunicationView(View):
         self.request.session['communication_form_data'] = self.request.POST.dict()
         self.request.session['target_group_form_data'] = self.request.POST.dict()
         self.request.session['attachment_formset_data'] = self.request.POST.dict()
-        
-        # Convert non-field errors to plain list of strings
         non_field_errors = communication_form.non_field_errors()
         self.request.session['non_field_errors'] = [str(error) for error in non_field_errors]
-
         self.request.session['form_error'] = True
         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
         return redirect('communication_index')
@@ -1477,10 +1411,10 @@ class SendCommunicationView(View):
         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
 
         if not selected_recipients.exists() and not valid_manual_emails:
-            if request.user.role in ['student', 'parent']:
-                communication_form.add_error(None, "Please select at least one recipient.")
-            else:
-                communication_form.add_error(None, "Please select at least one recipient or provide a valid manual email.")
+            error_msg = "Please select at least one recipient."
+            if request.user.role not in ['student', 'parent']:
+                error_msg += " Or provide a valid manual email."
+            communication_form.add_error(None, error_msg)
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
@@ -1505,6 +1439,7 @@ class SendCommunicationView(View):
         if communication.is_due():
             send_communication_to_recipients(communication)
             communication.sent = True
+            communication.sent_at = timezone.now()  
             communication.save()
             messages.success(request, "Communication sent successfully.")
             return redirect('communication_success')
@@ -1512,7 +1447,7 @@ class SendCommunicationView(View):
             url = reverse('communication_scheduled')
             query_string = urlencode({
                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %H:%M:%S'),
-                'sent': 'false'  # explicitly mark as not yet sent
+                'sent': 'false'
             })
             url_with_params = f"{url}?{query_string}"
             messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
@@ -1547,20 +1482,6 @@ def communication_scheduled(request):
     }
     return render(request, 'communications/scheduled_success.html', context)
 
-
-
-# def send_notification_email(recipient, communication):
-#     subject = f"New Message: {communication.title or 'Untitled'}"
-#     message = communication.body
-#     from_email = 'no-reply@example.com'
-#     recipient_list = [recipient.email]
-#     send_mail(subject, message, from_email, recipient_list, fail_silently=True)
-
-
-from django.http import HttpResponseServerError
-import logging
-
-logger = logging.getLogger(__name__)
 
 @login_required
 @require_GET
@@ -1642,22 +1563,29 @@ def download_attachment(request, pk):
     return response
 
 
-
 @login_required
 @require_GET
 def outbox_view(request):
     try:
-        # Get IDs of messages the user has deleted from sent
         deleted_message_ids = SentMessageDelete.objects.filter(
-            sender=request.user,
-            deleted=True
+            sender=request.user, deleted=True
         ).values_list('communication_id', flat=True)
 
         sent_messages = Communication.objects.filter(
-            sender=request.user
+            sender=request.user,
+            sent=True,
+            is_draft=False,
         ).exclude(
             id__in=deleted_message_ids
-        ).select_related('sender').prefetch_related('attachments').order_by('-created_at')
+        ).filter(
+            Q(scheduled_time__isnull=True) | Q(scheduled_time__lte=timezone.now())
+        ).select_related(
+            'sender'
+        ).prefetch_related(
+            'attachments', 'recipients__recipient'
+        ).order_by(
+            F('sent_at').desc(nulls_last=True), F('created_at').desc()
+        )
 
         return render(request, 'communications/outbox.html', {
             'sent_messages': sent_messages
