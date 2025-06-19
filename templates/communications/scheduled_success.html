@@ -21,7 +21,7 @@
     max-width: 460px;
     box-shadow: 0 10px 30px rgba(220, 53, 69, 0.1);
     text-align: center;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   }
 
   .scheduled-emoji {
@@ -36,12 +36,10 @@
     font-size: 2.2rem;
   }
 
-  /* Sent message heading — red */
   h2.sent-message {
     color: #c82333;
   }
 
-  /* Scheduled message heading — green */
   h2.scheduled-message {
     color: #28a745 !important;
   }
@@ -97,24 +95,33 @@
 <div class="scheduled-wrapper">
   <div class="scheduled-card" role="alert" aria-live="polite" aria-atomic="true">
     <div class="scheduled-emoji" aria-hidden="true">🕓</div>
-
-    {% if is_sent %}
-      <h2 class="sent-message">Scheduled Message Submitted</h2>
-      <p class="lead">
-        Your communication scheduled for <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong> has now been submitted successfully.
-      </p>
-      <div class="btn-group">
-        <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
-        <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
-      </div>
+    {% if scheduled_time %}
+      {% if not is_sent %}
+        <h2 class="scheduled-message">Message Scheduled</h2>
+        <p class="lead">
+          Your message has been successfully scheduled. It will be delivered at:
+          <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong>.
+        </p>
+      {% else %}
+        <h2 class="sent-message">Scheduled Message Submitted</h2>
+        <p class="lead">
+          Your communication scheduled for
+          <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong>
+          has now been submitted successfully.
+        </p>
+      {% endif %}
     {% else %}
-      <h2 class="scheduled-message">Message Scheduled Successfully</h2>
-      <p class="lead">Your communication has been scheduled and will be delivered at the specified time.</p>
-      <div class="btn-group">
-        <a href="{% url 'communication_index' %}" class="btn btn-primary">Schedule Another</a>
-        <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
-      </div>
+      <h2 class="sent-message">Invalid or Missing Schedule</h2>
+      <p class="lead">
+        The scheduled time could not be determined. Please try again.
+      </p>
     {% endif %}
+
+
+    <div class="btn-group">
+      <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
+    </div>
   </div>
 </div>
 {% endblock %}

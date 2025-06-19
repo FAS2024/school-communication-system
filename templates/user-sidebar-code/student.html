@@ -1,0 +1,125 @@
+<style>
+  /* Highlight top-level active link */
+  .nav-link.active {
+    background-color: rgb(0, 119, 255);
+    color: white !important;
+    font-weight: bold;
+    border-radius: 0.375rem;
+  }
+
+  /* Highlight submenu active link */
+  #studentMessages .nav-link.active {
+    background-color:rgb(0, 0, 0);
+    color: black !important;
+    font-weight: bold;
+  }
+
+  /* Rotate chevron when expanded */
+  .nav-link[aria-expanded="true"] .fas.fa-chevron-down {
+    transform: rotate(180deg);
+    transition: transform 0.3s ease;
+  }
+
+  .nav-link .fas.fa-chevron-down {
+    transition: transform 0.3s ease;
+  }
+
+  /* Optional spacing fix for submenu */
+  #studentMessages .nav-link {
+    padding-left: 1.5rem;
+  }
+</style>
+
+<ul class="nav flex-column">
+  <li class="nav-item">
+    <a class="nav-link" href="{% url 'student_dashboard' %}">
+      <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link" href="#">
+      <i class="fas fa-book me-2"></i> My Courses
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link" href="#">
+      <i class="fas fa-clipboard-list me-2"></i> Assignments
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link" href="#">
+      <i class="fas fa-calendar-check me-2"></i> Exam Schedules
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link" href="#">
+      <i class="fas fa-bullhorn me-2"></i> Notices / Posts
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a
+      class="nav-link d-flex justify-content-between align-items-center"
+      data-bs-toggle="collapse"
+      href="#studentMessages"
+      role="button"
+      aria-expanded="false"
+      aria-controls="studentMessages"
+    >
+      <span><i class="fas fa-envelope me-2"></i> Messages</span>
+      {% comment %} <i class="fas fa-chevron-down small"></i> {% endcomment %}
+      <i class="fas fa-chevron-down small dropdown-arrow"></i>
+
+    </a>
+    <div class="collapse ps-4" id="studentMessages">
+      <ul class="nav flex-column mt-2">
+        {% comment %} <li class="nav-item">
+          <a class="nav-link" href="#">Sent to School (Outbox)</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#">Received from School (Inbox)</a>
+        </li> {% endcomment %}
+        <li class="nav-item"><a class="nav-link" href="#">Important</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Sent(Outbox)</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Inbox</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Scheduled</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Drafts</a></li>
+        <li class="nav-item"><a class="nav-link" href="#">Trash</a></li>
+      </ul>
+    </div>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link" href="#"> <i class="fas fa-cogs me-2"></i> Settings </a>
+  </li>
+</ul>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const currentPath = window.location.pathname;
+
+    // Highlight active top-level or submenu links
+    document.querySelectorAll('.nav-link[href]').forEach(link => {
+      const href = link.getAttribute('href');
+      if (href && (href === currentPath || currentPath.startsWith(href))) {
+        link.classList.add('active');
+
+        // If the active link is in the collapsed section, expand it
+        const collapseDiv = link.closest('.collapse');
+        if (collapseDiv && collapseDiv.classList.contains('collapse')) {
+          collapseDiv.classList.add('show');
+
+          const toggle = collapseDiv.closest('.nav-item').querySelector('[data-bs-toggle="collapse"]');
+          if (toggle) {
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.classList.add('active');
+          }
+        }
+      }
+    });
+  });
+</script>
