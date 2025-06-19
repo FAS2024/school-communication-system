@@ -48,7 +48,7 @@ from .models import (
     CustomUser, StudentProfile, ParentProfile, StaffProfile,
     TeachingPosition, NonTeachingPosition, Branch, StudentClass, ClassArm,
     Communication, CommunicationAttachment, CommunicationComment,
-    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete
+    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete,MessageReply
 )
 
 # Logger
@@ -1388,11 +1388,11 @@ class SendCommunicationView(View):
         # Save the communication
         communication = communication_form.save(commit=False)
         communication.sender = request.user
+        communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
         communication.save()
-
 
         # Save attachments
         for form in attachment_formset:
@@ -1456,8 +1456,6 @@ def communication_scheduled(request):
     }
     return render(request, 'communications/scheduled_success.html', context)
 
-
-from django.http import HttpResponseForbidden
 
 @login_required(login_url='login')
 @require_GET
@@ -1669,3 +1667,32 @@ def delete_all_sent_messages(request):
                 defaults={'deleted': True}
             )
     return redirect('outbox')
+
+
+@login_required
+def submit_reply(request, recipient_id):
+    recipient_entry = get_object_or_404(
+        CommunicationRecipient,
+        pk=recipient_id,
+        recipient=request.user,
+        deleted=False,
+        requires_response=True
+    )
+
+    if request.method == 'POST':
+        reply_text = request.POST.get('reply', '').strip()
+        if reply_text:
+            # Save actual reply
+            MessageReply.objects.create(
+                recipient_entry=recipient_entry,
+                responder=request.user,
+                reply_text=reply_text
+            )
+
+            recipient_entry.has_responded = True
+            recipient_entry.save()
+            messages.success(request, "Your reply has been submitted.")
+        else:
+            messages.error(request, "Reply cannot be empty.")
+
+    return redirect('inbox')

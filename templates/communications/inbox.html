@@ -63,10 +63,22 @@
                 </td>
 
                 <td class="text-center">
-                  {% if not item.read %}
-                    <span class="badge bg-primary">Unread</span>
+                  {% if item.requires_response %}
+                    {% if item.has_responded %}
+                      <span class="badge bg-success">✅ Responded</span>
+                    {% else %}
+                        <a href="{% url 'read_message' item.pk %}" class="badge text-white text-decoration-none" style="background-color: #ffb703;">
+                          🟡 Action Required
+                        </a>
+
+
+                    {% endif %}
                   {% else %}
-                    <span class="badge bg-danger">Read</span>
+                    {% if not item.read %}
+                      <span class="badge bg-primary">Unread</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Read</span>
+                    {% endif %}
                   {% endif %}
                 </td>
 
@@ -127,8 +139,87 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <script>
+  $(document).ready(function () {
+    const table = $('#inbox-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[5, 'desc']], // Sort by Sent At column
+      language: {
+        searchPlaceholder: "🔍 Search messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 7, orderable: false }
+      ],
+      drawCallback: function (settings) {
+        const api = this.api();
+        api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+          cell.innerHTML = i + 1;
+        });
+      }
+    });
+
+    const topScroll = document.getElementById('top-scroll');
+    const bottomScroll = document.getElementById('bottom-scroll');
+    const ghostDiv = topScroll.querySelector('div');
+    const realTable = document.querySelector('#inbox-table');
+
+    bottomScroll.addEventListener('scroll', () => {
+      topScroll.scrollLeft = bottomScroll.scrollLeft;
+    });
+    topScroll.addEventListener('scroll', () => {
+      bottomScroll.scrollLeft = topScroll.scrollLeft;
+    });
+    ghostDiv.style.width = realTable.scrollWidth + 'px';
+
+    // SweetAlert for delete single
+    $(".delete-form").on("submit", function (e) {
+      e.preventDefault();
+      const form = this;
+
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This message will be permanently deleted!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+
+    // SweetAlert for delete all inbox
+    $("#delete-all-btn").on("click", function (e) {
+      e.preventDefault();
+
+      Swal.fire({
+        title: "Delete All Messages?",
+        text: "⚠️ This will soft-delete all your inbox messages. You won’t be able to undo this.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $("#delete-all-form").submit();
+        }
+      });
+    });
+  });
+</script>
+
+{% comment %} <script>
   $(document).ready(function () {
     const table = $('#inbox-table').DataTable({
       paging: true,
@@ -206,5 +297,6 @@
       });
     });
   });
-</script>
+
+</script> {% endcomment %}
 {% endblock %}

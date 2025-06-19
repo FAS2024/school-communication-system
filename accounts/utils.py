@@ -6,10 +6,17 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# def send_communication_to_recipients(communication):
+
+# def send_communication_to_recipients(communication, selected_recipients=None, manual_emails=None):
 #     from .models import CommunicationRecipient
 #     from django.contrib.auth import get_user_model
+#     from django.core.mail import EmailMessage
+#     from django.utils.timezone import now
+#     from django.conf import settings
+#     from django.db import transaction
+#     import logging
 
+#     logger = logging.getLogger(__name__)
 #     User = get_user_model()
 
 #     subject = communication.title or (communication.body[:50] + '...')
@@ -20,16 +27,32 @@ logger = logging.getLogger(__name__)
 #         else settings.DEFAULT_FROM_EMAIL
 #     )
 
-#     # Prefetch recipients and attachments
+#     # Step 1: Save recipients if provided
+#     if selected_recipients or manual_emails:
+#         with transaction.atomic():
+#             if selected_recipients:
+#                 for recipient in selected_recipients:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         recipient=recipient
+#                     )
+#             if manual_emails:
+#                 for email in manual_emails:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         email=email
+#                     )
+
+#     # Step 2: Send to manual emails (not in-app users)
 #     recipients = CommunicationRecipient.objects.filter(communication=communication)
 #     attachments = list(communication.attachments.all())
+
 #     registered_emails = set(
 #         email.lower() for email in User.objects.values_list('email', flat=True)
 #     )
 
 #     for recipient in recipients:
 #         if recipient.recipient:
-#             # Skip sending email for in-app users (they'll view in dashboard)
 #             logger.debug(f"Skipping in-app recipient: {recipient.recipient}")
 #             continue
 
@@ -39,7 +62,7 @@ logger = logging.getLogger(__name__)
 #                 continue
 
 #             try:
-#                 email = EmailMessage(
+#                 email_msg = EmailMessage(
 #                     subject=subject,
 #                     body=message,
 #                     from_email=from_email,
@@ -49,11 +72,11 @@ logger = logging.getLogger(__name__)
 #                 for attachment in attachments:
 #                     try:
 #                         content_type = getattr(attachment.file.file, 'content_type', 'application/octet-stream')
-#                         email.attach(attachment.basename, attachment.file.read(), content_type)
+#                         email_msg.attach(attachment.basename, attachment.file.read(), content_type)
 #                     except Exception as e:
 #                         logger.warning(f"Attachment issue for {recipient.email}: {e}")
 
-#                 email.send(fail_silently=False)
+#                 email_msg.send(fail_silently=False)
 #                 recipient.delivered = True
 #                 recipient.delivered_at = now()
 #                 recipient.save()
@@ -89,13 +112,15 @@ def send_communication_to_recipients(communication, selected_recipients=None, ma
                 for recipient in selected_recipients:
                     CommunicationRecipient.objects.create(
                         communication=communication,
-                        recipient=recipient
+                        recipient=recipient,
+                        requires_response=communication.requires_response
                     )
             if manual_emails:
                 for email in manual_emails:
                     CommunicationRecipient.objects.create(
                         communication=communication,
-                        email=email
+                        email=email,
+                        requires_response=communication.requires_response
                     )
 
     # Step 2: Send to manual emails (not in-app users)
@@ -139,7 +164,6 @@ def send_communication_to_recipients(communication, selected_recipients=None, ma
 
             except Exception as e:
                 logger.error(f"Failed to send to {recipient.email}: {e}", exc_info=True)
-
 
 
 def generate_profile_number(role_prefix, model_class):

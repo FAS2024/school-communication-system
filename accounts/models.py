@@ -320,7 +320,7 @@ class Communication(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     selected_recipient_ids = models.JSONField(blank=True, default=list)
     manual_emails = models.JSONField(blank=True, default=list)
-
+    requires_response = models.BooleanField(default=False)
 
     def short_body(self):
         return self.body[:75] + "..." if len(self.body) > 75 else self.body
@@ -420,6 +420,8 @@ class CommunicationRecipient(models.Model):
     read_at = models.DateTimeField(null=True, blank=True)
     delivered = models.BooleanField(default=False)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    requires_response = models.BooleanField(default=False)
+    has_responded = models.BooleanField(default=False)
 
     def mark_as_read(self):
         if not self.read:
@@ -457,3 +459,13 @@ class SentMessageDelete(models.Model):
 
     def __str__(self):
         return f"Sent message {self.communication.id} deleted by {self.sender.username}"
+
+
+class MessageReply(models.Model):
+    recipient_entry = models.ForeignKey(CommunicationRecipient, on_delete=models.CASCADE, related_name='replies')
+    responder = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    reply_text = models.TextField()
+    replied_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Reply by {self.responder.username} on {self.recipient_entry.communication.title or 'Untitled'}"
