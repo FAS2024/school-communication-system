@@ -1,91 +1,57 @@
-from django.contrib.auth import authenticate, login
-from django.contrib import messages
-from django.contrib.auth import logout as auth_logout
-from .forms import (
-        TeachingPositionForm, 
-        NonTeachingPositionForm, 
-        StaffCreationForm, 
-        StaffProfileForm,
-        BranchForm,
-        StudentCreationForm,
-        StudentClassForm,
-        ClassArmForm,
-        ParentCreationForm,
-        StudentProfileForm,
-        CommunicationForm,
-        CommunicationRecipientForm,
-        CommunicationTargetGroupForm,
-        AttachmentFormSet
-    )
-from .models import (
-        CustomUser, 
-        StudentProfile, 
-        ParentProfile, 
-        StaffProfile,
-        TeachingPosition,
-        NonTeachingPosition,
-        Branch,
-        StudentClass,
-        ClassArm,
-        Communication,
-        CommunicationAttachment,
-        CommunicationComment,
-        CommunicationRecipient,
-        CommunicationTargetGroup,
-        SentMessageDelete
-    )
-
-# views.py
+# Standard Library
 import json
+import os
+import logging
 from datetime import datetime
 
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse,FileResponse,Http404
-from django.utils.timezone import make_aware
-from django.views.generic import TemplateView
-
-
-from django.shortcuts import render, redirect, get_object_or_404
+# Django Core
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login, logout as auth_logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponseForbidden
-from django.core.paginator import Paginator
-from django.contrib.auth import get_user_model
-# from django.http import Http404
-
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
-from django.urls import reverse_lazy
-from django.db import IntegrityError
-from django.http import HttpResponseRedirect
-from django.utils.decorators import method_decorator
-from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from . import utility
-from django.db import transaction
-from django.core.exceptions import PermissionDenied
-
-CustomUser = get_user_model()
-
-from django.db.models import Q, F
-from django.views.decorators.http import require_GET
-from django.views.decorators.csrf import csrf_exempt
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
-
-
-from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
-
-
-from .utils import send_communication_to_recipients
-from django.conf import settings  # Make sure this is imported at the top
-from django.urls import reverse
+from django.db import IntegrityError, transaction
+from django.db.models import Q, F
+from django.db.models.functions import Coalesce
+from django.http import (
+    JsonResponse, HttpResponse, HttpResponseRedirect, 
+    HttpResponseForbidden, HttpResponseServerError, FileResponse, Http404
+)
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.utils.http import urlencode
-import os
+from django.utils.timezone import make_aware
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+from django.views.generic import (
+    TemplateView, ListView, CreateView, UpdateView, 
+    DeleteView, DetailView
+)
 
-from django.http import HttpResponseServerError
-import logging
+# Project-Specific Imports
+from . import utility
+from .utils import send_communication_to_recipients
+from .forms import (
+    TeachingPositionForm, NonTeachingPositionForm, StaffCreationForm, StaffProfileForm,
+    BranchForm, StudentCreationForm, StudentClassForm, ClassArmForm,
+    ParentCreationForm, StudentProfileForm, CommunicationForm,
+    CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet
+)
+from .models import (
+    CustomUser, StudentProfile, ParentProfile, StaffProfile,
+    TeachingPosition, NonTeachingPosition, Branch, StudentClass, ClassArm,
+    Communication, CommunicationAttachment, CommunicationComment,
+    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete
+)
 
+# Logger
 logger = logging.getLogger(__name__)
 
 def home(request):
@@ -1449,10 +1415,9 @@ class SendCommunicationView(View):
             return redirect('communication_success')
 
         else:
-            # Scheduled for later
             url = reverse('communication_scheduled')
             query_string = urlencode({
-                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M %p'),
+                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),  # ← FIXED
                 'sent': 'false'
             })
             messages.success(request, f"Communication scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
@@ -1471,11 +1436,16 @@ def communication_scheduled(request):
 
     if scheduled_time_str:
         try:
-            # Parse as local time (since that's how it was saved and sent via GET param)
-            scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
+            # Try parsing 12-hour format (with AM/PM)
+            scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %I:%M:%S %p')
             scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
         except ValueError:
-            scheduled_time = None
+            try:
+                # Fallback to 24-hour format
+                scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
+                scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+            except ValueError:
+                scheduled_time = None
 
     if scheduled_time:
         is_sent = timezone.now() >= scheduled_time
@@ -1487,26 +1457,39 @@ def communication_scheduled(request):
     return render(request, 'communications/scheduled_success.html', context)
 
 
-@login_required
+from django.http import HttpResponseForbidden
+
+@login_required(login_url='login')
 @require_GET
 def inbox_view(request):
     try:
+        # Ensure user has an allowed role
+        allowed_roles = ['superadmin', 'branch_admin', 'staff', 'student', 'parent']
+        user_role = getattr(request.user, 'role', '').lower()
+
+        if user_role not in allowed_roles:
+            logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access inbox.")
+            return HttpResponseForbidden("You do not have permission to view this inbox.")
+
+        # Fetch and sort received messages by sent or created date
         received_messages = CommunicationRecipient.objects.filter(
             recipient=request.user,
             deleted=False,
-            communication__sent=True  
+            communication__sent=True
         ).select_related(
             'communication', 'communication__sender'
+        ).annotate(
+            display_time=Coalesce('communication__sent_at', 'communication__created_at')
         ).order_by(
-            F('communication__sent_at').desc(nulls_last=True),
-            '-communication__created_at'
+            F('display_time').desc()
         )
 
         return render(request, 'communications/inbox.html', {
             'received_messages': received_messages
         })
+
     except Exception as e:
-        logger.error(f"Error loading inbox for user {request.user.pk}: {e}", exc_info=True)
+        logger.error(f"Unexpected error loading inbox for user {request.user.pk}: {e}", exc_info=True)
         return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
 
 
@@ -1571,10 +1554,18 @@ def download_attachment(request, pk):
     return response
 
 
-@login_required
+@login_required(login_url='login')
 @require_GET
 def outbox_view(request):
     try:
+        # Optional: restrict roles that can send messages
+        allowed_roles = ['superadmin', 'branch_admin', 'staff', 'student', 'parent']
+        user_role = getattr(request.user, 'role', '').lower()
+
+        if user_role not in allowed_roles:
+            logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access outbox.")
+            return HttpResponseForbidden("You do not have permission to view this outbox.")
+
         # Fetch sent messages excluding soft-deleted ones
         sent_messages = Communication.objects.filter(
             sender=request.user,
@@ -1588,12 +1579,13 @@ def outbox_view(request):
         ).prefetch_related(
             'attachments',
             'recipients__recipient'
+        ).annotate(
+            display_time=Coalesce('sent_at', 'created_at')
         ).order_by(
-            F('sent_at').desc(nulls_last=True),
-            F('created_at').desc()
+            F('display_time').desc()
         )
 
-        logger.info(f"[OUTBOX] User {request.user} has {sent_messages.count()} sent messages (excluding deleted).")
+        logger.info(f"[OUTBOX] User {request.user.pk} has {sent_messages.count()} sent messages (excluding deleted).")
 
         return render(request, 'communications/outbox.html', {
             'sent_messages': sent_messages

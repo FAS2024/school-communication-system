@@ -1,33 +1,30 @@
+# Standard Library
+import re
+
+# Django Core
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import get_user_model
+from django.contrib.auth import password_validation
+from django.contrib.auth.forms import ReadOnlyPasswordHashField, UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, RegexValidator
-from django.contrib.auth.forms import ReadOnlyPasswordHashField
-from django.contrib.auth.password_validation import validate_password
-from django.db import transaction
-from django.contrib.auth import password_validation
-from django.contrib.auth import get_user_model
-
-
-from django.forms import inlineformset_factory
-from .models import (
-    Communication, CommunicationAttachment,
-    CommunicationRecipient, CommunicationTargetGroup,
-    CustomUser, TeachingPosition, NonTeachingPosition, 
-    Branch, StaffProfile,StudentProfile,StudentClass, 
-    ClassArm, ParentProfile, CommunicationComment
-)
-        
-from django.forms.widgets import ClearableFileInput
-
-from django.contrib.auth import get_user_model
-from django.forms.widgets import CheckboxSelectMultiple
+from django.db import transaction, models
 from django.db.models import Q
-from django.utils.timezone import localtime
-import re
-from django.contrib.contenttypes.models import ContentType
+from django.forms import inlineformset_factory
+from django.forms.widgets import CheckboxSelectMultiple, ClearableFileInput
 from django.http import QueryDict
+from django.utils import timezone
+from django.utils.timezone import localtime
+from django.contrib.contenttypes.models import ContentType
 
+# Local App Imports
+from .models import (
+    Branch, ClassArm, Communication, CommunicationAttachment, 
+    CommunicationComment, CommunicationRecipient, CommunicationTargetGroup,
+    CustomUser, NonTeachingPosition, ParentProfile, StaffProfile, 
+    StudentClass, StudentProfile, TeachingPosition
+)
 
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
@@ -922,6 +919,7 @@ class CommunicationForm(forms.ModelForm):
         title = cleaned_data.get('title')
         body = cleaned_data.get('body')
         manual_emails = cleaned_data.get('manual_emails')
+        scheduled_time = cleaned_data.get('scheduled_time')  # ← Get the field
 
         # Validate required fields
         if not message_type:
@@ -936,7 +934,6 @@ class CommunicationForm(forms.ModelForm):
             emails = [e.strip() for e in manual_emails.split(',') if e.strip()]
             registered_emails = CustomUser.objects.filter(email__in=emails).values_list('email', flat=True)
 
-            invalid_emails = []
             for email in emails:
                 if email in registered_emails:
                     self.add_error(
@@ -945,7 +942,10 @@ class CommunicationForm(forms.ModelForm):
                     )
                 elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
                     self.add_error('manual_emails', f"The email '{email}' is not a valid format.")
-                    invalid_emails.append(email)
+
+        # Prevent past scheduled times
+        if scheduled_time and scheduled_time < timezone.now():
+            self.add_error('scheduled_time', "Scheduled time cannot be in the past.")
 
         return cleaned_data
 

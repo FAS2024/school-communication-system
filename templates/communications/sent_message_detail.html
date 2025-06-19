@@ -4,7 +4,6 @@
 {% block content %}
 <div class="container py-5">
   <div class="card shadow-sm rounded-4 border-0">
-
     <!-- Header -->
     <div class="px-4 py-3 rounded-top-4" style="background-color:#2c2c2c; color:#f5f5f5;">
       <h4 class="mb-0 d-flex align-items-center gap-2" style="font-weight: 600;">
@@ -14,94 +13,133 @@
     </div>
 
     <div class="card-body px-5 py-4" style="background-color:#ddd;">
-
-    <!-- Recipient Info -->
-        {% for r in sent_message.recipients.all %}
+      <!-- Recipients -->
+      {% with all_recipients=sent_message.recipients.all %}
+        <div class="mb-4">
+          <h6 class="fw-bold text-dark mb-3">Recipients</h6>
+          {% for r in all_recipients|slice:":2" %}
             {% if r.recipient %}
-                <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
+              <section class="d-flex align-items-center gap-3 mb-3">
                 {% if r.recipient.profile_picture %}
-                    <img src="{{ r.recipient.profile_picture.url }}" alt="Recipient" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+                  <img src="{{ r.recipient.profile_picture.url }}" width="45" height="45" class="rounded-circle object-fit-cover shadow-sm" />
                 {% else %}
-                    <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+                  <img src="{% static 'assets/img/profile-pic.png' %}" width="45" height="45" class="rounded-circle object-fit-cover shadow-sm" />
                 {% endif %}
                 <div>
-                    <p class="mb-1" style="font-weight: 600; color:black;">
-                    {{ r.recipient.get_full_name|default:"(No name)" }}
-                    </p>
-                    <small class="text-muted text-capitalize d-block">
-                    {{ r.recipient.role|default:"Unknown role" }}
-                    </small>
-                    <small class="text-muted d-block mt-1" style="font-size:0.9rem;">
-                    <strong>Email:</strong> {{ r.recipient.email|default:"N/A" }}<br/>
-                    {% if r.recipient.branch %}
-                        <strong>Branch:</strong> {{ r.recipient.branch.name }}
-                    {% endif %}
-                    </small>
+                  <span class="fw-semibold d-block">{{ r.recipient.get_full_name|default:"(No name)" }}</span>
+                  <small class="text-muted text-capitalize d-block">{{ r.recipient.role|default:"Unknown" }}</small>
+                  <small class="text-muted">{{ r.recipient.branch.name|default:"No Branch" }}</small>
                 </div>
-                </section>
+              </section>
             {% elif r.email %}
-                <section class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4" style="border-color:red;">
-                <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="50" height="50" class="rounded-circle object-fit-cover shadow-sm" />
+              <section class="d-flex align-items-center gap-3 mb-3">
+                <img src="{% static 'assets/img/profile-pic.png' %}" width="45" height="45" class="rounded-circle object-fit-cover shadow-sm" />
                 <div>
-                    <p class="mb-1 fw-bold" style="color:black;">External Recipient</p>
-                    <small class="text-muted d-block">
-                    <strong>Email:</strong> {{ r.email }}
-                    </small>
+                  <span class="fw-semibold d-block">External</span>
+                  <small class="text-muted">{{ r.email }}</small>
                 </div>
-                </section>
+              </section>
             {% endif %}
-            {% empty %}
-            <p class="text-muted">No recipients found.</p>
-        {% endfor %}
-
-
-      <!-- Dates & Type -->
-      <section class="d-flex flex-wrap gap-4 text-muted small mb-4" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-        <div>
-          <i class="fas fa-clock me-1"></i>
-          Sent: {{ sent_message.sent_at|date:"D, M d, Y - h:i A" }}
+          {% endfor %}
+          
+          {% if all_recipients|length > 2 %}
+            <a href="#" data-bs-toggle="modal" data-bs-target="#recipientsModal" class="text-primary small d-block mt-2">
+              +{{ all_recipients|length|add:"-2" }} more recipient{{ all_recipients|length|add:"-2"|pluralize }}
+            </a>
+          {% endif %}
         </div>
-        {% if sent_message.scheduled_time %}
-          <div>
-            <i class="fas fa-calendar-alt me-1"></i>
-            Scheduled: {{ sent_message.scheduled_time|date:"D, M d, Y - h:i A" }}
+      {% endwith %}
+
+      <!-- Modal -->
+      <div class="modal fade" id="recipientsModal" tabindex="-1" aria-labelledby="recipientsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content rounded-4 shadow-lg">
+            <div class="modal-header bg-dark text-white">
+              <h5 class="modal-title" id="recipientsModalLabel">📋 All Recipients</h5>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 py-3">
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle w-100" id="recipients-table">
+                  <thead class="table-light text-center">
+                    <tr>
+                      <th>S/N</th>
+                      <th>Profile</th>
+                      <th>Name</th>
+                      <th>Role</th>
+                      <th>Branch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for r in sent_message.recipients.all %}
+                    <tr class="text-center">
+                      <td></td>
+                      <td>
+                        {% if r.recipient and r.recipient.profile_picture %}
+                          <img src="{{ r.recipient.profile_picture.url }}" width="40" height="40" class="rounded-circle" style="object-fit: cover;" />
+                        {% else %}
+                          <img src="{% static 'assets/img/profile-pic.png' %}" width="40" height="40" class="rounded-circle" style="object-fit: cover;" />
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if r.recipient %}
+                          {{ r.recipient.get_full_name|default:r.recipient.username }}
+                        {% elif r.email %}
+                          {{ r.email }}
+                        {% else %}
+                          <span class="text-muted">Unknown</span>
+                        {% endif %}
+                      </td>
+                      <td>{{ r.recipient.role|default:"-" }}</td>
+                      <td>{{ r.recipient.branch.name|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="modal-footer bg-light">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Message Details -->
+      <section class="d-flex flex-wrap gap-4 text-muted small mb-4">
+        <div><i class="fas fa-clock me-1"></i> Sent: {{ sent_message.sent_at|date:"D, M d, Y - h:i A" }}</div>
+        {% if sent_message.scheduled_time %}
+        <div><i class="fas fa-calendar-alt me-1"></i> Scheduled: {{ sent_message.scheduled_time|date:"D, M d, Y - h:i A" }}</div>
         {% endif %}
         <div>
-          <i class="fas fa-tag me-1"></i>
-          Type: <span style="background:#f5a623; color:#222; padding: 2px 10px; border-radius: 15px; font-weight: 600; text-transform: capitalize;">
-            {{ sent_message.message_type|default:"general" }}
-          </span>
+          <i class="fas fa-tag me-1"></i> Type:
+          <span class="badge bg-warning text-dark text-capitalize">{{ sent_message.message_type|default:"general" }}</span>
         </div>
       </section>
 
       <!-- Message Body -->
-      <article class="p-4 rounded-3 mb-4" style="background:white; border:1px solid #ccc; font-size: 1rem; line-height: 1.5; color:#444; white-space: pre-wrap;">
+      <article class="p-4 rounded-3 mb-4 bg-white border text-dark" style="white-space: pre-wrap;">
         {{ sent_message.body|linebreaks }}
       </article>
 
       <!-- Attachments -->
       {% if sent_message.attachments.exists %}
-      <section class="mb-4">
-        <h6 style="color:black; font-weight: 600; margin-bottom: 0.75rem;">
-          <i class="fas fa-paperclip me-2" style="color:green;"></i><strong>Attachments</strong>
-        </h6>
-        <ul class="list-unstyled ps-3">
-          {% for attachment in sent_message.attachments.all %}
-          <li class="mb-2">
-            <a href="{% url 'download_attachment' attachment.pk %}" class="text-decoration-none d-flex align-items-center gap-1" style="color:#007bff;">
-              <i class="fas fa-file-alt" style="color:#0056b3;"></i>
-              <span>{{ attachment.basename }}</span>
-              <i class="fas fa-download ms-2" style="color:#007bff;"></i>
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
-      </section>
+        <section class="mb-4">
+          <h6 class="fw-bold mb-3"><i class="fas fa-paperclip me-2 text-success"></i>Attachments</h6>
+          <ul class="list-unstyled ps-2">
+            {% for file in sent_message.attachments.all %}
+              <li class="mb-2">
+                <a href="{% url 'download_attachment' file.pk %}" class="d-flex align-items-center gap-2 text-decoration-none text-primary">
+                  <i class="fas fa-file-alt"></i>{{ file.basename }}<i class="fas fa-download ms-2"></i>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
       {% endif %}
 
       <!-- Actions -->
-      <div class="d-flex flex-wrap gap-3 justify-content-start">
+      <div class="d-flex flex-wrap gap-3">
         {% if sent_message.is_deleted_by_sender %}
           <button class="btn btn-outline-secondary" disabled>
             <i class="fas fa-trash-alt"></i> Message Deleted
@@ -109,42 +147,42 @@
         {% else %}
           <form method="post" action="{% url 'delete_sent_message' sent_message.pk %}" class="delete-form m-0">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-2" style="font-weight: 600;">
-              <i class="fas fa-trash-alt"></i> Delete Message
+            <button type="submit" class="btn btn-outline-danger">
+              <i class="fas fa-trash-alt me-1"></i> Delete Message
             </button>
           </form>
         {% endif %}
-        <a href="{% url 'outbox' %}" class="btn btn-outline-secondary d-flex align-items-center gap-2" style="font-weight: 600;">
-          <i class="fas fa-arrow-left"></i> Back to Outbox
+        <a href="{% url 'outbox' %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-1"></i> Back to Outbox
         </a>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- SweetAlert2 Script -->
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Scripts -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".delete-form").forEach(form => {
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        Swal.fire({
-          title: "Are you sure?",
-          text: "This message will be permanently deleted!",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#d33",
-          cancelButtonColor: "#3085d6",
-          confirmButtonText: "Yes, delete it!",
-          reverseButtons: true
-        }).then(result => {
-          if (result.isConfirmed) {
-            form.submit();
-          }
+  document.addEventListener('DOMContentLoaded', function () {
+    const table = $('#recipients-table').DataTable({
+      responsive: true,
+      paging: true,
+      ordering: true,
+      searching: true,
+      language: {
+        searchPlaceholder: "🔍 Search recipients...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries",
+        info: "Showing _START_ to _END_ of _TOTAL_ recipients",
+      },
+      columnDefs: [{ targets: 0, orderable: false, searchable: false }],
+      drawCallback: function () {
+        const api = this.api();
+        api.column(0).nodes().each((cell, i) => {
+          cell.innerHTML = i + 1;
         });
-      });
+      }
     });
   });
 </script>

@@ -1,17 +1,23 @@
-from django.db import models
-from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, PermissionsMixin
-from django.conf import settings
-from django.templatetags.static import static
+# Standard Library
 import datetime
+import os
 from datetime import date
 
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from phonenumber_field.modelfields import PhoneNumberField
-from accounts.utils import generate_profile_number, get_prefix_for_user
+# Django Core
+from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-import os
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.templatetags.static import static
+from django.utils import timezone
+
+# Third-Party
+from phonenumber_field.modelfields import PhoneNumberField
+
+# Local App Imports
+from accounts.utils import generate_profile_number, get_prefix_for_user
 
 
 class StudentClass(models.Model):
