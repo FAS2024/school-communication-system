@@ -878,11 +878,24 @@ class CommunicationForm(forms.ModelForm):
             'body',
             'is_draft',
             'scheduled_time',
+            'requires_response',
         ]
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        
+        self.fields['requires_response'].label = "Does this message require a reply?"
+        self.fields['requires_response'].widget.attrs.update({'class': 'form-check-input'})
+        
+        # Customize checkbox widgets here
+        self.fields['is_draft'].widget = forms.CheckboxInput(attrs={
+            'class': 'form-check-input', 'role': 'switch'
+        })
+        self.fields['requires_response'].widget = forms.CheckboxInput(attrs={
+            'class': 'form-check-input', 'role': 'switch'
+        })
+
 
         # Format scheduled_time for display
         if self.instance and self.instance.scheduled_time:
