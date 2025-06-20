@@ -858,7 +858,7 @@ class CommunicationForm(forms.ModelForm):
             "rows": 2,
             "cols": 40
         }),
-        help_text="Add emails manually (e.g., external contacts)"
+        help_text="Add emails manually for external contacts (e.g., fas@gmail.com, acad@gmail.com)"
     )
     scheduled_time = forms.DateTimeField(
         input_formats=['%d-%m-%Y %I:%M %p'],
@@ -1176,6 +1176,68 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             if not teaching_positions and not non_teaching_positions:
                 raise ValidationError("Select at least one teaching or non-teaching position for 'both' staff type.")
 
+    # def save(self, commit=True):
+    #     instance = super().save(commit=False)
+    #     instance.sender = self.user
+
+    #     role = self.cleaned_data.get('role')
+
+    #     if self.user.role in self.STUDENT_ROLES:
+    #         instance.branch = self.user.branch
+    #         instance.role = role
+
+    #         if role in ['student', 'parent']:
+    #             instance.student_class = self.cleaned_data.get('student_class')
+    #             instance.class_arm = self.cleaned_data.get('class_arm')
+
+    #             # Clear staff fields
+    #             instance.staff_type = None
+    #             instance.teaching_positions.clear()
+    #             instance.non_teaching_positions.clear()
+
+    #         elif role in self.STAFF_ROLES:
+    #             instance.staff_type = self.cleaned_data.get('staff_type')
+    #             if instance.staff_type == 'teaching':
+    #                 # instance.teaching_positions.set(self.cleaned_data.get('teaching_positions'))
+    #                 instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
+    #                 instance.non_teaching_positions.clear()
+    #             elif instance.staff_type == 'non_teaching':
+    #                 # instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions'))
+    #                 instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
+    #                 instance.teaching_positions.clear()
+    #             else:  # both or none
+    #                 instance.teaching_positions.clear()
+    #                 instance.non_teaching_positions.clear()
+
+    #             instance.student_class = None
+    #             instance.class_arm = None
+    #         else:
+    #             raise ValidationError(f"Invalid role selected: {role}")
+
+    #     elif self.user.role in self.STAFF_ROLES:
+    #         instance.branch = self.cleaned_data.get('branch')
+    #         instance.role = self.cleaned_data.get('role')
+    #         instance.staff_type = self.cleaned_data.get('staff_type')
+
+    #         if instance.staff_type == 'teaching':
+    #             instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
+    #             instance.non_teaching_positions.clear()
+    #         elif instance.staff_type == 'non_teaching':
+    #             instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
+    #             instance.teaching_positions.clear()
+    #         else:
+    #             instance.teaching_positions.clear()
+    #             instance.non_teaching_positions.clear()
+
+    #         instance.student_class = self.cleaned_data.get('student_class')
+    #         instance.class_arm = self.cleaned_data.get('class_arm')
+
+    #     if commit:
+    #         instance.save()
+    #         self.save_m2m()
+
+    #     return instance
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         instance.sender = self.user
@@ -1192,49 +1254,42 @@ class CommunicationTargetGroupForm(forms.ModelForm):
 
                 # Clear staff fields
                 instance.staff_type = None
-                instance.teaching_positions.clear()
-                instance.non_teaching_positions.clear()
+                instance.student_class = self.cleaned_data.get('student_class')
+                instance.class_arm = self.cleaned_data.get('class_arm')
 
             elif role in self.STAFF_ROLES:
                 instance.staff_type = self.cleaned_data.get('staff_type')
-                if instance.staff_type == 'teaching':
-                    # instance.teaching_positions.set(self.cleaned_data.get('teaching_positions'))
-                    instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
-                    instance.non_teaching_positions.clear()
-                elif instance.staff_type == 'non_teaching':
-                    # instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions'))
-                    instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
-                    instance.teaching_positions.clear()
-                else:  # both or none
-                    instance.teaching_positions.clear()
-                    instance.non_teaching_positions.clear()
-
                 instance.student_class = None
                 instance.class_arm = None
+
             else:
                 raise ValidationError(f"Invalid role selected: {role}")
 
         elif self.user.role in self.STAFF_ROLES:
             instance.branch = self.cleaned_data.get('branch')
-            instance.role = self.cleaned_data.get('role')
+            instance.role = role
             instance.staff_type = self.cleaned_data.get('staff_type')
-
-            if instance.staff_type == 'teaching':
-                instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
-                instance.non_teaching_positions.clear()
-            elif instance.staff_type == 'non_teaching':
-                instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
-                instance.teaching_positions.clear()
-            else:
-                instance.teaching_positions.clear()
-                instance.non_teaching_positions.clear()
-
             instance.student_class = self.cleaned_data.get('student_class')
             instance.class_arm = self.cleaned_data.get('class_arm')
 
         if commit:
             instance.save()
-            self.save_m2m()
+            self.save_m2m()  # required if form has m2m
+
+            # Now that instance is saved, update m2m safely
+            if role in self.STAFF_ROLES:
+                if instance.staff_type == 'teaching':
+                    instance.teaching_positions.set(self.cleaned_data.get('teaching_positions') or [])
+                    instance.non_teaching_positions.clear()
+                elif instance.staff_type == 'non_teaching':
+                    instance.non_teaching_positions.set(self.cleaned_data.get('non_teaching_positions') or [])
+                    instance.teaching_positions.clear()
+                else:
+                    instance.teaching_positions.clear()
+                    instance.non_teaching_positions.clear()
+            else:
+                instance.teaching_positions.clear()
+                instance.non_teaching_positions.clear()
 
         return instance
 
@@ -1501,7 +1556,7 @@ AttachmentFormSet = inlineformset_factory(
     Communication,
     CommunicationAttachment,
     form=CommunicationAttachmentModelForm,
-    extra=2,
+    extra=1,
     can_delete=True
 )
 

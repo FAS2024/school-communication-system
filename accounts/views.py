@@ -42,7 +42,9 @@ from .forms import (
     TeachingPositionForm, NonTeachingPositionForm, StaffCreationForm, StaffProfileForm,
     BranchForm, StudentCreationForm, StudentClassForm, ClassArmForm,
     ParentCreationForm, StudentProfileForm, CommunicationForm,
-    CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet
+    CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet,
+    CommunicationAttachmentModelForm
+    
 )
 from .models import (
     CustomUser, StudentProfile, ParentProfile, StaffProfile,
@@ -1473,12 +1475,21 @@ class SendCommunicationView(View):
 class EditDraftMessageView(View):
 
     def get(self, request, pk):
-        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
-        communication_form = CommunicationForm(instance=draft, user=request.user)
-        target_group = draft.target_groups.first()
-        target_group_form = CommunicationTargetGroupForm(instance=target_group, user=request.user)
-        attachment_formset = AttachmentFormSet(queryset=draft.attachments.all())
+        draft = get_object_or_404(
+            Communication,
+            pk=pk,
+            sender=request.user,
+            is_draft=True,
+            sent=False
+        )
 
+        # Main communication form
+        communication_form = CommunicationForm(instance=draft, user=request.user)
+
+        # Get the first related target group instance (if exists)
+        target_group = draft.target_groups.first()
+
+        # Prepare saved filter data for JavaScript or form initial
         saved_filter_data = {}
         if target_group:
             saved_filter_data = {
@@ -1491,20 +1502,44 @@ class EditDraftMessageView(View):
                 'id_non_teaching_positions': [str(pos.id) for pos in target_group.non_teaching_positions.all()],
             }
 
-        return render(request, 'communications/edit_draft.html', {
+        # Load the target group form with the instance
+        target_group_form = CommunicationTargetGroupForm(
+            instance=target_group,
+            user=request.user
+        )
+    
+        attachment_formset = AttachmentFormSet(
+            request.POST or None,
+            request.FILES or None,
+            instance=draft,
+            prefix="attachments"  
+        )
+
+        # Inside get():
+        context = {
             'communication_form': communication_form,
             'target_group_form': target_group_form,
             'attachment_formset': attachment_formset,
             'draft': draft,
-            'saved_filter_data': saved_filter_data,
-            'selected_recipient_ids': draft.selected_recipient_ids or [],
-        })
+            'saved_filter_data': json.dumps(saved_filter_data), 
+            'selected_recipient_ids': json.dumps(draft.selected_recipient_ids or []), 
+            'is_editing_draft': True,
+        }
+        return render(request, 'communications/edit_draft.html', context)
 
     def post(self, request, pk):
-        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+        action = request.POST.get('action')
+        draft = get_object_or_404(
+            Communication,
+            pk=pk,
+            sender=request.user,
+            is_draft=True,
+            sent=False
+        )
+
         communication_form = CommunicationForm(request.POST, request.FILES, instance=draft, user=request.user)
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
-        attachment_formset = AttachmentFormSet(request.POST, request.FILES, queryset=draft.attachments.all())
+        attachment_formset = AttachmentFormSet(request.POST, request.FILES, instance=draft, prefix="attachments")
 
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
             messages.error(request, "Please correct the form errors below.")
@@ -1518,7 +1553,7 @@ class EditDraftMessageView(View):
         try:
             validate_attachment_formset(attachment_formset)
         except ValidationError as e:
-            messages.error(request, str(e))
+            attachment_formset._non_form_errors = attachment_formset.error_class([str(e)])
             return render(request, 'communications/edit_draft.html', {
                 'communication_form': communication_form,
                 'target_group_form': target_group_form,
@@ -1531,6 +1566,12 @@ class EditDraftMessageView(View):
             target_group_form.cleaned_data['branch'] = branch
             if hasattr(target_group_form, 'instance'):
                 target_group_form.instance.branch = branch
+
+        # Save or update the target group instance
+        target_group = target_group_form.save(commit=False)
+        target_group.communication = draft
+        target_group.save()
+        draft.target_groups.set([target_group])
 
         allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
         selected_ids = request.POST.getlist('selected_recipients')
@@ -1568,26 +1609,35 @@ class EditDraftMessageView(View):
                 'draft': draft,
             })
 
-        # Update the draft to a real communication
+        # Save Communication
         communication = communication_form.save(commit=False)
         communication.sender = request.user
         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
-        communication.is_draft = False  # 🔥 Mark as no longer a draft
+        communication.is_draft = (action == 'draft')
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
+
+        communication.saved_filter_data = {
+            'id_branch': str(target_group.branch.id) if target_group.branch else '',
+            'id_role': target_group.role or '',
+            'id_staff_type': target_group.staff_type or '',
+            'id_student_class': str(target_group.student_class.id) if target_group.student_class else '',
+            'id_class_arm': str(target_group.class_arm.id) if target_group.class_arm else '',
+            'id_teaching_positions': [str(pos.id) for pos in target_group.teaching_positions.all()],
+            'id_non_teaching_positions': [str(pos.id) for pos in target_group.non_teaching_positions.all()],
+        }
+
         communication.save()
-        print(f"Editing Communication ID: {communication.pk}")
 
+        # Save formset (handles add, edit, delete automatically)
+        attachment_formset.save()
 
-
-        # Save attachments
-        for form in attachment_formset:
-            if form.cleaned_data.get('file'):
-                form.instance.communication = communication
-                form.save()
-
-        if communication.is_due():
+        # Handle Sending
+        if action == 'draft':
+            messages.success(request, "Draft saved successfully.")
+            return redirect('draft_messages') 
+        elif communication.is_due():
             send_communication_to_recipients(
                 communication=communication,
                 selected_recipients=selected_recipients,
@@ -1596,10 +1646,8 @@ class EditDraftMessageView(View):
             communication.sent = True
             communication.sent_at = timezone.now()
             communication.save()
-
             messages.success(request, "Message sent successfully.")
             return redirect('communication_success')
-
         else:
             query_string = urlencode({
                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),

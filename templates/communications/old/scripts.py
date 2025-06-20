@@ -1,9 +1,342 @@
-{% comment %} <script>
+{% extends "base.html" %} {% load static %} 
+
+{% block content %}
+<h2 style="margin-bottom: 1rem">Create Communication</h2>
+
+<style>
+  #form-fields-container {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-wrap: wrap; /* allow wrapping */
+    gap: 1rem; /* spacing between fields */
+    justify-content: flex-start; /* align fields left */
+    align-items: flex-start; /* align items at top */
+    /* Remove scroll and nowrap */
+    overflow-x: visible;
+    white-space: normal;
+    /* New background color */
+    background-color:rgb(242, 243, 245);
+
+    /* Optional subtle shadow for nice depth */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  #form-fields-container legend {
+    font-weight: 600;
+    font-size: 1.1rem;
+    padding: 0 0.5rem;
+    flex-basis: 100%; /* make legend take full width on its own line */
+    margin-bottom: 1rem; /* space below legend */
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column; /* label on top of input */
+    min-width: 180px; /* minimum width for each group */
+    flex-grow: 1;
+    margin-top: -2rem;
+    /* fields can grow to fill space */
+  }
+
+  .form-label {
+    margin-bottom: 0.3rem;
+    font-weight: 500;
+  }
+</style>
+
+
+  
+<form id="target-group-form" method="get" style="margin-bottom: 1rem;">
+  <fieldset id="form-fields-container">
+    <legend>Select Target Group</legend>
+
+    {% if user_role != "student" and user_role != "parent" %}
+    <div id="branch-field" class="form-group">
+      <label for="id_branch" class="form-label">Branch:</label>
+      {{ target_group_form.branch }} {% if target_group_form.branch.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.branch.errors }}
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <input
+      type="hidden"
+      id="id_branch"
+      name="branch"
+      value="{{ user_branch_id }}"
+    />
+    {% endif %}
+
+    <div
+      id="role-field"
+      class="form-group"
+      style="{% if target_group_form.role.errors %}display: block{% else %}display: none{% endif %}"
+    >
+      <label for="id_role" class="form-label">Role:</label>
+      {{ target_group_form.role }} {% if target_group_form.role.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.role.errors }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="staff-type-field" class="form-group" style="display: none">
+      <label for="id_staff_type" class="form-label">Staff Type:</label>
+      {{ target_group_form.staff_type }} 
+      {% if target_group_form.staff_type.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.staff_type.errors }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="teaching-positions-field" class="form-group" style="display: none">
+      <label for="id_teaching_positions" class="form-label"
+        >Teaching Positions:</label
+      >
+      {{ target_group_form.teaching_positions }} 
+      {% if target_group_form.teaching_positions.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.teaching_positions.errors }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div
+      id="non-teaching-positions-field"
+      class="form-group"
+      style="display: none"
+    >
+      <label for="id_non_teaching_positions" class="form-label"
+        >Non-Teaching Positions:</label
+      >
+      {{ target_group_form.non_teaching_positions }} 
+      {% if target_group_form.non_teaching_positions.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.non_teaching_positions.errors }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="student-class-field" class="form-group" style="display: none">
+      <label for="id_student_class" class="form-label">Student Class:</label>
+      {{ target_group_form.student_class }} 
+      {% if target_group_form.student_class.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.student_class.errors }}
+      </div>
+      {% endif %}
+    </div>
+
+    <div id="class-arm-field" class="form-group" style="display: none">
+      <label for="id_class_arm" class="form-label">Class Arm:</label>
+      {{ target_group_form.class_arm }} 
+      {% if target_group_form.class_arm.errors %}
+      <div class="text-danger" style="color: red; margin-top: 0.25rem">
+        {{ target_group_form.class_arm.errors }}
+      </div>
+      {% endif %}
+    </div>
+  </fieldset>
+</form>
+
+
+{% if communication_form.non_field_errors %}
+  <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
+    {% for error in communication_form.non_field_errors %}
+      <div>{{ error }}</div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+
+<h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
+<table
+  id="recipients-table"
+  class="table table-striped"
+  style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
+>
+  <thead style="background-color: #007bff; color: white">
+    <tr>
+      <th style="padding: 0.5rem; text-align: center">
+        <input type="checkbox" id="select-all-recipients" />
+      </th>
+      <th style="padding: 0.5rem; text-align: center">S/N</th>
+      <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
+      <th style="padding: 0.5rem; text-align: center">Branch</th>
+      <th style="padding: 0.5rem; text-align: left">Name</th>
+      <th style="padding: 0.5rem; text-align: left">Email</th>
+    </tr>
+  </thead>
+  <tbody style="border: 1px solid #ddd">
+    <tr>
+      <td></td>
+      <td></td>
+      <td
+        colspan="6"
+        style="
+          padding: 1rem;
+          text-align: center;
+          font-style: italic;
+          color: #555;
+        "
+      >
+        Select filters above to view recipients.
+      </td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+<form
+  id="communication-form"
+  method="post"
+  action="{% url 'send_communication' %}"
+  enctype="multipart/form-data"
+  style="max-width: 100%"
+  data-user-role="{{ request.user.role }}"
+>
+  {% csrf_token %}
+
+  {% if attachment_formset.non_form_errors %}
+  <div class="alert alert-danger" style="margin-bottom: 1rem;">
+    {{ attachment_formset.non_form_errors }}
+  </div>
+  {% endif %}
+
+  <div
+    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;  background-color:rgb(242, 243, 245);"
+  >
+    <!-- Left Column: Message Details -->
+    <fieldset
+      style="
+        flex: 1 1 600px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Message Details
+      </legend>
+
+      {# First loop: render all fields except is_draft and requires_response #}
+      {% for field in communication_form %}
+        {% if field.name != 'is_draft' and field.name != 'requires_response' %}
+          <div class="form-group mb-3 d-flex flex-column">
+            <label for="{{ field.id_for_label }}" class="form-label fw-semibold mb-1">
+              {{ field.label }}:
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="form-text text-muted">{{ field.help_text }}</small>
+            {% endif %}
+            {% if field.errors %}
+              <div class="text-danger mt-1">{{ field.errors }}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      {# Render is_draft and requires_response as toggle switches #}
+      <div class="form-switch-group p-4 mt-4 rounded-4" style="background-color:#ddd;">
+      <h6 class="text-black mb-3 fw-semibold">Additional Options</h6>
+      <div class="d-flex flex-column flex-md-row gap-4">
+        {% for field in communication_form %}
+          {% if field.name == 'is_draft' or field.name == 'requires_response' %}
+            <div class="form-check form-switch text-white">
+              {{ field }}
+              <label class="form-check-label fw-semibold ms-2" for="{{ field.id_for_label }}">
+                {{ field.label }}
+              </label>
+              {% if field.help_text %}
+                <div class="form-text text-light small">{{ field.help_text }}</div>
+              {% endif %}
+              {% if field.errors %}
+                <div class="text-danger small">{{ field.errors }}</div>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+
+
+
+    </fieldset>
+
+    <!-- Right Column: Attachments -->
+    <fieldset
+      style="
+        flex: 1 1 200px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+      "
+    >
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+        Attachments
+      </legend>
+      {{ attachment_formset.management_form }}
+      <div id="attachments-container">
+        {% for form in attachment_formset.forms %}
+        <div
+          class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
+          style="margin-bottom: 1rem; position: relative"
+        >
+          {{ form.as_p }}
+          {% if forloop.counter > 2 %}
+          <button
+            type="button"
+            class="btn btn-danger remove-attachment"
+            style="position: absolute; top: 10px; right: 10px"
+          >
+            Remove
+          </button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <button
+        type="button"
+        id="add-attachment"
+        class="btn btn-success"
+        style="margin-top: 0.75rem"
+      >
+        Add More Files
+      </button>
+    </fieldset>
+  </div>
+
+  <input type="hidden" name="selected_recipients" id="selected-recipients" />
+  
+  <button
+    type="submit"
+    class="btn btn-primary"
+    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
+  >
+    Send Message
+  </button>
+</form>
+
+
+
+<!-- jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
   $(document).ready(function () {
     const $form = $("#target-group-form");
     const $recipientsTableBody = $("#recipients-table tbody");
     const $selectAll = $("#select-all-recipients");
     const $communicationForm = $("#communication-form");
+    const userRole = $communicationForm.data("user-role");
 
     const fields = {
       branch: $("#id_branch"),
@@ -17,13 +350,33 @@
 
     let selectedRecipients = new Set();
 
+    // ===== Utility Functions =====
+
+    function areFiltersEmpty() {
+      // Check if all filters are empty or unchecked
+      for (const key in fields) {
+        const field = fields[key];
+
+        // Skip logic for fields not relevant to userRole
+        if ((userRole === "student" || userRole === "parent") && key !== "role") continue;
+        if ((userRole !== "student" && userRole !== "parent") && key === "role") continue;
+
+        if (field.is(":checkbox")) {
+          if (field.prop("checked")) return false;
+        } else {
+          const val = field.val();
+          if (val && val.toString().trim() !== "" && val !== "------------") return false;
+        }
+      }
+      return true;
+    }
+
+
     function saveFilters() {
       const filters = {};
       $form.find("select, input[type=checkbox]").each(function () {
         const $el = $(this);
-        filters[$el.attr("id")] = $el.is(":checkbox")
-          ? $el.prop("checked")
-          : $el.val();
+        filters[$el.attr("id")] = $el.is(":checkbox") ? $el.prop("checked") : $el.val();
       });
       localStorage.setItem("targetGroupFilters", JSON.stringify(filters));
     }
@@ -44,95 +397,13 @@
       for (const id in filters) {
         const $el = $("#" + id);
         if ($el.length) {
-          $el.is(":checkbox")
-            ? $el.prop("checked", filters[id])
-            : $el.val(filters[id]);
+          if ($el.is(":checkbox")) {
+            $el.prop("checked", filters[id]);
+          } else {
+            $el.val(filters[id]);
+          }
         }
       }
-    }
-
-    function updateBranchVisibility() {
-      if (fields.branch.val()) {
-        $("#role-field").show();
-      } else {
-        $(
-          "#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
-        ).hide();
-        resetFields([
-          "role",
-          "staffType",
-          "teaching",
-          "nonTeaching",
-          "studentClass",
-          "classArm",
-        ]);
-      }
-    }
-
-    function updateRoleVisibility() {
-      const role = fields.role.val();
-      if (role === "staff") {
-        $("#staff-type-field").show();
-        $("#student-class-field, #class-arm-field").hide();
-        resetFields(["studentClass", "classArm"]);
-        updateStaffTypeVisibility();
-      } else if (role === "student") {
-        $(
-          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field"
-        ).hide();
-        resetFields(["staffType", "teaching", "nonTeaching"]);
-        $("#student-class-field").show();
-        updateStudentClassVisibility();
-      } else {
-        $(
-          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
-        ).hide();
-        resetFields([
-          "staffType",
-          "teaching",
-          "nonTeaching",
-          "studentClass",
-          "classArm",
-        ]);
-      }
-    }
-
-    function updateStaffTypeVisibility() {
-      const type = fields.staffType.val();
-      const $teachingField = $("#teaching-positions-field");
-      const $nonTeachingField = $("#non-teaching-positions-field");
-
-      switch (type) {
-        case "teaching":
-          $teachingField.show();
-          $nonTeachingField.hide();
-          fields.nonTeaching
-            .find("input[type=checkbox]")
-            .prop("checked", false);
-          break;
-        case "non_teaching":
-          $teachingField.hide();
-          $nonTeachingField.show();
-          fields.teaching.find("input[type=checkbox]").prop("checked", false);
-          break;
-        case "both":
-          $teachingField.show();
-          $nonTeachingField.show();
-          break;
-        default:
-          $teachingField.hide();
-          $nonTeachingField.hide();
-          fields.teaching.find("input[type=checkbox]").prop("checked", false);
-          fields.nonTeaching
-            .find("input[type=checkbox]")
-            .prop("checked", false);
-      }
-    }
-
-    function updateStudentClassVisibility() {
-      const show = !!fields.studentClass.val();
-      $("#class-arm-field").toggle(show);
-      if (!show) fields.classArm.val("");
     }
 
     function resetFields(keys) {
@@ -146,17 +417,65 @@
       });
     }
 
+    function updateBranchVisibility() {
+      if (fields.branch.val()) {
+        $("#role-field").show();
+      } else {
+        $("#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field").hide();
+        resetFields(["role", "staffType", "teaching", "nonTeaching", "studentClass", "classArm"]);
+      }
+    }
+
+    function updateRoleVisibility() {
+      const role = fields.role.val();
+      if (role === "staff") {
+        $("#staff-type-field").show();
+        $("#student-class-field, #class-arm-field").hide();
+        resetFields(["studentClass", "classArm"]);
+        updateStaffTypeVisibility();
+      } else if (role === "student") {
+        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field").hide();
+        resetFields(["staffType", "teaching", "nonTeaching"]);
+        $("#student-class-field").show();
+        updateStudentClassVisibility();
+      } else {
+        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field").hide();
+        resetFields(["staffType", "teaching", "nonTeaching", "studentClass", "classArm"]);
+      }
+    }
+
+    function updateStaffTypeVisibility() {
+      const type = fields.staffType.val();
+      const $teaching = $("#teaching-positions-field");
+      const $nonTeaching = $("#non-teaching-positions-field");
+
+      if (type === "teaching") {
+        $teaching.show();
+        $nonTeaching.hide().find("input[type=checkbox]").prop("checked", false);
+      } else if (type === "non_teaching") {
+        $nonTeaching.show();
+        $teaching.hide().find("input[type=checkbox]").prop("checked", false);
+      } else if (type === "both") {
+        $teaching.show();
+        $nonTeaching.show();
+      } else {
+        $teaching.hide().find("input[type=checkbox]").prop("checked", false);
+        $nonTeaching.hide().find("input[type=checkbox]").prop("checked", false);
+      }
+    }
+
+    function updateStudentClassVisibility() {
+      const show = !!fields.studentClass.val();
+      $("#class-arm-field").toggle(show);
+      if (!show) fields.classArm.val("");
+    }
+
     function saveSelectedRecipients() {
-      localStorage.setItem(
-        "selectedRecipients",
-        JSON.stringify([...selectedRecipients])
-      );
+      localStorage.setItem("selectedRecipients", JSON.stringify([...selectedRecipients]));
     }
 
     function loadSelectedRecipients() {
-      selectedRecipients = new Set(
-        JSON.parse(localStorage.getItem("selectedRecipients") || "[]")
-      );
+      selectedRecipients = new Set(JSON.parse(localStorage.getItem("selectedRecipients") || "[]"));
     }
 
     function updateRecipientTableCheckboxStates() {
@@ -166,51 +485,110 @@
       });
       $selectAll.prop(
         "checked",
-        $(".recipient-checkbox:checked").length ===
-          $(".recipient-checkbox").length
+        $(".recipient-checkbox:checked").length === $(".recipient-checkbox").length
       );
     }
 
     function loadRecipients() {
-      $.get(
-        "{% url 'get_filtered_users' %}",
-        $form.serialize(),
-        function (response) {
-          $recipientsTableBody.empty();
-          if (response.length === 0) {
-            $recipientsTableBody.append(
-              '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
-            );
+      // If no filters are applied, always show no users found message
+      if (areFiltersEmpty()) {
+        recipientsTable.clear().draw();
+        $selectAll.prop("checked", false);
+        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
+        return;
+      }
+
+      // Extra safeguard for student role — avoid sending request if student_class or class_arm is empty
+      if (userRole === "student") {
+        if (fields.role.val() === "student") {
+          const studentClass = fields.studentClass.val();
+          const classArm = fields.classArm.val();
+
+          if (!studentClass || !classArm) {
+            recipientsTable.clear().draw();
             $selectAll.prop("checked", false);
+            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+            return;
+          }
+        }
+      }
+
+      const queryData = $form.serializeArray().filter(item => {
+      const val = item.value && item.value.trim();
+      if (!val) return false;
+
+      const role = fields.role.val();
+      const staffType = fields.staffType.val();
+
+      // Skip irrelevant fields
+      if (role !== "student" && (item.name === "student_class" || item.name === "class_arm")) return false;
+      if (role !== "staff" && item.name === "staff_type") return false;
+
+      // Require at least one teaching/non-teaching checkbox for staff_type 'both'
+      if (role === "staff") {
+        const hasTeaching = fields.teaching.find("input:checked").length > 0;
+        const hasNonTeaching = fields.nonTeaching.find("input:checked").length > 0;
+
+        if (staffType === "both" && !hasTeaching && !hasNonTeaching) {
+          recipientsTable.clear().draw();
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching or Non-Teaching position.</td></tr>');
+          return false;
+        }
+
+        if (staffType === "non_teaching" && !hasNonTeaching) {
+          recipientsTable.clear().draw();
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Non-Teaching position.</td></tr>');
+          return false;
+        }
+
+        if (staffType === "teaching" && !hasTeaching) {
+          recipientsTable.clear().draw();
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching position.</td></tr>');
+          return false;
+        }
+      }
+
+      return true;
+      });
+
+      if (queryData.length === 0) {
+        recipientsTable.clear().draw();
+        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please apply valid filters to see results.</td></tr>');
+        return;
+      }
+
+      // Only make request when queryData is not empty
+      $.get("{% url 'get_filtered_users' %}", $.param(queryData), function (response) {
+          recipientsTable.clear();
+          if (response.length === 0) {
+            recipientsTable.draw();
+            $selectAll.prop("checked", false);
+            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
             return;
           }
 
           response.forEach((user, index) => {
-            const profilePic =
-              (user.profile_picture && user.profile_picture.url) ||
-              "/static/assets/img/profile-pic.png";
-            const isChecked = selectedRecipients.has(user.id.toString())
-              ? "checked"
-              : "";
-            const row = `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td class="text-center"><input type="checkbox" class="recipient-checkbox" value="${
-                user.id
-              }" ${isChecked}></td>
-              <td class="text-center">${index + 1}</td>
-              <td class="text-center"><img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;"></td>
-              <td class="text-center">${user.branch__name}</td>
-              <td>${user.first_name} ${user.last_name}</td>
-              <td>${user.email}</td>
-            </tr>`;
-            $recipientsTableBody.append(row);
+            const profilePic = (user.profile_picture && user.profile_picture.url) || "/static/assets/img/profile-pic.png";
+            const isChecked = selectedRecipients.has(user.id.toString());
+
+            recipientsTable.row.add([
+              `<input type="checkbox" class="recipient-checkbox" value="${user.id}" ${isChecked ? "checked" : ""}>`,
+              index + 1,
+              `<img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;">`,
+              user.branch__name,
+              `${user.first_name} ${user.last_name}`,
+              user.email,
+            ]);
           });
 
+          recipientsTable.draw();
           updateRecipientTableCheckboxStates();
-        }
-      );
-    }
+        });
+      }
 
+
+    
+    
     function handleDependencyChange() {
       clearSelectedRecipients();
       $selectAll.prop("checked", false);
@@ -218,7 +596,8 @@
       loadRecipients();
     }
 
-    // === Event Bindings ===
+    // ===== Event Bindings =====
+
     fields.branch.on("change", () => {
       updateBranchVisibility();
       updateRoleVisibility();
@@ -240,16 +619,15 @@
       handleDependencyChange();
     });
 
-    $form
-      .find("select, input[type=checkbox]")
-      .not("#select-all-recipients")
-      .on("change", handleDependencyChange);
+    $form.find("select, input[type=checkbox]").not("#select-all-recipients").on("change", handleDependencyChange);
 
     $recipientsTableBody.on("change", ".recipient-checkbox", function () {
       const id = $(this).val();
-      $(this).is(":checked")
-        ? selectedRecipients.add(id)
-        : selectedRecipients.delete(id);
+      if ($(this).is(":checked")) {
+        selectedRecipients.add(id);
+      } else {
+        selectedRecipients.delete(id);
+      }
       saveSelectedRecipients();
       updateRecipientTableCheckboxStates();
     });
@@ -259,373 +637,102 @@
       $(".recipient-checkbox").each(function () {
         $(this).prop("checked", checked);
         const id = $(this).val();
-        checked ? selectedRecipients.add(id) : selectedRecipients.delete(id);
-      });
-      saveSelectedRecipients();
-    });
-
-    $communicationForm.on("submit", function () {
-      // Clear filters and recipients on submit
-      clearFiltersStorage();
-      clearSelectedRecipients();
-      localStorage.removeItem("selectedRecipients");
-
-      // Remove any old hidden inputs
-      $communicationForm.find('input[name="selected_recipients"]').remove();
-
-      [...selectedRecipients].forEach(function (id) {
-        $("<input>", {
-          type: "hidden",
-          name: "selected_recipients",
-          value: id,
-        }).appendTo($communicationForm);
-      });
-    });
-
-    // === Attachments ===
-
-    const maxAttachments = 10;
-    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
-
-    $("#add-attachment").on("click", function () {
-      if (totalForms >= maxAttachments)
-        return alert("Maximum attachments reached.");
-
-      const $newForm = $(".attachment-form:first").clone();
-      $newForm.find("input, select, textarea").each(function () {
-        const name = $(this).attr("name").replace("-0-", `-${totalForms}-`);
-        const id = "id_" + name;
-        $(this).attr({ name, id }).val("");
-        if ($(this).is(":checkbox, :radio")) $(this).prop("checked", false);
-      });
-
-      $newForm.find(".remove-attachment").remove();
-      $newForm.append(
-        '<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>'
-      );
-      $("#attachments-container").append($newForm);
-
-      totalForms++;
-      $("#id_attachments-TOTAL_FORMS").val(totalForms);
-    });
-
-    $("#attachments-container").on("click", ".remove-attachment", function () {
-      $(this).closest(".attachment-form").remove();
-      totalForms--;
-      $("#id_attachments-TOTAL_FORMS").val(totalForms);
-    });
-
-    // === Initial Setup ===
-    loadFilters();
-    loadSelectedRecipients();
-    updateBranchVisibility();
-    updateRoleVisibility();
-    updateStaffTypeVisibility();
-    updateStudentClassVisibility();
-    loadRecipients();
-  });
-</script>
-
-<script>
-  $(document).ready(function () {
-    $('#recipients-table').DataTable();
-  });
-</script> {% endcomment %}
-
-
-
-<script>
-  $(document).ready(function () {
-    const $form = $("#target-group-form");
-    const $recipientsTableBody = $("#recipients-table tbody");
-    const $selectAll = $("#select-all-recipients");
-    const $communicationForm = $("#communication-form");
-
-    const fields = {
-      branch: $("#id_branch"),
-      role: $("#id_role"),
-      staffType: $("#id_staff_type"),
-      teaching: $("#id_teaching_positions"),
-      nonTeaching: $("#id_non_teaching_positions"),
-      studentClass: $("#id_student_class"),
-      classArm: $("#id_class_arm"),
-    };
-
-    let selectedRecipients = new Set();
-
-    function saveFilters() {
-      const filters = {};
-      $form.find("select, input[type=checkbox]").each(function () {
-        const $el = $(this);
-        filters[$el.attr("id")] = $el.is(":checkbox")
-          ? $el.prop("checked")
-          : $el.val();
-      });
-      localStorage.setItem("targetGroupFilters", JSON.stringify(filters));
-    }
-
-    function clearFiltersStorage() {
-      localStorage.removeItem("targetGroupFilters");
-    }
-
-    function clearSelectedRecipients() {
-      selectedRecipients.clear();
-      localStorage.removeItem("selectedRecipients");
-    }
-
-    function loadFilters() {
-      const saved = localStorage.getItem("targetGroupFilters");
-      if (!saved) return;
-      const filters = JSON.parse(saved);
-      for (const id in filters) {
-        const $el = $("#" + id);
-        if ($el.length) {
-          $el.is(":checkbox")
-            ? $el.prop("checked", filters[id])
-            : $el.val(filters[id]);
-        }
-      }
-    }
-
-    function updateBranchVisibility() {
-      if (fields.branch.val()) {
-        $("#role-field").show();
-      } else {
-        $(
-          "#role-field, #staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
-        ).hide();
-        resetFields([
-          "role",
-          "staffType",
-          "teaching",
-          "nonTeaching",
-          "studentClass",
-          "classArm",
-        ]);
-      }
-    }
-
-    function updateRoleVisibility() {
-      const role = fields.role.val();
-      if (role === "staff") {
-        $("#staff-type-field").show();
-        $("#student-class-field, #class-arm-field").hide();
-        resetFields(["studentClass", "classArm"]);
-        updateStaffTypeVisibility();
-      } else if (role === "student") {
-        $(
-          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field"
-        ).hide();
-        resetFields(["staffType", "teaching", "nonTeaching"]);
-        $("#student-class-field").show();
-        updateStudentClassVisibility();
-      } else {
-        $(
-          "#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field"
-        ).hide();
-        resetFields([
-          "staffType",
-          "teaching",
-          "nonTeaching",
-          "studentClass",
-          "classArm",
-        ]);
-      }
-    }
-
-    function updateStaffTypeVisibility() {
-      const type = fields.staffType.val();
-      const $teachingField = $("#teaching-positions-field");
-      const $nonTeachingField = $("#non-teaching-positions-field");
-
-      switch (type) {
-        case "teaching":
-          $teachingField.show();
-          $nonTeachingField.hide();
-          fields.nonTeaching
-            .find("input[type=checkbox]")
-            .prop("checked", false);
-          break;
-        case "non_teaching":
-          $teachingField.hide();
-          $nonTeachingField.show();
-          fields.teaching.find("input[type=checkbox]").prop("checked", false);
-          break;
-        case "both":
-          $teachingField.show();
-          $nonTeachingField.show();
-          break;
-        default:
-          $teachingField.hide();
-          $nonTeachingField.hide();
-          fields.teaching.find("input[type=checkbox]").prop("checked", false);
-          fields.nonTeaching
-            .find("input[type=checkbox]")
-            .prop("checked", false);
-      }
-    }
-
-    function updateStudentClassVisibility() {
-      const show = !!fields.studentClass.val();
-      $("#class-arm-field").toggle(show);
-      if (!show) fields.classArm.val("");
-    }
-
-    function resetFields(keys) {
-      keys.forEach((key) => {
-        const field = fields[key];
-        if (field.is("select")) {
-          field.val("");
+        if (checked) {
+          selectedRecipients.add(id);
         } else {
-          field.find("input[type=checkbox]").prop("checked", false);
+          selectedRecipients.delete(id);
         }
       });
-    }
+      saveSelectedRecipients();
+    });
 
-    function saveSelectedRecipients() {
-      localStorage.setItem(
-        "selectedRecipients",
-        JSON.stringify([...selectedRecipients])
-      );
-    }
+    $communicationForm.on("submit", function (e) {
+      e.preventDefault(); // stop auto submit
 
-    function loadSelectedRecipients() {
-      selectedRecipients = new Set(
-        JSON.parse(localStorage.getItem("selectedRecipients") || "[]")
-      );
-    }
+      // 1. Validations
+      if (["staff", "branch_admin", "superadmin"].includes(userRole) && !fields.branch.val()) {
+        alert("Please select a Branch before submitting the form.");
+        return false;
+      }
 
-    function updateRecipientTableCheckboxStates() {
-      $(".recipient-checkbox").each(function () {
-        const id = $(this).val();
-        $(this).prop("checked", selectedRecipients.has(id));
-      });
-      $selectAll.prop(
-        "checked",
-        $(".recipient-checkbox:checked").length ===
-          $(".recipient-checkbox").length
-      );
-    }
+      if (["student", "parent"].includes(userRole) && !fields.role.val()) {
+        alert("Please select a Role before submitting the form.");
+        return false;
+      }
 
-    function loadRecipients() {
-      $.get(
-        "{% url 'get_filtered_users' %}",
-        $form.serialize(),
-        function (response) {
-          $recipientsTableBody.empty();
-          if (response.length === 0) {
-            $recipientsTableBody.append(
-              '<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>'
-            );
-            $selectAll.prop("checked", false);
-            return;
-          }
+      // 2. Inject filters
+      $communicationForm.find(".injected-filter-field").remove();
+      const filterFieldNames = ["branch", "role", "staff_type", "teaching_positions", "non_teaching_positions", "student_class", "class_arm"];
 
-          response.forEach((user, index) => {
-            const profilePic =
-              (user.profile_picture && user.profile_picture.url) ||
-              "/static/assets/img/profile-pic.png";
-            const isChecked = selectedRecipients.has(user.id.toString())
-              ? "checked"
-              : "";
-            const row = `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td class="text-center"><input type="checkbox" class="recipient-checkbox" value="${
-                user.id
-              }" ${isChecked}></td>
-              <td class="text-center">${index + 1}</td>
-              <td class="text-center"><img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;"></td>
-              <td class="text-center">${user.branch__name}</td>
-              <td>${user.first_name} ${user.last_name}</td>
-              <td>${user.email}</td>
-            </tr>`;
-            $recipientsTableBody.append(row);
+      filterFieldNames.forEach(function (name) {
+        const $fields = $("#target-group-form [name='" + name + "']");
+
+        if ($fields.length && $fields[0].type === "checkbox") {
+          // Case: Multiple checkboxes
+          $fields.filter(":checked").each(function () {
+            $("<input>", {
+              type: "hidden",
+              name: name,
+              value: $(this).val(),
+              class: "injected-filter-field"
+            }).appendTo($communicationForm);
           });
+        } else {
+          // Case: dropdowns (single or multiple select), or other fields
+          const val = $fields.val();
 
-          updateRecipientTableCheckboxStates();
+          if (Array.isArray(val)) {
+            // Handle multi-select dropdown (multiple values)
+            val.forEach(function (item) {
+              $("<input>", {
+                type: "hidden",
+                name: name,
+                value: item,
+                class: "injected-filter-field"
+              }).appendTo($communicationForm);
+            });
+          } else if (val !== undefined && val !== null && val !== "") {
+            // Single value input
+            $("<input>", {
+              type: "hidden",
+              name: name,
+              value: val,
+              class: "injected-filter-field"
+            }).appendTo($communicationForm);
+          }
         }
-      );
-    }
-
-    function handleDependencyChange() {
-      clearSelectedRecipients();
-      $selectAll.prop("checked", false);
-      saveFilters();
-      loadRecipients();
-    }
-
-    // === Event Bindings ===
-    fields.branch.on("change", () => {
-      updateBranchVisibility();
-      updateRoleVisibility();
-      handleDependencyChange();
-    });
-
-    fields.role.on("change", () => {
-      updateRoleVisibility();
-      handleDependencyChange();
-    });
-
-    fields.staffType.on("change", () => {
-      updateStaffTypeVisibility();
-      handleDependencyChange();
-    });
-
-    fields.studentClass.on("change", () => {
-      updateStudentClassVisibility();
-      handleDependencyChange();
-    });
-
-    $form
-      .find("select, input[type=checkbox]")
-      .not("#select-all-recipients")
-      .on("change", handleDependencyChange);
-
-    $recipientsTableBody.on("change", ".recipient-checkbox", function () {
-      const id = $(this).val();
-      $(this).is(":checked")
-        ? selectedRecipients.add(id)
-        : selectedRecipients.delete(id);
-      saveSelectedRecipients();
-      updateRecipientTableCheckboxStates();
-    });
-
-    $selectAll.on("change", function () {
-      const checked = this.checked;
-      $(".recipient-checkbox").each(function () {
-        $(this).prop("checked", checked);
-        const id = $(this).val();
-        checked ? selectedRecipients.add(id) : selectedRecipients.delete(id);
       });
-      saveSelectedRecipients();
-    });
 
-    $communicationForm.on("submit", function () {
-      // Clear filters and recipients on submit
-      clearFiltersStorage();
-      clearSelectedRecipients();
-      localStorage.removeItem("selectedRecipients");
-
-      // Remove any old hidden inputs
+      // 3. Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
+
+      console.log("Selected Recipients Array:", selectedRecipients);
 
       [...selectedRecipients].forEach(function (id) {
         $("<input>", {
           type: "hidden",
           name: "selected_recipients",
-          value: id,
+          value: id
         }).appendTo($communicationForm);
       });
+
+      // 4. Clear local storage filters immediately before submission
+      if (typeof clearFiltersStorage === "function") {
+        clearFiltersStorage();
+      }
+
+      // 4. Submit manually
+      $communicationForm.off("submit").submit();
+
     });
 
-    // === Attachments ===
+    // ===== Attachments =====
 
     const maxAttachments = 10;
     let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
 
     $("#add-attachment").on("click", function () {
-      if (totalForms >= maxAttachments)
-        return alert("Maximum attachments reached.");
+      if (totalForms >= maxAttachments) return alert("Maximum attachments reached.");
 
       const $newForm = $(".attachment-form:first").clone();
       $newForm.find("input, select, textarea").each(function () {
@@ -636,9 +743,7 @@
       });
 
       $newForm.find(".remove-attachment").remove();
-      $newForm.append(
-        '<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>'
-      );
+      $newForm.append('<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>');
       $("#attachments-container").append($newForm);
 
       totalForms++;
@@ -651,7 +756,9 @@
       $("#id_attachments-TOTAL_FORMS").val(totalForms);
     });
 
-    // === Initial Setup ===
+
+    // ===== Initial Load =====
+
     loadFilters();
     loadSelectedRecipients();
     updateBranchVisibility();
@@ -660,19 +767,25 @@
     updateStudentClassVisibility();
     loadRecipients();
   });
-</script>
+</script> 
 
 <script>
+  let recipientsTable;
+
   $(document).ready(function () {
-    $("#recipients-table").DataTable({
+    recipientsTable = $("#recipients-table").DataTable({
       columnDefs: [
         {
-          targets: 0, // First column (Select All / checkboxes)
+          targets: 0,
           orderable: false,
           searchable: false,
-        }
+        },
       ],
-      order: [[1, 'asc']] // Optional: set default sorting by serial number
+      order: [[1, "asc"]],
     });
   });
+  
+
 </script>
+
+{% endblock %}

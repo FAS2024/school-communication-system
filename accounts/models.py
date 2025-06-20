@@ -323,6 +323,8 @@ class Communication(models.Model):
     selected_recipient_ids = models.JSONField(blank=True, default=list)
     manual_emails = models.JSONField(blank=True, default=list)
     requires_response = models.BooleanField(default=False)
+    saved_filter_data = models.JSONField(blank=True, null=True)
+
     
     class Meta:
         indexes = [
