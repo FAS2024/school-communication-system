@@ -48,8 +48,13 @@ from .models import (
     CustomUser, StudentProfile, ParentProfile, StaffProfile,
     TeachingPosition, NonTeachingPosition, Branch, StudentClass, ClassArm,
     Communication, CommunicationAttachment, CommunicationComment,
-    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete,MessageReply
+    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete,MessageReply, ReplyAttachment
 )
+
+
+from django.views.decorators.http import require_http_methods
+MAX_FILE_COUNT = 5
+MAX_TOTAL_SIZE_MB = 20
 
 # Logger
 logger = logging.getLogger(__name__)
@@ -1313,8 +1318,40 @@ def communication_index(request):
     }
     return render(request, 'communications/communication_form.html', context)
 
+
+def validate_attachment_formset(formset):
+    total_size = 0
+    count = 0
+
+    for form in formset:
+        file = form.cleaned_data.get('file')
+        if file:
+            count += 1
+            size_mb = file.size / (1024 * 1024)
+
+            if size_mb > settings.MAX_SINGLE_ATTACHMENT_MB:
+                raise ValidationError(
+                    f"Each file must not exceed {settings.MAX_SINGLE_ATTACHMENT_MB}MB. "
+                    f"File '{file.name}' is {size_mb:.2f}MB."
+                )
+
+            total_size += size_mb
+
+    if count > settings.MAX_ATTACHMENT_COUNT:
+        raise ValidationError(
+            f"You can upload up to {settings.MAX_ATTACHMENT_COUNT} attachments only."
+        )
+
+    if total_size > settings.MAX_TOTAL_ATTACHMENT_MB:
+        raise ValidationError(
+            f"Total attachment size exceeds {settings.MAX_TOTAL_ATTACHMENT_MB}MB. "
+            f"Currently: {total_size:.2f}MB"
+        )
+
+
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
+
     def _get_allowed_recipients(self, target_group_form, user):
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
         return recipients.exclude(id=user.id)
@@ -1347,8 +1384,6 @@ class SendCommunicationView(View):
         self.request.session['communication_form_data'] = self.request.POST.dict()
         self.request.session['target_group_form_data'] = self.request.POST.dict()
         self.request.session['attachment_formset_data'] = self.request.POST.dict()
-        non_field_errors = communication_form.non_field_errors()
-        self.request.session['non_field_errors'] = [str(error) for error in non_field_errors]
         self.request.session['form_error'] = True
         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
         return redirect('communication_index')
@@ -1361,6 +1396,12 @@ class SendCommunicationView(View):
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+        try:
+            validate_attachment_formset(attachment_formset)
+        except ValidationError as e:
+            messages.error(request, str(e))
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
         if request.user.role in ['student', 'parent']:
@@ -1385,14 +1426,16 @@ class SendCommunicationView(View):
         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Save the communication
+        # Save the communication object
         communication = communication_form.save(commit=False)
         communication.sender = request.user
         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
+        communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
         communication.save()
+        
 
         # Save attachments
         for form in attachment_formset:
@@ -1400,7 +1443,150 @@ class SendCommunicationView(View):
                 form.instance.communication = communication
                 form.save()
 
-        # Immediate send
+        # Send immediately if not draft
+        if not communication.is_draft and communication.is_due():
+            send_communication_to_recipients(
+                communication=communication,
+                selected_recipients=selected_recipients,
+                manual_emails=valid_manual_emails
+            )
+            communication.sent = True
+            communication.sent_at = timezone.now()
+            communication.save()
+            messages.success(request, "Communication sent successfully.")
+            return redirect('communication_success')
+
+        elif communication.is_draft:
+            messages.success(request, "Communication saved as draft.")
+            return redirect('draft_messages')
+
+        else:
+            url = reverse('communication_scheduled')
+            query_string = urlencode({
+                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
+                'sent': 'false'
+            })
+            messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+            return redirect(f"{url}?{query_string}")
+
+@method_decorator([login_required, require_http_methods(["GET", "POST"])], name='dispatch')
+class EditDraftMessageView(View):
+
+    def get(self, request, pk):
+        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+        communication_form = CommunicationForm(instance=draft, user=request.user)
+        target_group = draft.target_groups.first()
+        target_group_form = CommunicationTargetGroupForm(instance=target_group, user=request.user)
+        attachment_formset = AttachmentFormSet(queryset=draft.attachments.all())
+
+        saved_filter_data = {}
+        if target_group:
+            saved_filter_data = {
+                'id_branch': str(target_group.branch.id) if target_group.branch else '',
+                'id_role': target_group.role or '',
+                'id_staff_type': target_group.staff_type or '',
+                'id_student_class': str(target_group.student_class.id) if target_group.student_class else '',
+                'id_class_arm': str(target_group.class_arm.id) if target_group.class_arm else '',
+                'id_teaching_positions': [str(pos.id) for pos in target_group.teaching_positions.all()],
+                'id_non_teaching_positions': [str(pos.id) for pos in target_group.non_teaching_positions.all()],
+            }
+
+        return render(request, 'communications/edit_draft.html', {
+            'communication_form': communication_form,
+            'target_group_form': target_group_form,
+            'attachment_formset': attachment_formset,
+            'draft': draft,
+            'saved_filter_data': saved_filter_data,
+            'selected_recipient_ids': draft.selected_recipient_ids or [],
+        })
+
+    def post(self, request, pk):
+        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+        communication_form = CommunicationForm(request.POST, request.FILES, instance=draft, user=request.user)
+        target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
+        attachment_formset = AttachmentFormSet(request.POST, request.FILES, queryset=draft.attachments.all())
+
+        if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
+            messages.error(request, "Please correct the form errors below.")
+            return render(request, 'communications/edit_draft.html', {
+                'communication_form': communication_form,
+                'target_group_form': target_group_form,
+                'attachment_formset': attachment_formset,
+                'draft': draft,
+            })
+
+        try:
+            validate_attachment_formset(attachment_formset)
+        except ValidationError as e:
+            messages.error(request, str(e))
+            return render(request, 'communications/edit_draft.html', {
+                'communication_form': communication_form,
+                'target_group_form': target_group_form,
+                'attachment_formset': attachment_formset,
+                'draft': draft,
+            })
+
+        if request.user.role in ['student', 'parent']:
+            branch = request.user.branch
+            target_group_form.cleaned_data['branch'] = branch
+            if hasattr(target_group_form, 'instance'):
+                target_group_form.instance.branch = branch
+
+        allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
+        selected_ids = request.POST.getlist('selected_recipients')
+        selected_recipients = allowed_recipients.filter(id__in=selected_ids)
+
+        manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+        valid_manual_emails = []
+        for email in manual_emails_raw.split(','):
+            email = email.strip().lower()
+            if not email:
+                continue
+            try:
+                validate_email(email)
+                valid_manual_emails.append(email)
+            except ValidationError:
+                messages.warning(request, f"Invalid email skipped: {email}")
+
+        selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
+        duplicates = selected_emails.intersection(valid_manual_emails)
+        if duplicates:
+            communication_form.add_error(None, f"Duplicate emails: {', '.join(duplicates)}")
+            return render(request, 'communications/edit_draft.html', {
+                'communication_form': communication_form,
+                'target_group_form': target_group_form,
+                'attachment_formset': attachment_formset,
+                'draft': draft,
+            })
+
+        if not selected_recipients.exists() and not valid_manual_emails:
+            communication_form.add_error(None, "Select at least one recipient or provide valid email.")
+            return render(request, 'communications/edit_draft.html', {
+                'communication_form': communication_form,
+                'target_group_form': target_group_form,
+                'attachment_formset': attachment_formset,
+                'draft': draft,
+            })
+
+        # Update the draft to a real communication
+        communication = communication_form.save(commit=False)
+        communication.sender = request.user
+        communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
+        communication.sent = False
+        communication.is_draft = False  # 🔥 Mark as no longer a draft
+        communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
+        communication.manual_emails = valid_manual_emails
+        communication.save()
+        print(f"Editing Communication ID: {communication.pk}")
+
+
+
+        # Save attachments
+        for form in attachment_formset:
+            if form.cleaned_data.get('file'):
+                form.instance.communication = communication
+                form.save()
+
         if communication.is_due():
             send_communication_to_recipients(
                 communication=communication,
@@ -1411,17 +1597,16 @@ class SendCommunicationView(View):
             communication.sent_at = timezone.now()
             communication.save()
 
-            messages.success(request, "Communication sent successfully.")
+            messages.success(request, "Message sent successfully.")
             return redirect('communication_success')
 
         else:
-            url = reverse('communication_scheduled')
             query_string = urlencode({
-                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),  # ← FIXED
+                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
                 'sent': 'false'
             })
-            messages.success(request, f"Communication scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
-            return redirect(f"{url}?{query_string}")
+            messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+            return redirect(f"{reverse('communication_scheduled')}?{query_string}")
 
 
 def communication_success(request):
@@ -1491,6 +1676,21 @@ def inbox_view(request):
         return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
 
 
+# @login_required
+# def read_message(request, pk):
+#     recipient_entry = get_object_or_404(
+#         CommunicationRecipient,
+#         pk=pk,
+#         recipient=request.user,
+#         deleted=False
+#     )
+#     recipient_entry.mark_as_read()
+
+#     return render(request, 'communications/message_detail.html', {
+#         'message': recipient_entry.communication,
+#         'recipient_entry': recipient_entry
+#     })
+
 @login_required
 def read_message(request, pk):
     recipient_entry = get_object_or_404(
@@ -1503,7 +1703,9 @@ def read_message(request, pk):
 
     return render(request, 'communications/message_detail.html', {
         'message': recipient_entry.communication,
-        'recipient_entry': recipient_entry
+        'recipient_entry': recipient_entry,
+        'MAX_ATTACHMENT_COUNT': settings.MAX_ATTACHMENT_COUNT,
+        'MAX_SINGLE_ATTACHMENT_MB': settings.MAX_SINGLE_ATTACHMENT_MB,
     })
 
 
@@ -1669,6 +1871,35 @@ def delete_all_sent_messages(request):
     return redirect('outbox')
 
 
+# @login_required
+# def submit_reply(request, recipient_id):
+#     recipient_entry = get_object_or_404(
+#         CommunicationRecipient,
+#         pk=recipient_id,
+#         recipient=request.user,
+#         deleted=False,
+#         requires_response=True
+#     )
+
+#     if request.method == 'POST':
+#         reply_text = request.POST.get('reply', '').strip()
+#         if reply_text:
+#             # Save actual reply
+#             MessageReply.objects.create(
+#                 recipient_entry=recipient_entry,
+#                 responder=request.user,
+#                 reply_text=reply_text
+#             )
+
+#             recipient_entry.has_responded = True
+#             recipient_entry.save()
+#             messages.success(request, "Your reply has been submitted.")
+#         else:
+#             messages.error(request, "Reply cannot be empty.")
+
+#     return redirect('inbox')
+
+
 @login_required
 def submit_reply(request, recipient_id):
     recipient_entry = get_object_or_404(
@@ -1681,18 +1912,112 @@ def submit_reply(request, recipient_id):
 
     if request.method == 'POST':
         reply_text = request.POST.get('reply', '').strip()
-        if reply_text:
-            # Save actual reply
-            MessageReply.objects.create(
-                recipient_entry=recipient_entry,
-                responder=request.user,
-                reply_text=reply_text
-            )
+        files = request.FILES.getlist('files')  # Multiple files allowed
 
-            recipient_entry.has_responded = True
-            recipient_entry.save()
-            messages.success(request, "Your reply has been submitted.")
-        else:
+        if not reply_text and not files:
             messages.error(request, "Reply cannot be empty.")
+            return redirect('inbox')
+
+        # Validate attachment count
+        if len(files) > settings.MAX_ATTACHMENT_COUNT:
+            messages.error(request, f"Maximum {settings.MAX_ATTACHMENT_COUNT} attachments allowed.")
+            return redirect('inbox')
+
+        # Validate total size
+        total_size = sum(f.size for f in files)
+        if total_size > settings.MAX_TOTAL_ATTACHMENT_MB * 1024 * 1024:
+            messages.error(request, f"Total file size must not exceed {settings.MAX_TOTAL_ATTACHMENT_MB}MB.")
+            return redirect('inbox')
+
+        # Validate individual files
+        for f in files:
+            if f.size > settings.MAX_SINGLE_ATTACHMENT_MB * 1024 * 1024:
+                messages.error(request, f"File '{f.name}' exceeds {settings.MAX_SINGLE_ATTACHMENT_MB}MB.")
+                return redirect('inbox')
+
+        # Save reply and attachments safely
+        try:
+            with transaction.atomic():
+                reply = MessageReply.objects.create(
+                    recipient_entry=recipient_entry,
+                    responder=request.user,
+                    reply_text=reply_text,
+                )
+
+                for f in files:
+                    ReplyAttachment.objects.create(reply=reply, file=f)
+
+                recipient_entry.has_responded = True
+                recipient_entry.save()
+
+                messages.success(request, "Your reply has been submitted.")
+        except Exception as e:
+            messages.error(request, f"An error occurred while saving your reply: {str(e)}")
+            return redirect('inbox')
 
     return redirect('inbox')
+
+
+@login_required(login_url='login')
+@require_GET
+def scheduled_messages_view(request):
+    try:
+        # Allow only specific roles to access scheduled messages
+        allowed_roles = ['superadmin', 'branch_admin', 'staff']
+        user_role = getattr(request.user, 'role', '').lower()
+
+        if user_role not in allowed_roles:
+            logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access scheduled messages.")
+            return HttpResponseForbidden("You do not have permission to view scheduled messages.")
+
+        # Fetch scheduled messages not sent yet and not drafts
+        scheduled_messages = Communication.objects.filter(
+            sender=request.user,
+            sent=False,
+            is_draft=False,
+        ).annotate(
+            display_time=Coalesce('scheduled_time', 'created_at')
+        ).order_by(F('display_time').asc())
+
+        return render(request, 'communications/scheduled.html', {
+            'scheduled_messages': scheduled_messages
+        })
+
+    except Exception as e:
+        logger.error(f"Error loading scheduled messages for user {request.user.pk}: {e}", exc_info=True)
+        return HttpResponseServerError("An error occurred while loading scheduled messages.")
+
+
+@login_required(login_url='login')
+@require_GET
+def draft_messages_view(request):
+    try:
+        draft_messages = Communication.objects.filter(
+            sender=request.user,
+            is_draft=True,
+            sent=False
+        ).order_by('-created_at')
+
+        return render(request, 'communications/drafts.html', {
+            'draft_messages': draft_messages
+        })
+
+    except Exception as e:
+        logger.error(f"[Draft Messages] Error loading drafts for user {request.user.pk}: {e}", exc_info=True)
+        return HttpResponseServerError("An error occurred while loading your draft messages.")
+
+
+@require_POST
+@login_required
+def delete_draft_message(request, pk):
+    draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+    draft.delete()
+    messages.success(request, "Draft message deleted successfully.")
+    return redirect('draft_messages')  # Make sure this name matches your drafts page URL
+
+
+@method_decorator(login_required, name='dispatch')
+class DeleteAllDraftMessagesView(View):
+    def post(self, request):
+        Communication.objects.filter(sender=request.user, is_draft=True, sent=False).delete()
+        return redirect('draft_messages')  # or wherever you want to go after deletion

@@ -84,10 +84,10 @@
           <a class="nav-link" href="#">Received from School (Inbox)</a>
         </li> {% endcomment %}
         <li class="nav-item"><a class="nav-link" href="#">Important</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Sent(Outbox)</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Inbox</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Scheduled</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">Drafts</a></li>
+        <li class="nav-item"><a href="{% url 'outbox' %}">Sent(Outbox)</a></li>
+        <li class="nav-item"><a href="{% url 'inbox' %}">Inbox</a></li>
+        <li class="nav-item"><a href="{% url 'scheduled_messages' %}">Scheduled</a></li>
+        <li class="nav-item"><a href="{% url 'draft_messages' %}">Drafts</a></li>
         <li class="nav-item"><a class="nav-link" href="#">Trash</a></li>
       </ul>
     </div>

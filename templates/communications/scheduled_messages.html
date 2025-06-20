@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">⏰ Scheduled Messages</h2>
+    <div>
+      <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm me-2">
+        <i class="fas fa-edit me-1"></i> Compose
+      </a>
+    </div>
+  </div>
+
+  {% if scheduled_messages %}
+  <div class="card shadow rounded-4">
+    <div class="card-body p-0">
+      <div class="position-relative">
+        <div class="overflow-auto mb-0" style="overflow-y: hidden; max-width: 100%;" id="top-scroll">
+          <div style="width: max-content; visibility: hidden; height: 1px;"></div>
+        </div>
+
+        <div class="overflow-auto" style="overflow-y: hidden;" id="bottom-scroll">
+          <table id="scheduled-table" class="table table-striped align-middle mb-0" style="min-width: 1000px;">
+            <thead class="table-light">
+              <tr class="text-center">
+                <th>S/N</th>
+                <th>Title & Message</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Scheduled For</th>
+                <th>Created At</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in scheduled_messages %}
+              <tr>
+                <td class="text-center"></td>
+                <td>
+                  <span class="fw-semibold text-dark">{{ item.title|default:"(Untitled)" }}</span>
+                  <div class="small text-muted">{{ item.short_body }}</div>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-warning text-dark">Scheduled</span>
+                </td>
+                <td class="text-center">
+                  <span class="badge bg-info text-dark text-capitalize">{{ item.message_type }}</span>
+                </td>
+                <td class="text-center">{{ item.scheduled_time|date:"M d, Y h:i A" }}</td>
+                <td class="text-center">{{ item.created_at|date:"M d, Y h:i A" }}</td>
+                <td class="text-center">
+                  <a href="{% url 'edit_message' item.id %}" class="btn btn-sm btn-outline-primary" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <form method="post" action="{% url 'delete_scheduled_message' item.id %}" class="d-inline delete-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info text-center mt-4">No scheduled messages found.</div>
+  {% endif %}
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  $(document).ready(function () {
+    const table = $('#scheduled-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[4, 'asc']],
+      language: {
+        searchPlaceholder: "🔍 Search scheduled messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 6, orderable: false }
+      ],
+      drawCallback: function (settings) {
+        const api = this.api();
+        api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+          cell.innerHTML = i + 1;
+        });
+      }
+    });
+
+    $('.delete-form').on('submit', function (e) {
+      e.preventDefault();
+      const form = this;
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This scheduled message will be deleted.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

@@ -90,11 +90,34 @@
         </h6>
 
         {% if not recipient_entry.has_responded %}
-          <form method="post" action="{% url 'submit_reply' recipient_entry.id %}" class="mb-4" id="reply-form">
+          <form method="post" action="{% url 'submit_reply' recipient_entry.id %}" enctype="multipart/form-data" class="mb-4" id="reply-form">
             {% csrf_token %}
             <div class="mb-3">
               <textarea name="reply" rows="4" class="form-control shadow-sm" placeholder="Write your reply here..." required></textarea>
             </div>
+
+            <!-- File Upload Input -->
+            <div class="form-group mb-3">
+              <label for="file-upload">Attach files (max {{ MAX_ATTACHMENT_COUNT }}, each up to {{ MAX_SINGLE_ATTACHMENT_MB }}MB):</label>
+              <input
+                type="file"
+                id="file-upload"
+                name="files"
+                multiple
+                accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                class="form-control"
+              >
+            </div>
+
+            <!-- File Previews -->
+            <div id="file-preview" class="mb-3"></div>
+
+            <!-- Upload spinner -->
+            <div id="upload-spinner" style="display:none; margin-top: 10px;">
+              <img src="{% static 'images/spinner.gif' %}" alt="Uploading..." width="40" />
+              Uploading files, please wait...
+            </div>
+
             <div class="d-flex justify-content-start gap-3">
               <button type="submit" class="btn btn-success d-flex align-items-center gap-2" id="send-reply-btn">
                 <i class="fas fa-paper-plane"></i> Send Reply
@@ -115,6 +138,13 @@
           <strong>Your Reply:</strong>
           <p class="mb-1">{{ reply.reply_text }}</p>
           <small class="text-muted">Replied on: {{ reply.replied_at|date:"D, M d, Y - h:i A" }}</small>
+          {% if reply.file %}
+            <p>
+              <a href="{{ reply.file.url }}" target="_blank" class="text-decoration-none">
+                <i class="fas fa-paperclip"></i> Download attached file
+              </a>
+            </p>
+          {% endif %}
         </div>
         {% endfor %}
 
@@ -140,7 +170,6 @@
         </a>
       </div>
       {% endif %}
-
 
     </div>
   </div>
@@ -174,6 +203,52 @@
     // REPLY CONFIRMATION (only if not empty)
     const replyForm = document.getElementById("reply-form");
     const replyBtn = document.getElementById("send-reply-btn");
+    const fileInput = document.getElementById('file-upload');
+    const preview = document.getElementById('file-preview');
+    const spinner = document.getElementById('upload-spinner');
+    const maxFiles = {{ MAX_ATTACHMENT_COUNT }};
+    const maxSizeMB = {{ MAX_SINGLE_ATTACHMENT_MB }};
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain'
+    ];
+
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        preview.innerHTML = '';
+        const files = fileInput.files;
+
+        if(files.length > maxFiles) {
+          alert(`You can only upload up to ${maxFiles} files.`);
+          fileInput.value = ''; // reset
+          return;
+        }
+
+        for(let file of files) {
+          if(!allowedTypes.includes(file.type)) {
+            alert(`File type not allowed: ${file.name}`);
+            fileInput.value = ''; // reset
+            preview.innerHTML = '';
+            return;
+          }
+          if(file.size > maxSizeMB * 1024 * 1024) {
+            alert(`File "${file.name}" exceeds size limit of ${maxSizeMB}MB.`);
+            fileInput.value = '';
+            preview.innerHTML = '';
+            return;
+          }
+          const fileElement = document.createElement('div');
+          fileElement.textContent = `${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+          preview.appendChild(fileElement);
+        }
+      });
+    }
 
     if (replyForm && replyBtn) {
       replyBtn.addEventListener("click", function (e) {
@@ -182,8 +257,7 @@
         const replyText = replyForm.querySelector('textarea[name="reply"]').value.trim();
 
         if (!replyText) {
-          // Let browser handle required field if empty
-          replyForm.reportValidity();  // Shows browser native validation message
+          replyForm.reportValidity();
           return;
         }
 
@@ -198,6 +272,8 @@
           reverseButtons: true
         }).then(result => {
           if (result.isConfirmed) {
+            spinner.style.display = 'block';
+            replyBtn.disabled = true;
             replyForm.submit();
           }
         });
@@ -207,6 +283,3 @@
 </script>
 
 {% endblock %}
-
-
-{% comment %} communication.recipients.filter(has_responded=True).count() {% endcomment %}

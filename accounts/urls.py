@@ -108,8 +108,10 @@ urlpatterns = [
     path('communications/inbox/delete-all/', views.delete_all_inbox_messages, name='delete_all_inbox_messages'),
     path('communications/sent/delete-all/', views.delete_all_sent_messages, name='delete_all_outbox_messages'),
     path('communications/reply/<int:recipient_id>/', views.submit_reply, name='submit_reply'),
-
-
-
+    path('communications/scheduled/', views.scheduled_messages_view, name='scheduled_messages'),
+    path('communications/drafts/', views.draft_messages_view, name='draft_messages'),
+    path('communications/drafts/<int:pk>/edit/', views.EditDraftMessageView.as_view(), name='edit_draft_message'),
+    path('communications/drafts/<int:pk>/delete/', views.delete_draft_message, name='delete_draft_message'),
+    path('communications/drafts/delete_all/', views.DeleteAllDraftMessagesView.as_view(), name='delete_all_draft_messages'),
 ]
 

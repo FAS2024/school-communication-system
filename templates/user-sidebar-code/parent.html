@@ -94,10 +94,10 @@
     <li><a href="">Sent to Parent(OUTBOX)</a></li>
     <li><a href="">Received from Parent(INBOX)</a></li> {% endcomment %}
     <li><a href="#">Important</a></li>
-    <li><a href="#">Sent(Outbox)</a></li>
-    <li><a href="#">Inbox</a></li>
-    <li><a href="#">Scheduled</a></li>
-    <li><a href="#">Drafts</a></li>
+    <li><a href="{% url 'outbox' %}">Sent(Outbox)</a></li>
+    <li><a href="{% url 'inbox' %}">Inbox</a></li>
+    <li><a href="{% url 'scheduled_messages' %}">Scheduled</a></li>
+    <li><a href="{% url 'draft_messages' %}">Drafts</a></li>
     <li><a href="#">Trash</a></li>
   </ul>
 </li>

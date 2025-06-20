@@ -18,6 +18,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 # Local App Imports
 from accounts.utils import generate_profile_number, get_prefix_for_user
+from django.utils.html import strip_tags
 
 
 class StudentClass(models.Model):
@@ -298,6 +299,7 @@ class StaffProfile(models.Model):
 
         super().save(*args, **kwargs)
 
+
 class Communication(models.Model):
     MESSAGE_TYPE_CHOICES = [
         ('announcement', 'Announcement'),
@@ -321,9 +323,16 @@ class Communication(models.Model):
     selected_recipient_ids = models.JSONField(blank=True, default=list)
     manual_emails = models.JSONField(blank=True, default=list)
     requires_response = models.BooleanField(default=False)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=["sender", "is_draft"]),
+            models.Index(fields=["sent", "scheduled_time"]),
+        ]
 
     def short_body(self):
-        return self.body[:75] + "..." if len(self.body) > 75 else self.body
+        clean_text = strip_tags(self.body)
+        return clean_text[:75] + "..." if len(clean_text) > 75 else clean_text
 
     def is_due(self):
         return self.scheduled_time is None or self.scheduled_time <= timezone.now()
@@ -460,7 +469,6 @@ class SentMessageDelete(models.Model):
     def __str__(self):
         return f"Sent message {self.communication.id} deleted by {self.sender.username}"
 
-
 class MessageReply(models.Model):
     recipient_entry = models.ForeignKey(CommunicationRecipient, on_delete=models.CASCADE, related_name='replies')
     responder = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
@@ -469,3 +477,16 @@ class MessageReply(models.Model):
 
     def __str__(self):
         return f"Reply by {self.responder.username} on {self.recipient_entry.communication.title or 'Untitled'}"
+
+
+class ReplyAttachment(models.Model):
+    reply = models.ForeignKey(MessageReply, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='reply_attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name
+
+    @property
+    def basename(self):
+        return os.path.basename(self.file.name)
