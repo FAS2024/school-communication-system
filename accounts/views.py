@@ -43,7 +43,7 @@ from .forms import (
     BranchForm, StudentCreationForm, StudentClassForm, ClassArmForm,
     ParentCreationForm, StudentProfileForm, CommunicationForm,
     CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet,
-    CommunicationAttachmentModelForm
+    CommunicationAttachmentModelForm,ReplyAttachmentFormSet  
     
 )
 from .models import (
@@ -54,6 +54,7 @@ from .models import (
 )
 
 
+from django.http import QueryDict
 from django.views.decorators.http import require_http_methods
 MAX_FILE_COUNT = 5
 MAX_TOTAL_SIZE_MB = 20
@@ -1285,14 +1286,21 @@ def get_filtered_users(request):
         return JsonResponse(list(users), safe=False)
     
     # Always show all form errors (including non-field errors) in DEBUG
+    # if settings.DEBUG:
+    #     error_response = {
+    #         'field_errors': form.errors,
+    #         'non_field_errors': form.non_field_errors(),
+    #     }
+    #     return JsonResponse({'errors': error_response}, status=400)
+
     if settings.DEBUG:
-        error_response = {
-            'field_errors': form.errors,
+        return JsonResponse({
+            'errors': form.errors,
             'non_field_errors': form.non_field_errors(),
-        }
-        return JsonResponse({'errors': error_response}, status=400)
+        }, status=400)
 
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
+
 
 
 @login_required
@@ -1301,26 +1309,54 @@ def communication_index(request):
     target_group_data = request.session.pop('target_group_form_data', None)
     attachment_data = request.session.pop('attachment_formset_data', None)
     non_field_errors = request.session.pop('non_field_errors', None)
+    form_error = request.session.pop('form_error', False)
 
     communication_form = CommunicationForm(data=communication_data, user=request.user) if communication_data else CommunicationForm(user=request.user)
-    target_group_form = CommunicationTargetGroupForm(data=target_group_data, user=request.user) if target_group_data else CommunicationTargetGroupForm(user=request.user)
-    attachment_formset = AttachmentFormSet(data=attachment_data) if attachment_data else AttachmentFormSet()
 
-    # Re-inject non-field errors if available
+    # 🛠 Clean teaching_positions & non_teaching_positions if data exists
+    if target_group_data:
+        if not isinstance(target_group_data, QueryDict):
+            target_group_data = QueryDict('', mutable=True).copy()
+        else:
+            target_group_data = target_group_data.copy()
+
+        for name in ["teaching_positions", "non_teaching_positions"]:
+            if name in target_group_data:
+                raw_values = target_group_data.getlist(name)
+                clean_ids = []
+                for val in raw_values:
+                    try:
+                        clean_ids.append(str(int(val)))
+                    except (ValueError, TypeError):
+                        continue
+                target_group_data.setlist(name, clean_ids)
+
+    target_group_form = CommunicationTargetGroupForm(
+        data=target_group_data or communication_data or None,
+        user=request.user
+    )
+
+    if attachment_data:
+        qd = QueryDict('', mutable=True)
+        for k, v in attachment_data.items():
+            qd.setlist(k, v if isinstance(v, list) else [v])
+        attachment_formset = AttachmentFormSet(data=qd)
+    else:
+        attachment_formset = AttachmentFormSet()
+
     if non_field_errors:
-        for err_msg in non_field_errors:
-            communication_form.add_error(None, err_msg)
+        for msg in non_field_errors:
+            communication_form.add_error(None, msg)
 
-    context = {
+    return render(request, 'communications/communication_form.html', {
         'communication_form': communication_form,
         'target_group_form': target_group_form,
         'attachment_formset': attachment_formset,
+        'form_error': form_error,
         'user_role': request.user.role,
         'user_branch_id': request.user.branch.id if request.user.branch else '',
-    }
-    return render(request, 'communications/communication_form.html', context)
-
-
+    })
+    
 def validate_attachment_formset(formset):
     total_size = 0
     count = 0
@@ -1351,8 +1387,174 @@ def validate_attachment_formset(formset):
         )
 
 
+# @method_decorator([login_required, require_POST], name='dispatch')
+# class SendCommunicationView(View):
+
+#     def flatten_querydict(self, qd: QueryDict):
+#         return {k: v[0] if len(v) == 1 else v for k, v in qd.lists()}
+
+#     def _get_allowed_recipients(self, target_group_form, user):
+#         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
+#         return recipients.exclude(id=user.id)
+
+#     def _get_selected_recipients(self, request, allowed_recipients):
+#         selected_ids = request.POST.getlist('selected_recipients')
+#         return allowed_recipients.filter(id__in=selected_ids)
+
+#     def _parse_manual_emails(self, email_string):
+#         emails = [email.strip() for email in email_string.split(',') if email.strip()]
+#         valid_emails = []
+#         for email in emails:
+#             try:
+#                 validate_email(email)
+#                 valid_emails.append(email.lower())
+#             except ValidationError:
+#                 messages.warning(self.request, f"Invalid manual email skipped: {email}")
+#         return valid_emails
+
+#     def _check_for_duplicate_emails(self, selected_recipients, manual_emails, form):
+#         if selected_recipients.exists():
+#             selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
+#             duplicates = selected_emails.intersection(set(manual_emails))
+#             if duplicates:
+#                 form.add_error(None, f"Duplicate manual email(s): {', '.join(duplicates)}")
+#                 return False
+#         return True
+
+#     def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
+#         def flatten_querydict(qd):
+#             return {k: qd.getlist(k) if len(qd.getlist(k)) > 1 else qd.get(k) for k in qd}
+
+#         post_data = flatten_querydict(self.request.POST)
+
+#         self.request.session['communication_form_data'] = {
+#             k: v for k, v in post_data.items() if k in communication_form.fields
+#         }
+#         self.request.session['target_group_form_data'] = {
+#             k: v for k, v in post_data.items() if k in target_group_form.fields
+#         }
+#         self.request.session['attachment_formset_data'] = post_data
+#         self.request.session['non_field_errors'] = list(communication_form.non_field_errors())
+#         self.request.session['form_error'] = True
+
+#         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+#         return redirect('communication_index')
+
+#     def post(self, request):
+#         self.request = request
+
+#         communication_form = CommunicationForm(request.POST, user=request.user)
+#         target_group_form = CommunicationTargetGroupForm(request.GET, user=request.user)
+#         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
+
+#         if not communication_form.is_valid() or not attachment_formset.is_valid():
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         try:
+#             validate_attachment_formset(attachment_formset)
+#         except ValidationError as e:
+#             messages.error(request, str(e))
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         def clean_id_list(raw_list):
+#             return [item for item in raw_list if item.strip()]
+
+#         saved_filter_data = {
+#             'id_branch': request.POST.get('saved_branch', ''),
+#             'id_role': request.POST.get('saved_role', ''),
+#             'id_staff_type': request.POST.get('saved_staff_type', ''),
+#             'id_student_class': request.POST.get('saved_student_class', ''),
+#             'id_class_arm': request.POST.get('saved_class_arm', ''),
+#             'id_teaching_positions': clean_id_list(request.POST.get('saved_teaching_positions', '').split(',')),
+#             'id_non_teaching_positions': clean_id_list(request.POST.get('saved_non_teaching_positions', '').split(',')),
+#         }
+
+#         if request.user.role in ['student', 'parent']:
+#             branch = request.user.branch
+#         else:
+#             if not saved_filter_data['id_branch']:
+#                 communication_form.add_error(None, "Please select a Branch.")
+#                 return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+#             branch = Branch.objects.filter(id=saved_filter_data['id_branch']).first()
+#             if not branch:
+#                 communication_form.add_error(None, "Invalid Branch selected.")
+#                 return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         target_group_form.cleaned_data = {
+#             'branch': branch,
+#             'role': saved_filter_data['id_role'],
+#             'staff_type': saved_filter_data['id_staff_type'],
+#             'student_class': StudentClass.objects.filter(id=saved_filter_data['id_student_class']).first() if saved_filter_data['id_student_class'] else None,
+#             'class_arm': ClassArm.objects.filter(id=saved_filter_data['id_class_arm']).first() if saved_filter_data['id_class_arm'] else None,
+#             'teaching_positions': TeachingPosition.objects.filter(id__in=saved_filter_data['id_teaching_positions']),
+#             'non_teaching_positions': NonTeachingPosition.objects.filter(id__in=saved_filter_data['id_non_teaching_positions']),
+#         }
+
+#         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
+#         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
+#         # selected_recipients = allowed_recipients.filter(
+#         #     id__in=request.POST.getlist('selected_recipients')
+#         # )
+
+
+#         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+#         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
+
+#         if not selected_recipients.exists() and not valid_manual_emails:
+#             error_msg = "Please select at least one recipient."
+#             if request.user.role not in ['student', 'parent']:
+#                 error_msg += " Or provide a valid manual email."
+#             communication_form.add_error(None, error_msg)
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+#         communication = communication_form.save(commit=False)
+#         communication.sender = request.user
+#         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
+#         communication.sent = False
+#         communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
+#         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
+#         communication.manual_emails = valid_manual_emails
+#         communication.saved_filter_data = saved_filter_data
+#         communication.save()
+
+#         for form in attachment_formset:
+#             if form.cleaned_data.get('file'):
+#                 form.instance.communication = communication
+#                 form.save()
+
+#         if not communication.is_draft and communication.is_due():
+#             send_communication_to_recipients(
+#                 communication=communication,
+#                 selected_recipients=selected_recipients,
+#                 manual_emails=valid_manual_emails
+#             )
+#             communication.sent = True
+#             communication.sent_at = timezone.now()
+#             communication.save()
+#             messages.success(request, "Communication sent successfully.")
+#             return redirect('communication_success')
+
+#         elif communication.is_draft:
+#             messages.success(request, "Communication saved as draft.")
+#             return redirect('draft_messages')
+
+#         else:
+#             url = reverse('communication_scheduled')
+#             query_string = urlencode({
+#                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
+#                 'sent': 'false'
+#             })
+#             messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+#             return redirect(f"{url}?{query_string}")
+
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
+
+    def flatten_querydict(self, qd: QueryDict):
+        return {k: v[0] if len(v) == 1 else v for k, v in qd.lists()}
 
     def _get_allowed_recipients(self, target_group_form, user):
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
@@ -1383,10 +1585,21 @@ class SendCommunicationView(View):
         return True
 
     def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
-        self.request.session['communication_form_data'] = self.request.POST.dict()
-        self.request.session['target_group_form_data'] = self.request.POST.dict()
-        self.request.session['attachment_formset_data'] = self.request.POST.dict()
+        def flatten_querydict(qd):
+            return {k: qd.getlist(k) if len(qd.getlist(k)) > 1 else qd.get(k) for k in qd}
+
+        post_data = flatten_querydict(self.request.POST)
+
+        self.request.session['communication_form_data'] = {
+            k: v for k, v in post_data.items() if k in communication_form.fields
+        }
+        self.request.session['target_group_form_data'] = {
+            k: v for k, v in post_data.items() if k in target_group_form.fields
+        }
+        self.request.session['attachment_formset_data'] = post_data
+        self.request.session['non_field_errors'] = list(communication_form.non_field_errors())
         self.request.session['form_error'] = True
+
         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
         return redirect('communication_index')
 
@@ -1394,10 +1607,41 @@ class SendCommunicationView(View):
         self.request = request
 
         communication_form = CommunicationForm(request.POST, user=request.user)
-        target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
-        if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
+        # Sanitize and ensure only valid numeric IDs are passed
+        def clean_id_list(raw_list):
+            clean = []
+            for item in raw_list:
+                try:
+                    clean.append(str(int(item.strip())))
+                except (ValueError, TypeError):
+                    continue
+            return clean
+
+        saved_filter_data = {
+            'branch': request.user.branch.id if request.user.role in ['student', 'parent'] else request.POST.get('saved_branch', ''),
+            'role': request.POST.get('saved_role', ''),
+            'staff_type': request.POST.get('saved_staff_type', ''),
+            'student_class': request.POST.get('saved_student_class', ''),
+            'class_arm': request.POST.get('saved_class_arm', ''),
+            'teaching_positions': clean_id_list(request.POST.get('saved_teaching_positions', '').split(',')),
+            'non_teaching_positions': clean_id_list(request.POST.get('saved_non_teaching_positions', '').split(',')),
+        }
+
+        from django.http import QueryDict
+        form_data = QueryDict('', mutable=True)
+        for key in ['branch', 'role', 'staff_type', 'student_class', 'class_arm']:
+            form_data[key] = saved_filter_data[key]
+        form_data.setlist('teaching_positions', saved_filter_data['teaching_positions'])
+        form_data.setlist('non_teaching_positions', saved_filter_data['non_teaching_positions'])
+
+        target_group_form = CommunicationTargetGroupForm(data=form_data, user=request.user)
+        if not target_group_form.is_valid():
+            communication_form.add_error(None, "Invalid target group filters.")
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
+        if not communication_form.is_valid() or not attachment_formset.is_valid():
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
         try:
@@ -1405,12 +1649,6 @@ class SendCommunicationView(View):
         except ValidationError as e:
             messages.error(request, str(e))
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
-
-        if request.user.role in ['student', 'parent']:
-            branch = request.user.branch
-            target_group_form.cleaned_data['branch'] = branch
-            if hasattr(target_group_form, 'instance'):
-                target_group_form.instance.branch = branch
 
         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
@@ -1428,7 +1666,6 @@ class SendCommunicationView(View):
         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Save the communication object
         communication = communication_form.save(commit=False)
         communication.sender = request.user
         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
@@ -1436,16 +1673,16 @@ class SendCommunicationView(View):
         communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
+        communication.saved_filter_data = {
+            f"id_{k}": v for k, v in saved_filter_data.items()
+        }
         communication.save()
-        
 
-        # Save attachments
         for form in attachment_formset:
             if form.cleaned_data.get('file'):
                 form.instance.communication = communication
                 form.save()
 
-        # Send immediately if not draft
         if not communication.is_draft and communication.is_due():
             send_communication_to_recipients(
                 communication=communication,
@@ -1471,173 +1708,163 @@ class SendCommunicationView(View):
             messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
             return redirect(f"{url}?{query_string}")
 
+
 @method_decorator([login_required, require_http_methods(["GET", "POST"])], name='dispatch')
 class EditDraftMessageView(View):
 
+    def _clean_id_list(self, raw_list):
+        cleaned = []
+        for item in raw_list:
+            try:
+                cleaned.append(str(int(item.strip())))
+            except (ValueError, TypeError):
+                continue
+        return cleaned
+
+    def _render_with_errors(self, communication_form, target_group_form, attachment_formset):
+        messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+        return render(self.request, 'communications/edit_draft.html', {
+            'communication_form': communication_form,
+            'target_group_form': target_group_form,
+            'attachment_formset': attachment_formset,
+            'editing_draft': True,
+            'communication': self.draft,
+            'user_role': self.request.user.role,
+            'user_branch_id': self.request.user.branch.id if hasattr(self.request.user, 'branch') else '',
+        })
+
     def get(self, request, pk):
-        draft = get_object_or_404(
-            Communication,
-            pk=pk,
-            sender=request.user,
-            is_draft=True,
-            sent=False
-        )
+        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+        self.draft = draft
 
-        # Main communication form
+        saved_filter_data = draft.saved_filter_data or {}
+        selected_recipient_ids = draft.selected_recipient_ids or []
+
+        initial_data = {
+            'branch': Branch.objects.filter(id=saved_filter_data.get('id_branch')).first(),
+            'role': saved_filter_data.get('id_role', ''),
+            'staff_type': saved_filter_data.get('id_staff_type', ''),
+            'student_class': StudentClass.objects.filter(id=saved_filter_data.get('id_student_class')).first(),
+            'class_arm': ClassArm.objects.filter(id=saved_filter_data.get('id_class_arm')).first(),
+            'teaching_positions': TeachingPosition.objects.filter(
+                id__in=self._clean_id_list(saved_filter_data.get('id_teaching_positions', []))
+            ),
+            'non_teaching_positions': NonTeachingPosition.objects.filter(
+                id__in=self._clean_id_list(saved_filter_data.get('id_non_teaching_positions', []))
+            ),
+        }
+
+        target_group_form = CommunicationTargetGroupForm(initial=initial_data, user=request.user)
+
+        dummy_data = QueryDict('', mutable=True)
+        for key in ['id_branch', 'id_role', 'id_staff_type', 'id_student_class', 'id_class_arm']:
+            dummy_data[key] = saved_filter_data.get(key, '')
+        dummy_data.setlist('id_teaching_positions', self._clean_id_list(saved_filter_data.get('id_teaching_positions', [])))
+        dummy_data.setlist('id_non_teaching_positions', self._clean_id_list(saved_filter_data.get('id_non_teaching_positions', [])))
+
+        dummy_form = CommunicationTargetGroupForm(data=dummy_data, user=request.user)
+        if dummy_form.is_valid():
+            allowed_recipients = dummy_form.get_filtered_recipients(dummy_form.cleaned_data).exclude(id=request.user.id)
+        else:
+            allowed_recipients = CustomUser.objects.filter(id__in=selected_recipient_ids)
+
+        selected_recipients = allowed_recipients.filter(id__in=selected_recipient_ids)
+
         communication_form = CommunicationForm(instance=draft, user=request.user)
+        attachment_formset = AttachmentFormSet(instance=draft, prefix="attachments")
 
-        # Get the first related target group instance (if exists)
-        target_group = draft.target_groups.first()
-
-        # Prepare saved filter data for JavaScript or form initial
-        saved_filter_data = {}
-        if target_group:
-            saved_filter_data = {
-                'id_branch': str(target_group.branch.id) if target_group.branch else '',
-                'id_role': target_group.role or '',
-                'id_staff_type': target_group.staff_type or '',
-                'id_student_class': str(target_group.student_class.id) if target_group.student_class else '',
-                'id_class_arm': str(target_group.class_arm.id) if target_group.class_arm else '',
-                'id_teaching_positions': [str(pos.id) for pos in target_group.teaching_positions.all()],
-                'id_non_teaching_positions': [str(pos.id) for pos in target_group.non_teaching_positions.all()],
-            }
-
-        # Load the target group form with the instance
-        target_group_form = CommunicationTargetGroupForm(
-            instance=target_group,
-            user=request.user
-        )
-    
-        attachment_formset = AttachmentFormSet(
-            request.POST or None,
-            request.FILES or None,
-            instance=draft,
-            prefix="attachments"  
-        )
-
-        # Inside get():
         context = {
             'communication_form': communication_form,
             'target_group_form': target_group_form,
             'attachment_formset': attachment_formset,
-            'draft': draft,
-            'saved_filter_data': json.dumps(saved_filter_data), 
-            'selected_recipient_ids': json.dumps(draft.selected_recipient_ids or []), 
-            'is_editing_draft': True,
+            'communication': draft,
+            'saved_filter_data': json.dumps(saved_filter_data),
+            'selected_recipient_ids': json.dumps(selected_recipient_ids),
+            'recipients': allowed_recipients,
+            'selected_recipients': selected_recipients,
+            'editing_draft': True,
+            'user_branch_id': request.user.branch.id if hasattr(request.user, 'branch') else '',
+            'user_role': request.user.role,
         }
+
         return render(request, 'communications/edit_draft.html', context)
 
     def post(self, request, pk):
-        action = request.POST.get('action')
-        draft = get_object_or_404(
-            Communication,
-            pk=pk,
-            sender=request.user,
-            is_draft=True,
-            sent=False
-        )
+        self.request = request
+        draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+        self.draft = draft
 
         communication_form = CommunicationForm(request.POST, request.FILES, instance=draft, user=request.user)
-        target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
-        attachment_formset = AttachmentFormSet(request.POST, request.FILES, instance=draft, prefix="attachments")
+        attachment_formset = AttachmentFormSet(request.POST, request.FILES, instance=draft)
+
+        saved_filter_data = {
+            'branch': request.user.branch.id if request.user.role in ['student', 'parent'] else request.POST.get('saved_branch', ''),
+            'role': request.POST.get('saved_role', ''),
+            'staff_type': request.POST.get('saved_staff_type', ''),
+            'student_class': request.POST.get('saved_student_class', ''),
+            'class_arm': request.POST.get('saved_class_arm', ''),
+            'teaching_positions': self._clean_id_list(request.POST.get('saved_teaching_positions', '').split(',')),
+            'non_teaching_positions': self._clean_id_list(request.POST.get('saved_non_teaching_positions', '').split(',')),
+        }
+
+        form_data = QueryDict('', mutable=True)
+        for key in ['branch', 'role', 'staff_type', 'student_class', 'class_arm']:
+            form_data[key] = saved_filter_data[key]
+        form_data.setlist('teaching_positions', saved_filter_data['teaching_positions'])
+        form_data.setlist('non_teaching_positions', saved_filter_data['non_teaching_positions'])
+
+        target_group_form = CommunicationTargetGroupForm(data=form_data, user=request.user)
 
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
-            messages.error(request, "Please correct the form errors below.")
-            return render(request, 'communications/edit_draft.html', {
-                'communication_form': communication_form,
-                'target_group_form': target_group_form,
-                'attachment_formset': attachment_formset,
-                'draft': draft,
-            })
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
         try:
             validate_attachment_formset(attachment_formset)
         except ValidationError as e:
-            attachment_formset._non_form_errors = attachment_formset.error_class([str(e)])
-            return render(request, 'communications/edit_draft.html', {
-                'communication_form': communication_form,
-                'target_group_form': target_group_form,
-                'attachment_formset': attachment_formset,
-                'draft': draft,
-            })
+            messages.error(request, str(e))
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        if request.user.role in ['student', 'parent']:
-            branch = request.user.branch
-            target_group_form.cleaned_data['branch'] = branch
-            if hasattr(target_group_form, 'instance'):
-                target_group_form.instance.branch = branch
-
-        # Save or update the target group instance
-        target_group = target_group_form.save(commit=False)
-        target_group.communication = draft
-        target_group.save()
-        draft.target_groups.set([target_group])
+        branch = request.user.branch if request.user.role in ['student', 'parent'] else target_group_form.cleaned_data.get('branch')
+        if not branch:
+            target_group_form.add_error('branch', "Please select a Branch.")
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
         allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
-        selected_ids = request.POST.getlist('selected_recipients')
-        selected_recipients = allowed_recipients.filter(id__in=selected_ids)
+        selected_recipients = allowed_recipients.filter(id__in=request.POST.getlist('selected_recipients'))
 
         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-        valid_manual_emails = []
-        for email in manual_emails_raw.split(','):
-            email = email.strip().lower()
-            if not email:
-                continue
-            try:
-                validate_email(email)
-                valid_manual_emails.append(email)
-            except ValidationError:
-                messages.warning(request, f"Invalid email skipped: {email}")
-
-        selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
-        duplicates = selected_emails.intersection(valid_manual_emails)
-        if duplicates:
-            communication_form.add_error(None, f"Duplicate emails: {', '.join(duplicates)}")
-            return render(request, 'communications/edit_draft.html', {
-                'communication_form': communication_form,
-                'target_group_form': target_group_form,
-                'attachment_formset': attachment_formset,
-                'draft': draft,
-            })
+        valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
 
         if not selected_recipients.exists() and not valid_manual_emails:
-            communication_form.add_error(None, "Select at least one recipient or provide valid email.")
-            return render(request, 'communications/edit_draft.html', {
-                'communication_form': communication_form,
-                'target_group_form': target_group_form,
-                'attachment_formset': attachment_formset,
-                'draft': draft,
-            })
+            communication_form.add_error(None, "Please select at least one recipient or enter a valid manual email.")
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Save Communication
+        if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
+            return self._render_with_errors(communication_form, target_group_form, attachment_formset)
+
         communication = communication_form.save(commit=False)
-        communication.sender = request.user
         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
-        communication.is_draft = (action == 'draft')
+        communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
-
         communication.saved_filter_data = {
-            'id_branch': str(target_group.branch.id) if target_group.branch else '',
-            'id_role': target_group.role or '',
-            'id_staff_type': target_group.staff_type or '',
-            'id_student_class': str(target_group.student_class.id) if target_group.student_class else '',
-            'id_class_arm': str(target_group.class_arm.id) if target_group.class_arm else '',
-            'id_teaching_positions': [str(pos.id) for pos in target_group.teaching_positions.all()],
-            'id_non_teaching_positions': [str(pos.id) for pos in target_group.non_teaching_positions.all()],
+            'id_branch': str(branch.id) if branch else '',
+            'id_role': target_group_form.cleaned_data.get('role', ''),
+            'id_staff_type': target_group_form.cleaned_data.get('staff_type', ''),
+            'id_student_class': str(target_group_form.cleaned_data['student_class'].id) if target_group_form.cleaned_data.get('student_class') else '',
+            'id_class_arm': str(target_group_form.cleaned_data['class_arm'].id) if target_group_form.cleaned_data.get('class_arm') else '',
+            'id_teaching_positions': [str(pos.id) for pos in target_group_form.cleaned_data.get('teaching_positions', [])],
+            'id_non_teaching_positions': [str(pos.id) for pos in target_group_form.cleaned_data.get('non_teaching_positions', [])],
         }
-
         communication.save()
 
-        # Save formset (handles add, edit, delete automatically)
-        attachment_formset.save()
+        for form in attachment_formset:
+            if form.cleaned_data.get('file'):
+                form.instance.communication = communication
+                form.save()
 
-        # Handle Sending
-        if action == 'draft':
-            messages.success(request, "Draft saved successfully.")
-            return redirect('draft_messages') 
-        elif communication.is_due():
+        if not communication.is_draft and communication.is_due():
             send_communication_to_recipients(
                 communication=communication,
                 selected_recipients=selected_recipients,
@@ -1646,15 +1873,21 @@ class EditDraftMessageView(View):
             communication.sent = True
             communication.sent_at = timezone.now()
             communication.save()
-            messages.success(request, "Message sent successfully.")
+            messages.success(request, "Communication sent successfully.")
             return redirect('communication_success')
+
+        elif communication.is_draft:
+            messages.success(request, "Draft updated successfully.")
+            return redirect('draft_messages')
+
         else:
+            url = reverse('communication_scheduled')
             query_string = urlencode({
                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
                 'sent': 'false'
             })
             messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
-            return redirect(f"{reverse('communication_scheduled')}?{query_string}")
+            return redirect(f"{url}?{query_string}")
 
 
 def communication_success(request):
@@ -1724,21 +1957,6 @@ def inbox_view(request):
         return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
 
 
-# @login_required
-# def read_message(request, pk):
-#     recipient_entry = get_object_or_404(
-#         CommunicationRecipient,
-#         pk=pk,
-#         recipient=request.user,
-#         deleted=False
-#     )
-#     recipient_entry.mark_as_read()
-
-#     return render(request, 'communications/message_detail.html', {
-#         'message': recipient_entry.communication,
-#         'recipient_entry': recipient_entry
-#     })
-
 @login_required
 def read_message(request, pk):
     recipient_entry = get_object_or_404(
@@ -1749,12 +1967,21 @@ def read_message(request, pk):
     )
     recipient_entry.mark_as_read()
 
+    reply_instance = MessageReply()  
+    attachment_formset = ReplyAttachmentFormSet(
+        instance=reply_instance,
+        queryset=ReplyAttachment.objects.none(),
+        prefix='attachments'
+    )
+
     return render(request, 'communications/message_detail.html', {
         'message': recipient_entry.communication,
         'recipient_entry': recipient_entry,
+        'attachment_formset': attachment_formset,
         'MAX_ATTACHMENT_COUNT': settings.MAX_ATTACHMENT_COUNT,
         'MAX_SINGLE_ATTACHMENT_MB': settings.MAX_SINGLE_ATTACHMENT_MB,
     })
+
 
 
 @login_required
@@ -1869,7 +2096,6 @@ def read_sent_message(request, pk):
     })
 
 
-
 @login_required
 def delete_sent_message(request, pk):
     if request.method == 'POST':
@@ -1919,35 +2145,6 @@ def delete_all_sent_messages(request):
     return redirect('outbox')
 
 
-# @login_required
-# def submit_reply(request, recipient_id):
-#     recipient_entry = get_object_or_404(
-#         CommunicationRecipient,
-#         pk=recipient_id,
-#         recipient=request.user,
-#         deleted=False,
-#         requires_response=True
-#     )
-
-#     if request.method == 'POST':
-#         reply_text = request.POST.get('reply', '').strip()
-#         if reply_text:
-#             # Save actual reply
-#             MessageReply.objects.create(
-#                 recipient_entry=recipient_entry,
-#                 responder=request.user,
-#                 reply_text=reply_text
-#             )
-
-#             recipient_entry.has_responded = True
-#             recipient_entry.save()
-#             messages.success(request, "Your reply has been submitted.")
-#         else:
-#             messages.error(request, "Reply cannot be empty.")
-
-#     return redirect('inbox')
-
-
 @login_required
 def submit_reply(request, recipient_id):
     recipient_entry = get_object_or_404(
@@ -1958,49 +2155,42 @@ def submit_reply(request, recipient_id):
         requires_response=True
     )
 
+    from .forms import ReplyAttachmentFormSet
+
     if request.method == 'POST':
         reply_text = request.POST.get('reply', '').strip()
-        files = request.FILES.getlist('files')  # Multiple files allowed
 
-        if not reply_text and not files:
+        if not reply_text and not request.FILES:
             messages.error(request, "Reply cannot be empty.")
             return redirect('inbox')
 
-        # Validate attachment count
-        if len(files) > settings.MAX_ATTACHMENT_COUNT:
-            messages.error(request, f"Maximum {settings.MAX_ATTACHMENT_COUNT} attachments allowed.")
-            return redirect('inbox')
-
-        # Validate total size
-        total_size = sum(f.size for f in files)
-        if total_size > settings.MAX_TOTAL_ATTACHMENT_MB * 1024 * 1024:
-            messages.error(request, f"Total file size must not exceed {settings.MAX_TOTAL_ATTACHMENT_MB}MB.")
-            return redirect('inbox')
-
-        # Validate individual files
-        for f in files:
-            if f.size > settings.MAX_SINGLE_ATTACHMENT_MB * 1024 * 1024:
-                messages.error(request, f"File '{f.name}' exceeds {settings.MAX_SINGLE_ATTACHMENT_MB}MB.")
-                return redirect('inbox')
-
-        # Save reply and attachments safely
         try:
             with transaction.atomic():
                 reply = MessageReply.objects.create(
                     recipient_entry=recipient_entry,
                     responder=request.user,
-                    reply_text=reply_text,
+                    reply_text=reply_text
                 )
 
-                for f in files:
-                    ReplyAttachment.objects.create(reply=reply, file=f)
+                formset = ReplyAttachmentFormSet(
+                    request.POST, request.FILES,
+                    instance=reply,
+                    prefix='attachments'
+                )
+
+                if formset.is_valid():
+                    formset.save()
+                else:
+                    messages.error(request, "There was an error with the attachments.")
+                    return redirect('inbox')
 
                 recipient_entry.has_responded = True
                 recipient_entry.save()
 
                 messages.success(request, "Your reply has been submitted.")
+
         except Exception as e:
-            messages.error(request, f"An error occurred while saving your reply: {str(e)}")
+            messages.error(request, f"An error occurred while saving your reply: {e}")
             return redirect('inbox')
 
     return redirect('inbox')

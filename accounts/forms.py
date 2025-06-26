@@ -23,7 +23,8 @@ from .models import (
     Branch, ClassArm, Communication, CommunicationAttachment, 
     CommunicationComment, CommunicationRecipient, CommunicationTargetGroup,
     CustomUser, NonTeachingPosition, ParentProfile, StaffProfile, 
-    StudentClass, StudentProfile, TeachingPosition
+    StudentClass, StudentProfile, TeachingPosition,
+    MessageReply, ReplyAttachment
 )
 
 from django.conf import settings
@@ -964,11 +965,44 @@ class CommunicationForm(forms.ModelForm):
 
         return cleaned_data
 
+from django.forms.widgets import CheckboxSelectMultiple
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+
+from django.forms.models import ModelChoiceIteratorValue
+
+class TeachingPositionCheckboxWidget(CheckboxSelectMultiple):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+
+        # Safely get the actual ID from ModelChoiceIteratorValue if needed
+        try:
+            if isinstance(value, ModelChoiceIteratorValue):
+                value = value.value  # Extract the actual ID
+
+            teaching_position = TeachingPosition.objects.get(pk=value)
+            if teaching_position.is_class_teacher:
+                option['attrs']['data-is-class-teacher'] = '1'
+        except (TeachingPosition.DoesNotExist, ValueError, TypeError):
+            pass
+
+        return option
+
 
 class CommunicationTargetGroupForm(forms.ModelForm):
     STUDENT_ROLES = ['student', 'parent']
     STAFF_ROLES = ['staff', 'branch_admin', 'superadmin']
+    teaching_positions = forms.ModelMultipleChoiceField(
+        queryset=TeachingPosition.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple
+    )
 
+    non_teaching_positions = forms.ModelMultipleChoiceField(
+        queryset=NonTeachingPosition.objects.all(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple
+    )
     class Meta:
         model = CommunicationTargetGroup
         fields = [
@@ -977,7 +1011,7 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             'student_class', 'class_arm',
         ]
         widgets = {
-            'teaching_positions': forms.CheckboxSelectMultiple(),
+            'teaching_positions': TeachingPositionCheckboxWidget(),
             'non_teaching_positions': forms.CheckboxSelectMultiple(),
         }
 
@@ -996,8 +1030,16 @@ class CommunicationTargetGroupForm(forms.ModelForm):
 
             # Defensive: wrap single string into list
             for name in ["teaching_positions", "non_teaching_positions"]:
-                if name in data and isinstance(data.get(name), str):
-                    data.setlist(name, [data.get(name)])
+                if name in data:
+                    raw_values = data.getlist(name)
+                    valid_ids = []
+                    for val in raw_values:
+                        try:
+                            valid_ids.append(int(val))  # Ensure it's an integer ID
+                        except (ValueError, TypeError):
+                            pass
+                    data.setlist(name, valid_ids)
+
 
             # Replace data in kwargs (DO NOT pass again in *args)
             kwargs["data"] = data
@@ -1005,6 +1047,11 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         # Final: pass everything cleanly to parent
         super().__init__(*args, **kwargs)
         
+        for position in self.fields['teaching_positions'].queryset:
+            self.fields['teaching_positions'].widget.attrs.update({
+                f'data-is-class-teacher-{position.id}': '1' if position.is_class_teacher else '0'
+            })
+            
         role = self.initial.get('role') or self.data.get('role')
         if self.user and self.user.role == 'student':
             if role == 'student':
@@ -1066,10 +1113,87 @@ class CommunicationTargetGroupForm(forms.ModelForm):
             self.fields['role'].choices = [('', '-----------')] + list(CommunicationTargetGroup.ROLE_CHOICES)
             self.fields['role'].required = False
 
+    # def clean(self):
+    #     cleaned_data = super().clean()
+
+    #     # Normalize empty strings or missing values to None
+    #     for field in ['student_class', 'class_arm', 'staff_type']:
+    #         if not cleaned_data.get(field):
+    #             cleaned_data[field] = None
+
+    #     role = cleaned_data.get('role')
+    #     staff_type = cleaned_data.get('staff_type')
+    #     branch = cleaned_data.get('branch')
+    #     # teaching_positions = cleaned_data.get('teaching_positions') or self.fields['teaching_positions'].queryset.none()
+    #     teaching_positions = cleaned_data.get('teaching_positions')
+    #     if teaching_positions is None:
+    #         teaching_positions = []
+    #     cleaned_data['teaching_positions'] = teaching_positions
+    #     # non_teaching_positions = cleaned_data.get('non_teaching_positions') or self.fields['non_teaching_positions'].queryset.none()
+    #     non_teaching_positions = cleaned_data.get('non_teaching_positions')
+    #     if non_teaching_positions is None:
+    #         non_teaching_positions = []
+    #     cleaned_data['non_teaching_positions'] = non_teaching_positions
+
+    #     student_class = cleaned_data.get('student_class')
+    #     class_arm = cleaned_data.get('class_arm')
+    #     # Enforce: If a class teacher position is selected, student_class and class_arm are required
+    #     if staff_type == 'teaching':
+    #         class_teacher_positions = [p for p in teaching_positions if getattr(p, 'is_class_teacher', False)]
+    #         if class_teacher_positions:
+    #             if not student_class:
+    #                 self.add_error('student_class', "This is required for class teachers.")
+    #             if not class_arm:
+    #                 self.add_error('class_arm', "This is required for class teachers.")
+    #             if not student_class or not class_arm:
+    #                 raise ValidationError("Class teachers must be filtered by both class and arm.")
+
+    #     # If no role is selected, clear all filters and exit early
+    #     if not role:
+    #         cleaned_data['student_class'] = None
+    #         cleaned_data['class_arm'] = None
+    #         cleaned_data['staff_type'] = None
+    #         cleaned_data['teaching_positions'] = []
+    #         cleaned_data['non_teaching_positions'] = []
+    #         return cleaned_data
+
+    #     # If the logged-in user is a student and selects "student" recipients
+    #     if self.user.role == 'student' and role == 'student':
+    #         if not student_class:
+    #             self.add_error('student_class', "This field is required for students.")
+    #         if not class_arm:
+    #             self.add_error('class_arm', "This field is required for students.")
+    #         if not student_class or not class_arm:
+    #             raise ValidationError('Please select both class and class arm to view student recipients.')
+
+    #     # If user is in student roles, override branch and validate role
+    #     if self.user.role in self.STUDENT_ROLES:
+    #         cleaned_data['branch'] = self.user.branch
+    #         if not role:
+    #             raise ValidationError('You must select a role.')
+
+    #     # If user is in staff roles, validate filters
+    #     elif self.user.role in self.STAFF_ROLES:
+    #         if not branch:
+    #             raise ValidationError('Branch must be selected.')
+
+    #         require_staff_filter = (
+    #             staff_type or teaching_positions.exists() or non_teaching_positions.exists()
+    #         )
+
+    #         if role in ['staff', 'branch_admin', 'superadmin'] and require_staff_filter:
+    #             self._validate_staff_positions(
+    #                 staff_type,
+    #                 teaching_positions,
+    #                 non_teaching_positions
+    #             )
+
+    #     return cleaned_data
+
     def clean(self):
         cleaned_data = super().clean()
 
-        # Normalize empty strings or missing values to None
+        # Normalize empty strings to None
         for field in ['student_class', 'class_arm', 'staff_type']:
             if not cleaned_data.get(field):
                 cleaned_data[field] = None
@@ -1077,59 +1201,59 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         role = cleaned_data.get('role')
         staff_type = cleaned_data.get('staff_type')
         branch = cleaned_data.get('branch')
-        # teaching_positions = cleaned_data.get('teaching_positions') or self.fields['teaching_positions'].queryset.none()
-        teaching_positions = cleaned_data.get('teaching_positions')
-        if teaching_positions is None:
-            teaching_positions = []
+
+        teaching_positions = cleaned_data.get('teaching_positions') or []
+        non_teaching_positions = cleaned_data.get('non_teaching_positions') or []
         cleaned_data['teaching_positions'] = teaching_positions
-        # non_teaching_positions = cleaned_data.get('non_teaching_positions') or self.fields['non_teaching_positions'].queryset.none()
-        non_teaching_positions = cleaned_data.get('non_teaching_positions')
-        if non_teaching_positions is None:
-            non_teaching_positions = []
         cleaned_data['non_teaching_positions'] = non_teaching_positions
 
         student_class = cleaned_data.get('student_class')
         class_arm = cleaned_data.get('class_arm')
 
-        # If no role is selected, clear all filters and exit early
+        # Enforce class & arm if Class Teacher is selected
+        if staff_type in ['teaching', 'both']:
+            is_class_teacher_selected = any(getattr(p, 'is_class_teacher', False) for p in teaching_positions)
+            if is_class_teacher_selected and self.user.role in ['student', 'parent']:
+                if not student_class:
+                    self.add_error('student_class', "Class is required when messaging a Class Teacher.")
+                if not class_arm:
+                    self.add_error('class_arm', "Arm is required when messaging a Class Teacher.")
+                if not student_class or not class_arm:
+                    raise ValidationError("Both class and arm are required when targeting Class Teachers.")
+
+        # If no role is selected, clear all filters
         if not role:
-            cleaned_data['student_class'] = None
-            cleaned_data['class_arm'] = None
-            cleaned_data['staff_type'] = None
-            cleaned_data['teaching_positions'] = []
-            cleaned_data['non_teaching_positions'] = []
+            for field in ['student_class', 'class_arm', 'staff_type', 'teaching_positions', 'non_teaching_positions']:
+                cleaned_data[field] = None if field in ['student_class', 'class_arm', 'staff_type'] else []
             return cleaned_data
 
-        # If the logged-in user is a student and selects "student" recipients
+        # Student sending to other students or parents
         if self.user.role == 'student' and role == 'student':
             if not student_class:
                 self.add_error('student_class', "This field is required for students.")
             if not class_arm:
                 self.add_error('class_arm', "This field is required for students.")
             if not student_class or not class_arm:
-                raise ValidationError('Please select both class and class arm to view student recipients.')
+                raise ValidationError("Select both class and arm to message students.")
 
-        # If user is in student roles, override branch and validate role
+        # Auto-set branch for student users
         if self.user.role in self.STUDENT_ROLES:
             cleaned_data['branch'] = self.user.branch
             if not role:
-                raise ValidationError('You must select a role.')
+                raise ValidationError("You must select a role.")
 
-        # If user is in staff roles, validate filters
+        # Staff validations
         elif self.user.role in self.STAFF_ROLES:
             if not branch:
-                raise ValidationError('Branch must be selected.')
+                raise ValidationError("Branch must be selected.")
 
-            require_staff_filter = (
-                staff_type or teaching_positions.exists() or non_teaching_positions.exists()
-            )
-
-            if role in ['staff', 'branch_admin', 'superadmin'] and require_staff_filter:
-                self._validate_staff_positions(
-                    staff_type,
-                    teaching_positions,
-                    non_teaching_positions
+            if role in ['staff', 'branch_admin', 'superadmin']:
+                require_staff_filter = (
+                    staff_type or bool(teaching_positions) or bool(non_teaching_positions)
                 )
+
+                if require_staff_filter:
+                    self._validate_staff_positions(staff_type, teaching_positions, non_teaching_positions)
 
         return cleaned_data
 
@@ -1152,8 +1276,31 @@ class CommunicationTargetGroupForm(forms.ModelForm):
     #     elif staff_type == 'both':
     #         if not (teaching_positions.exists() or non_teaching_positions.exists()):
     #             raise ValidationError("Select at least one teaching or non-teaching position for 'both' staff type.")
+    # def _validate_staff_positions(self, staff_type, teaching_positions, non_teaching_positions):
+    #     # Ensure we are not dealing with None values
+    #     teaching_positions = teaching_positions or []
+    #     non_teaching_positions = non_teaching_positions or []
+
+    #     if not staff_type and not teaching_positions and not non_teaching_positions:
+    #         raise ValidationError("Staff type and at least one teaching or non-teaching position must be selected.")
+
+    #     if staff_type == 'teaching':
+    #         if non_teaching_positions:
+    #             raise ValidationError("Non-teaching positions cannot be selected for teaching staff type.")
+    #         if not teaching_positions:
+    #             raise ValidationError("At least one teaching position must be selected.")
+
+    #     elif staff_type == 'non_teaching':
+    #         if teaching_positions:
+    #             raise ValidationError("Teaching positions cannot be selected for non-teaching staff type.")
+    #         if not non_teaching_positions:
+    #             raise ValidationError("At least one non-teaching position must be selected.")
+
+    #     elif staff_type == 'both':
+    #         if not teaching_positions and not non_teaching_positions:
+    #             raise ValidationError("Select at least one teaching or non-teaching position for 'both' staff type.")
+    
     def _validate_staff_positions(self, staff_type, teaching_positions, non_teaching_positions):
-        # Ensure we are not dealing with None values
         teaching_positions = teaching_positions or []
         non_teaching_positions = non_teaching_positions or []
 
@@ -1294,235 +1441,306 @@ class CommunicationTargetGroupForm(forms.ModelForm):
         return instance
 
     def get_filtered_recipients(self, target_group_data):
-        # Extract filters
+        from accounts.models import TeachingPosition, NonTeachingPosition, StaffProfile, CustomUser
+        from django.contrib.contenttypes.models import ContentType
+        from django.db.models import Q
+
+        # Extract basic filters
         role = target_group_data.get('role')
         branch = target_group_data.get('branch')
         staff_type = target_group_data.get('staff_type')
         student_class = target_group_data.get('student_class')
         class_arm = target_group_data.get('class_arm')
-        teaching_positions = target_group_data.get('teaching_positions') or []
-        non_teaching_positions = target_group_data.get('non_teaching_positions') or []
         search = target_group_data.get('search')
 
-        # Base queryset excluding current user
+        # Prepare positions
+        def ensure_position_objects(position_ids, model_cls):
+            if position_ids and isinstance(position_ids[0], (str, int)):
+                return list(model_cls.objects.filter(id__in=position_ids))
+            return position_ids or []
+
+        teaching_positions = ensure_position_objects(target_group_data.get('teaching_positions', []), TeachingPosition)
+        non_teaching_positions = ensure_position_objects(target_group_data.get('non_teaching_positions', []), NonTeachingPosition)
+
+        # Start queryset
         qs = CustomUser.objects.filter(is_active=True).exclude(id=self.user.id)
-    
 
-        def filter_staff(qs, staff_type, teaching_positions, non_teaching_positions):
-            if not staff_type:
-                return qs.none()
+        # # Nested filter for staff
+        # def filter_staff(staff_type, positions, positions_field, role_scope):
+        #     if not staff_type or not positions:
+        #         return qs.none()
 
-            user_role = self.user.role
-            valid_roles = {
-                "student": ['staff', 'branch_admin'],
-                "parent": ['staff', 'branch_admin'],
-                "default": ['staff', 'branch_admin', 'superadmin']
-            }
+        #     from django.db.models.query import QuerySet
+        #     if not isinstance(positions, (list, tuple, set, QuerySet)):
+        #         positions = [positions]
 
+        #     # Direct filter
+        #     direct_ids = qs.filter(
+        #         role__in=role_scope,
+        #         staff_type=staff_type,
+        #         **{positions_field: positions}
+        #     ).values_list('id', flat=True)
 
-            def has_required_positions(required_positions):
-                return bool(required_positions)
+        #     # GFK filter
+        #     content_type = ContentType.objects.get_for_model(positions[0].__class__)
+        #     via_profile_ids = StaffProfile.objects.filter(
+        #         position_content_type=content_type,
+        #         position_object_id__in=[p.id for p in positions],
+        #         user__role__in=role_scope,
+        #         user__staff_type=staff_type
+        #     ).values_list('user_id', flat=True)
 
-            # def apply_filter(roles, s_type, positions_field, positions):
-            #     if not has_required_positions(positions):
-            #         return CustomUser.objects.none()
+        #     all_ids = set(direct_ids) | set(via_profile_ids)
 
-            #     # Ensure positions is a list/tuple/set for __in lookup
-            #     from django.db.models.query import QuerySet
-            #     if not isinstance(positions, (list, tuple, set, QuerySet)):
-            #         positions = [positions]
+        #     # Extra: Filter by managed class (if class teacher)
+        #     if any(getattr(p, 'is_class_teacher', False) for p in positions):
+        #         if not student_class or not class_arm:
+        #             return CustomUser.objects.none()
 
-            #     return qs.filter(
-            #         role__in=roles,
-            #         staff_type=s_type,
-            #         **{positions_field: positions}
-            #     ).distinct()
+        #         teaching_ct = ContentType.objects.get_for_model(TeachingPosition)
+        #         managed_ids = StaffProfile.objects.filter(
+        #             position_content_type=teaching_ct,
+        #             position_object_id__in=TeachingPosition.objects.filter(is_class_teacher=True).values_list('id', flat=True),
+        #             managing_class_id=student_class,
+        #             managing_class_arm_id=class_arm,
+        #         ).values_list('user_id', flat=True)
+
+        #         all_ids &= set(managed_ids)
+
+        #     return qs.filter(id__in=all_ids).distinct()
+        
+        def filter_staff(
+                staff_type,
+                positions,
+                positions_field,
+                role_scope,
+                student_class=None,
+                class_arm=None,
+                request_user=None 
+            ):
             
-            def apply_filter(roles, s_type, positions_field, positions):
-                from django.db.models.query import QuerySet
-                from django.contrib.contenttypes.models import ContentType
-                from accounts.models import CustomUser, StaffProfile, TeachingPosition
-                from django.db.models import Q
+            if request_user and request_user.role in ['student', 'parent']:
+                if not staff_type or not positions:
+                    return qs.none()
 
-                if not roles or not has_required_positions(positions):
-                    return CustomUser.objects.none()
+            from django.db.models.query import QuerySet
+            from django.contrib.contenttypes.models import ContentType
+            from accounts.models import StaffProfile, TeachingPosition, CustomUser
 
-                if not isinstance(positions, (list, tuple, set, QuerySet)):
-                    positions = [positions]
+            if not isinstance(positions, (list, tuple, set, QuerySet)):
+                positions = [positions]
 
-                # Basic M2M and generic filtering
-                direct_user_ids = qs.filter(
-                    role__in=roles,
-                    staff_type=s_type,
-                    **{positions_field: positions}
-                ).values_list('id', flat=True)
+            # Step 1: Get direct match users
+            direct_ids = qs.filter(
+                role__in=role_scope,
+                staff_type=staff_type,
+                **{positions_field: positions}
+            ).values_list('id', flat=True)
 
-                content_type = ContentType.objects.get_for_model(positions[0].__class__)
-                position_ids = [p.id for p in positions]
+            # Step 2: Get users via StaffProfile (GFK)
+            content_type = ContentType.objects.get_for_model(positions[0].__class__)
+            via_profile_ids = StaffProfile.objects.filter(
+                position_content_type=content_type,
+                position_object_id__in=[p.id for p in positions],
+                user__role__in=role_scope,
+                user__staff_type=staff_type
+            ).values_list('user_id', flat=True)
 
-                via_profile_ids = StaffProfile.objects.filter(
-                    position_content_type=content_type,
-                    position_object_id__in=position_ids,
-                    user__role__in=roles,
-                    user__staff_type=s_type
-                ).values_list('user_id', flat=True)
+            all_ids = set(direct_ids) | set(via_profile_ids)
 
-                all_user_ids = set(direct_user_ids).union(set(via_profile_ids))
+            # Step 3: Class teacher filtering (conditional)
+            is_class_teacher_selected = any(getattr(p, 'is_class_teacher', False) for p in positions)
 
-                # Handle "class teacher" positions
-                if any(getattr(p, 'is_class_teacher', False) for p in positions):
+            if is_class_teacher_selected:
+                if request_user and request_user.role in ['student', 'parent']:
+                    if not student_class or not class_arm:
+                        return qs.none()
+
+                if student_class and class_arm:
                     teaching_ct = ContentType.objects.get_for_model(TeachingPosition)
-                    class_teacher_positions = TeachingPosition.objects.filter(is_class_teacher=True)
 
-                    primary_class_teacher_ids = StaffProfile.objects.filter(
-                        position_content_type=teaching_ct,
-                        position_object_id__in=class_teacher_positions.values_list('id', flat=True)
-                    ).values_list('user_id', flat=True)
-
-                    direct_class_teacher_ids = CustomUser.objects.filter(
-                        teaching_positions__in=class_teacher_positions
-                    ).values_list('id', flat=True)
-
-                    # Optional: include managing class/arm logic — less targeted without children
                     managed_ids = StaffProfile.objects.filter(
-                        managing_class_id__isnull=False,
-                        managing_class_arm_id__isnull=False
+                        position_content_type=teaching_ct,
+                        position_object_id__in=TeachingPosition.objects.filter(is_class_teacher=True).values_list('id', flat=True),
+                        managing_class_id=student_class,
+                        managing_class_arm_id=class_arm,
                     ).values_list('user_id', flat=True)
 
-                    final_class_teacher_ids = set(primary_class_teacher_ids).union(direct_class_teacher_ids)
-                    final_user_ids = final_class_teacher_ids.intersection(managed_ids)
+                    all_ids &= set(managed_ids)
 
-                    all_user_ids |= final_user_ids
+            return qs.filter(id__in=all_ids).distinct()
 
-                return qs.filter(id__in=all_user_ids).distinct()
+        # Role-specific logic
+        user_role = self.user.role
 
-            if user_role == "student":
-                if staff_type == 'teaching':
-                    return apply_filter(valid_roles["student"], 'teaching', 'teaching_positions__in', teaching_positions)
-                elif staff_type == 'non_teaching':
-                    return apply_filter(valid_roles["student"], 'non_teaching', 'non_teaching_positions__in', non_teaching_positions)
-                else:
-                    return qs.filter(role__in=valid_roles["student"])
+        VALID_ROLES = {
+            "student": ['staff', 'branch_admin'],
+            "parent": ['staff', 'branch_admin'],
+            "default": ['staff', 'branch_admin', 'superadmin']
+        }
 
-            elif user_role == "parent":
-                if staff_type == 'teaching':
-                    return apply_filter(valid_roles["parent"], 'teaching', 'teaching_positions__in', teaching_positions)
-                # for later if he can message non teaching staff
-                # elif staff_type == 'non_teaching':
-                #     return apply_filter(valid_roles["parent"], 'non_teaching', 'non_teaching_positions__in', non_teaching_positions)
-    
-            # Default for other roles (e.g. staff, admin)
-            if staff_type == 'teaching':
-                return apply_filter(valid_roles["default"], 'teaching', 'teaching_positions__in', teaching_positions)
-            elif staff_type == 'non_teaching':
-                return apply_filter(valid_roles["default"], 'non_teaching', 'non_teaching_positions__in', non_teaching_positions)
-            else:
-                return qs.filter(role__in=valid_roles["default"])
-
-        if self.user.role in self.STUDENT_ROLES:
+        if user_role in self.STUDENT_ROLES:
             branch = self.user.branch
             qs = qs.filter(branch=branch)
 
-            if self.user.role == 'student':
-                if not role:
-                    return  qs.none()
-
-                if role == 'student':
-                    qs = qs.filter(role='student')
-                    if not student_class:
-                        qs = qs.none()
-                    else:
-                        qs = qs.filter(studentprofile__current_class_id=student_class)
-                        if class_arm:
-                            qs = qs.filter(studentprofile__current_class_arm_id=class_arm)
-
-                elif role == 'parent':
-                    try:
-                        parent_user_id = self.user.studentprofile.parent.user.id
-                        qs = qs.filter(id=parent_user_id, role='parent')
-                    except StudentProfile.DoesNotExist:
-                        qs = CustomUser.objects.none()
-
-                else:
-                    qs = filter_staff(qs, staff_type, teaching_positions, non_teaching_positions)
-
-            elif self.user.role == 'parent':
-                from django.contrib.contenttypes.models import ContentType
-                from accounts.models import TeachingPosition, StaffProfile
-                from django.db.models import Q
-
-                parent = self.user.parentprofile
-                children = parent.students.all()
-
+            if user_role == 'student':
                 if not role:
                     return qs.none()
 
                 if role == 'student':
-                    qs = qs.filter(role='student', studentprofile__parent=parent)
-                    if student_class:
-                        qs = qs.filter(studentprofile__current_class_id=student_class)
+                    if not student_class:
+                        return qs.none()
+                    qs = qs.filter(role='student', studentprofile__current_class_id=student_class)
                     if class_arm:
                         qs = qs.filter(studentprofile__current_class_arm_id=class_arm)
 
-                elif role == 'branch_admin':
-                    return qs.filter(role='branch_admin', branch_id=self.user.branch_id)
-
-                elif role == 'staff':
-                    if not teaching_positions:
+                elif role == 'parent':
+                    try:
+                        parent_user_id = self.user.studentprofile.parent.user.id
+                        return qs.filter(id=parent_user_id, role='parent')
+                    except StudentProfile.DoesNotExist:
                         return qs.none()
 
-                    child_class_pairs = children.values_list('current_class', 'current_class_arm')
+                else:
+                    if staff_type in ['teaching', 'both']:
+                        positions = teaching_positions
+                        positions_field = 'teaching_positions__in'
 
-                    class_arm_filters = Q()
-                    for class_id, arm_id in child_class_pairs:
-                        if class_id and arm_id:
-                            class_arm_filters |= Q(managing_class_id=class_id, managing_class_arm_id=arm_id)
+                        # Check if class teacher is selected in teaching positions
+                        is_class_teacher = any(getattr(p, 'is_class_teacher', False) for p in positions)
 
-                    managing_staff_user_ids = StaffProfile.objects.filter(
-                        class_arm_filters
-                    ).values_list('user_id', flat=True)
+                        if bool(is_class_teacher) is True and self.user.role in ['student']:
+                            if not student_class or not class_arm:
+                                qs = qs.none()
+                                # raise ValueError("You must select both student class and arm when 'Class Teacher' is selected.")
+                            else:
+                                # Valid case: pass class info to filter
+                                qs = filter_staff(
+                                    staff_type,
+                                    positions,
+                                    positions_field,
+                                    VALID_ROLES['student'],
+                                    student_class=student_class,
+                                    class_arm=class_arm,
+                                    request_user=self.user
+                                )
+                        else:
+                            qs = filter_staff(
+                                staff_type,
+                                positions,
+                                positions_field,
+                                VALID_ROLES['student'],
+                                student_class=student_class,
+                                class_arm=class_arm,
+                                request_user=self.user
+                            )
 
-                    teaching_ct = ContentType.objects.get_for_model(TeachingPosition)
-                    class_teacher_positions = TeachingPosition.objects.filter(is_class_teacher=True)
-                    class_teacher_ids = class_teacher_positions.values_list('id', flat=True)
+                    else:
+                        # Non-teaching only
+                        positions = non_teaching_positions
+                        positions_field = 'non_teaching_positions__in'
+                        qs = filter_staff(
+                            staff_type,
+                            positions,
+                            positions_field,
+                            VALID_ROLES['student'],
+                            request_user=self.user
+                        )
+                        
+                    return qs
+                
+                return qs
 
-                    primary_class_teacher_ids = StaffProfile.objects.filter(
-                        position_content_type=teaching_ct,
-                        position_object_id__in=class_teacher_ids
-                    ).values_list('user_id', flat=True)
+            elif user_role == 'parent':
+                if staff_type == 'teaching':
+                    positions = teaching_positions
+                    positions_field = 'teaching_positions__in'
 
-                    any_class_teacher_ids = CustomUser.objects.filter(
-                        teaching_positions__in=class_teacher_positions
-                    ).values_list('id', flat=True)
+                    # Only allow class teacher selection
+                    has_class_teacher = any(getattr(p, 'is_class_teacher', False) for p in positions)
 
-                    class_teacher_user_ids = set(primary_class_teacher_ids).union(any_class_teacher_ids)
-                    final_staff_user_ids = set(managing_staff_user_ids).intersection(class_teacher_user_ids)
+                    if not has_class_teacher:
+                        return qs.none()
 
-                    branch_admin_class_teacher_ids = CustomUser.objects.filter(
-                        id__in=class_teacher_user_ids,
-                        role='branch_admin',
-                        branch_id=self.user.branch_id
-                    ).values_list('id', flat=True)
+                    # Require class and arm for class teacher filtering
+                    if not student_class or not class_arm:
+                        return qs.none()
 
-                    allowed_user_ids = list(final_staff_user_ids.union(branch_admin_class_teacher_ids))
-                    return qs.filter(id__in=allowed_user_ids).distinct()
+                    return filter_staff(
+                        staff_type=staff_type,
+                        positions=positions,
+                        positions_field=positions_field,
+                        role_scope=VALID_ROLES['parent'],
+                        student_class=student_class,
+                        class_arm=class_arm,
+                        request_user=self.user
+                    )
+                else:
+                    # Prevent parents from seeing non-teaching staff
+                    return qs.none()
 
-        elif self.user.role in self.STAFF_ROLES:
+        elif user_role in self.STAFF_ROLES:
             if not branch:
-                return CustomUser.objects.none()
-
+                return qs.none()
+            
             qs = qs.filter(branch=branch)
 
-            if role in ['staff', 'branch_admin', 'superadmin'] and staff_type:
-                qs = filter_staff(qs, staff_type, teaching_positions, non_teaching_positions)
+            if role in VALID_ROLES['default'] and staff_type:
+                if staff_type in ['teaching', 'both']:
+                    positions = teaching_positions
+                    positions_field = 'teaching_positions__in'
+                else:
+                    positions = non_teaching_positions
+                    positions_field = 'non_teaching_positions__in'
+
+                # Check if "Class Teacher" is selected
+                is_class_teacher = any(getattr(p, 'is_class_teacher', False) for p in positions)
+
+                # Pass student_class and class_arm if class teacher is involved and both fields are filled
+                if is_class_teacher and student_class and class_arm:
+                    return filter_staff(
+                        staff_type=staff_type,
+                        positions=positions,
+                        positions_field=positions_field,
+                        role_scope=VALID_ROLES['default'],
+                        student_class=student_class,
+                        class_arm=class_arm,
+                        request_user=self.user
+                    )
+                else:
+                    # Proceed even without class/arm; they are optional for staff users
+                    return filter_staff(
+                        staff_type=staff_type,
+                        positions=positions,
+                        positions_field=positions_field,
+                        role_scope=VALID_ROLES['default'],
+                        student_class=student_class,
+                        class_arm=class_arm,
+                        request_user=self.user
+                    )
+
             elif role:
                 qs = qs.filter(role=role)
 
+            return qs
+
+        # Search filter
         if search:
             qs = qs.filter(Q(username__icontains=search) | Q(email__icontains=search))
 
         return qs
 
+
+# staff_profile = getattr(user, 'staffprofile', None)
+
+# if staff_profile:
+#     if staff_profile.managing_class and cleaned_data.get('student_class') != staff_profile.managing_class:
+#         self.add_error('student_class', "You are not allowed to change this class.")
+#         cleaned_data['student_class'] = staff_profile.managing_class
+
+#     if staff_profile.managing_class_arm and cleaned_data.get('class_arm') != staff_profile.managing_class_arm:
+#         self.add_error('class_arm', "You are not allowed to change this class arm.")
+#         cleaned_data['class_arm'] = staff_profile.managing_class_arm
 
 class MultiFileInput(ClearableFileInput):
     allow_multiple_selected = True
@@ -1572,3 +1790,10 @@ class CommunicationCommentForm(forms.ModelForm):
         model = CommunicationComment
         fields = ['comment']
 
+ReplyAttachmentFormSet = inlineformset_factory(
+    MessageReply,  # Parent model for replies
+    ReplyAttachment,  # Child model for reply attachments
+    fields=["file"],
+    extra=1,
+    can_delete=True
+)

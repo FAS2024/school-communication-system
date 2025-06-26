@@ -1,8 +1,5 @@
-{% extends "base.html" %} {% load static %} 
-{% load custom_filters %}
-{% load widget_tweaks %}
-
-{% block content %}
+{% extends "base.html" %} {% load static %} {% load custom_filters %} {% load
+widget_tweaks %} {% block content %}
 <h2 style="margin-bottom: 1rem">Edit Communication</h2>
 
 <style>
@@ -19,7 +16,7 @@
     overflow-x: visible;
     white-space: normal;
     /* New background color */
-    background-color:rgb(242, 243, 245);
+    background-color: rgb(242, 243, 245);
 
     /* Optional subtle shadow for nice depth */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
@@ -48,9 +45,7 @@
   }
 </style>
 
-
-  
-<form id="target-group-form" method="get" style="margin-bottom: 1rem;">
+<form id="target-group-form" method="get" style="margin-bottom: 1rem">
   <fieldset id="form-fields-container">
     <legend>Select Target Group</legend>
 
@@ -145,15 +140,21 @@
   </fieldset>
 </form>
 
-
 {% if communication_form.non_field_errors %}
-  <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
-    {% for error in communication_form.non_field_errors %}
-      <div>{{ error }}</div>
-    {% endfor %}
-  </div>
+<div
+  style="
+    color: red;
+    background-color: white;
+    border: 1px solid red;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  "
+>
+  {% for error in communication_form.non_field_errors %}
+  <div>{{ error }}</div>
+  {% endfor %}
+</div>
 {% endif %}
-
 
 <h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
 <table
@@ -198,165 +199,170 @@
 <form
   id="communication-form"
   method="post"
-  action="{% url 'edit_draft_message' draft.pk %}"
+  action="{% url 'edit_draft_message' communication.pk %}"
   enctype="multipart/form-data"
   style="max-width: 100%"
   data-user-role="{{ request.user.role }}"
 >
   {% csrf_token %}
+  
 
   {% if attachment_formset.non_form_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
+  <div class="alert alert-danger" style="margin-bottom: 1rem">
     {{ attachment_formset.non_form_errors }}
   </div>
   {% endif %}
 
   <div
-    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;  background-color:rgb(242, 243, 245);"
-  >
-  <div style="display: flex; flex-wrap: wrap; gap: 1rem; width: 100%;">
-
-  <!-- Left Column: Message Details -->
-  <fieldset
     style="
-      flex: 1;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 1rem;
-      min-width: 300px;
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      background-color: rgb(242, 243, 245);
     "
   >
-    <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
-      Message Details
-    </legend>
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; width: 100%">
+      <!-- Left Column: Message Details -->
+      <fieldset
+        style="
+          flex: 1;
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          padding: 1rem;
+          min-width: 300px;
+        "
+      >
+        <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
+          Message Details
+        </legend>
 
-    {% for field in communication_form %}
-      {% if field.name != 'is_draft' and field.name != 'requires_response' %}
+        {% for field in communication_form %} 
+        {% if field.name != 'is_draft' and field.name != 'requires_response' %}
         <div class="form-group mb-3 d-flex flex-column">
-          <label for="{{ field.id_for_label }}" class="form-label fw-semibold mb-1">
+          <label
+            for="{{ field.id_for_label }}"
+            class="form-label fw-semibold mb-1"
+          >
             {{ field.label }}:
           </label>
-          {{ field }}
-          {% if field.help_text %}
-            <small class="form-text text-muted">{{ field.help_text }}</small>
-          {% endif %}
-          {% if field.errors %}
-            <div class="text-danger mt-1">{{ field.errors }}</div>
+          {{ field }} {% if field.help_text %}
+          <small class="form-text text-muted">{{ field.help_text }}</small>
+          {% endif %} {% if field.errors %}
+          <div class="text-danger mt-1">{{ field.errors }}</div>
           {% endif %}
         </div>
-      {% endif %}
-    {% endfor %}
+        {% endif %} {% endfor %}
 
-    <div class="form-switch-group p-4 mt-4 rounded-4" style="background-color:#ddd;">
-      <h6 class="text-black mb-3 fw-semibold">Additional Options</h6>
-      <div class="d-flex flex-column flex-md-row gap-4">
-        {% for field in communication_form %}
-          {% if field.name == 'is_draft' or field.name == 'requires_response' %}
+        <div
+          class="form-switch-group p-4 mt-4 rounded-4"
+          style="background-color: #ddd"
+        >
+          <h6 class="text-black mb-3 fw-semibold">Additional Options</h6>
+          <div class="d-flex flex-column flex-md-row gap-4">
+            {% for field in communication_form %} 
+            {% if field.name == 'is_draft' or field.name == 'requires_response' %}
             <div class="form-check form-switch text-white">
               {{ field }}
-              <label class="form-check-label fw-semibold ms-2" for="{{ field.id_for_label }}">
+              <label
+                class="form-check-label fw-semibold ms-2"
+                for="{{ field.id_for_label }}"
+              >
                 {{ field.label }}
               </label>
               {% if field.help_text %}
-                <div class="form-text text-light small">{{ field.help_text }}</div>
-              {% endif %}
-              {% if field.errors %}
-                <div class="text-danger small">{{ field.errors }}</div>
+              <div class="form-text text-light small">
+                {{ field.help_text }}
+              </div>
+              {% endif %} {% if field.errors %}
+              <div class="text-danger small">{{ field.errors }}</div>
               {% endif %}
             </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </div>
-  </fieldset>
-
-  <!-- Right Column: Attachments -->
-<fieldset style="flex: 1; border: 1px solid #ccc; border-radius: 8px; padding: 1rem; min-width: 300px;">
-  <legend style="font-weight: 600; font-size: 1.2rem;">Attachments</legend>
-
-  {{ attachment_formset.management_form }}
-  
-  {% if attachment_formset.non_form_errors %}
-    <div class="alert alert-danger mb-2">
-      {% for error in attachment_formset.non_form_errors %}
-        <div>{{ error }}</div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  <!-- Actual list of attachment forms -->
-  <div id="attachments-container">
-    {% for form in attachment_formset.forms %}
-      <div class="attachment-form mb-3 p-3 border rounded bg-light position-relative">
-        {{ form.id }}
-        {% if form.DELETE %}{{ form.DELETE }}{% endif %}
-
-        <label class="form-label mb-1">Upload File:</label>
-        {{ form.file|add_class:"form-control w-100 attachment-input" }}
-
-        {% if form.file.errors %}
-          <div class="text-danger small mt-1">
-            {% for error in form.file.errors %}
-              <div>{{ error }}</div>
-            {% endfor %}
+            {% endif %} {% endfor %}
           </div>
+        </div>
+      </fieldset>
+
+      <!-- Right Column: Attachments -->
+      <fieldset>
+        <h6 style="color: black; font-weight: 600; margin-bottom: 0.75rem">
+          <i class="fas fa-paperclip me-2" style="color: green"></i
+          ><strong>Attachments</strong>
+        </h6>
+        {% if attachment_formset.non_form_errors %}
+        <div class="alert alert-danger">
+          {% for error in attachment_formset.non_form_errors %}
+          <div>{{ error }}</div>
+          {% endfor %}
+        </div>
         {% endif %}
 
-        {% if form.instance.file %}
-          <small class="text-muted d-block">{{ form.instance.file.name }}</small>
-          <a href="{{ form.instance.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-1">View</a>
-        {% endif %}
+        <!-- Management form -->
+        {{ attachment_formset.management_form }}
 
-        <button type="button" class="btn btn-sm btn-outline-danger remove-attachment mt-2">Remove</button>
+        <!-- Existing forms -->
+        <div id="attachments-container">
+          {% for form in attachment_formset.forms %}
+          <div class="attachment-form mb-2 position-relative">
+            {{ form.file.label_tag }} {{ form.file }} {% if form.DELETE %}{{
+            form.DELETE }}{% endif %}
+            <button
+              type="button"
+              class="btn btn-sm btn-danger remove-attachment mt-1"
+              style="position: absolute; top: 8px; right: 8px"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Hidden template -->
+        <div id="empty-form-template" style="display: none">
+          <div class="attachment-form mb-2 position-relative">
+            {{ attachment_formset.empty_form.file.label_tag }} {{
+            attachment_formset.empty_form.file }}
+            <button
+              type="button"
+              class="btn btn-sm btn-danger remove-attachment mt-1"
+              style="position: absolute; top: 8px; right: 8px"
+            >
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add More Button -->
+        <button
+          type="button"
+          id="add-attachment"
+          class="btn btn-sm btn-outline-success mt-2"
+        >
+          + Add More Files
+        </button>
+      </fieldset>
+
+      <!-- Spinner (optional) -->
+      <div id="upload-spinner" style="display: none; margin-top: 10px">
+        <img
+          src="{% static 'assets/img/spinner.gif' %}"
+          alt="Uploading..."
+          width="40"
+        />
+        Uploading files, please wait...
       </div>
-    {% endfor %}
-  </div>
-
-  <!-- Add button -->
-  <button type="button" id="add-attachment" class="btn btn-sm btn-outline-success mt-3">+ Add More Files</button>
-
-  <!-- Hidden empty form template -->
-  <div id="empty-form-template" style="display: none;">
-    <div class="attachment-form mb-3 p-3 border rounded bg-light position-relative">
-      {{ attachment_formset.empty_form.id }}
-      {% if attachment_formset.empty_form.DELETE %}{{ attachment_formset.empty_form.DELETE }}{% endif %}
-
-      <label class="form-label mb-1">Upload File:</label>
-      {{ attachment_formset.empty_form.file|add_class:"form-control w-100 attachment-input" }}
-
-      <button type="button" class="btn btn-sm btn-outline-danger remove-attachment mt-2">Remove</button>
     </div>
-  </div>
-</fieldset>
-
-</div>
-
-
   </div>
 
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-  
-   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-   <button
-    type="submit"
-    class="btn btn-primary"
-    name="action"
-    value="draft"
-    id="save-draft"
-    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
-  >
-    Save as Draft
-  </button>
 
-  <button
-    type="submit"
-    class="btn btn-success"
-    name="action"
-    value="send"
-    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
-  >
-    Send Message
-  </button>
+    <button type="submit" name="action" value="draft" id="save-draft-btn" class="btn btn-primary" title="Save without sending">
+      Save as Draft
+    </button>
+    <button type="submit" name="action" value="send" id="send-message-btn" class="btn btn-success" title="Send message to recipients">
+      Send Message
+    </button>
+
 </form>
 
 <!-- jQuery -->
@@ -367,7 +373,7 @@
 <script>
   const savedFilterData = {{ saved_filter_data|safe }};
   const savedSelectedRecipients = {{ selected_recipient_ids|safe }};
-  const isEditingDraft = {{ is_editing_draft|yesno:"true,false" }};
+  const isEditingDraft = {{ editing_draft|yesno:"true,false" }};
 </script>
 
 <script>
@@ -410,11 +416,17 @@
         if (Array.isArray(savedSelectedRecipients)) {
           selectedRecipients = new Set(savedSelectedRecipients.map(String));
         }
+
+        updateBranchVisibility();
+        updateRoleVisibility();
+        updateStaffTypeVisibility();
+        updateStudentClassVisibility();
       } else {
         loadFilters();
         loadSelectedRecipients();
       }
     }
+
 
     function loadFilters() {
       const saved = localStorage.getItem("targetGroupFilters");
@@ -431,8 +443,6 @@
         }
       }
     }
-
-  
 
     // ===== Initialize DataTable =====
     if (!$.fn.DataTable.isDataTable("#recipients-table")) {
@@ -696,9 +706,8 @@
     });
 
     // Save as Draft validation with SweetAlert
-    $("#save-draft").on("click", function (e) {
-      const isDraftChecked = $("#id_is_draft").is(":checked");
-      if (!isDraftChecked) {
+    $("#save-draft-btn").on("click", function (e) {
+      if (!isDraftModeEnabled()) {
         e.preventDefault();
         Swal.fire({
           title: "Draft Not Checked",
@@ -714,28 +723,26 @@
       saveSelectedRecipients();
     });
 
+
+    // Clear local storage if final send
+    if (isSendAction && typeof clearFiltersStorage === "function") {
+      clearFiltersStorage();
+      localStorage.removeItem("selectedRecipients");
+    }
+
     // Submit validation with SweetAlert
-    $communicationForm.on("submit", function (e) {
-      const isDraftChecked = $("#id_is_draft").is(":checked");
-      const submitButton = document.activeElement;
-      const isSendAction = $(submitButton).val() === "send";
-      const isFinalSend = $("#id_status").val() === "sent";
+    const $communicationForm = $("#communication-form");
+    const $draftCheckbox = $("#id_is_draft");
+    const $saveDraftButton = $("#save-draft");
+    const userRole = $communicationForm.data("user-role");
 
-      // Prevent sending if "Save as Draft" is checked
-      if (isDraftChecked && (isSendAction || isFinalSend)) {
-        e.preventDefault();
-        Swal.fire({
-          title: "Draft is Checked",
-          text: "You cannot send a message while 'Save as Draft' is checked. Please uncheck it to proceed.",
-          icon: "error",
-          confirmButtonColor: "#3085d6",
-          confirmButtonText: "OK"
-        });
-        return false;
-      }
+    function isDraftModeEnabled() {
+      return $draftCheckbox.is(":checked");
+    }
 
-      // Prevent saving as draft if checkbox is NOT checked
-      if (!isDraftChecked && !isSendAction) {
+    // Handle Save as Draft button
+    $saveDraftButton.on("click", function (e) {
+      if (!isDraftModeEnabled()) {
         e.preventDefault();
         Swal.fire({
           title: "Draft Not Checked",
@@ -747,8 +754,30 @@
         return false;
       }
 
-      // Branch validation
-      if (["staff", "branch_admin", "superadmin"].includes(userRole) && !fields.branch.val()) {
+      // Save localStorage data before saving draft
+      saveFilters();
+      saveSelectedRecipients();
+    });
+
+    // Handle full form submission (either send or save as draft)
+    $communicationForm.on("submit", function (e) {
+      const submitButton = document.activeElement;
+
+      // Prevent sending message while 'Save as Draft' is checked
+      if ($(submitButton).val() === "send" && isDraftModeEnabled()) {
+        e.preventDefault();
+        Swal.fire({
+          title: "Draft is Checked",
+          text: "You cannot send a message while 'Save as Draft' is checked. Please uncheck it to proceed.",
+          icon: "error",
+          confirmButtonColor: "#3085d6",
+          confirmButtonText: "OK"
+        });
+        return false;
+      }
+
+      // Branch and Role validations
+      if (["staff", "branch_admin", "superadmin"].includes(userRole) && !$("#id_branch").val()) {
         e.preventDefault();
         Swal.fire({
           title: "Missing Branch",
@@ -760,8 +789,7 @@
         return false;
       }
 
-      // Role validation
-      if (["student", "parent"].includes(userRole) && !fields.role.val()) {
+      if (["student", "parent"].includes(userRole) && !$("#id_role").val()) {
         e.preventDefault();
         Swal.fire({
           title: "Missing Role",
@@ -773,9 +801,12 @@
         return false;
       }
 
-      // Proceed with submission
-      $communicationForm.find(".injected-filter-field").remove();
-      const filterFieldNames = ["branch", "role", "staff_type", "teaching_positions", "non_teaching_positions", "student_class", "class_arm"];
+      // Inject selected filters into form before submitting
+      const filterFieldNames = [
+        "branch", "role", "staff_type",
+        "teaching_positions", "non_teaching_positions",
+        "student_class", "class_arm"
+      ];
 
       filterFieldNames.forEach(function (name) {
         const $fields = $("#target-group-form [name='" + name + "']");
@@ -810,7 +841,7 @@
         }
       });
 
-      // Add selected recipients
+      // Inject selected recipients
       $communicationForm.find('input[name="selected_recipients"]').remove();
       [...selectedRecipients].forEach(function (id) {
         $("<input>", {
@@ -820,60 +851,86 @@
         }).appendTo($communicationForm);
       });
 
-      // Clear local storage if final send
-      if (isSendAction && typeof clearFiltersStorage === "function") {
+      // Clear storage if sending
+      if ($(submitButton).val() === "send") {
         clearFiltersStorage();
         localStorage.removeItem("selectedRecipients");
       }
 
-      // Actually submit
       $communicationForm.off("submit").submit();
     });
-
+  
     // ===== Attachment Handling =====
     const maxAttachments = 5;
-    let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
+
+    function getActiveAttachmentCount() {
+      return $("#attachments-container .attachment-form").filter(function () {
+        return !$(this).find("input[type='checkbox'][name$='-DELETE']").is(":checked");
+      }).length;
+    }
 
     $("#add-attachment").on("click", function () {
-      if (totalForms >= maxAttachments) {
+      const totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
+      const activeCount = getActiveAttachmentCount();
+
+      if (activeCount >= maxAttachments) {
         alert("Maximum attachments reached.");
         return;
       }
 
-      const $newFormHtml = $("#empty-form-template").html().replace(/__prefix__/g, totalForms);
-      $("#attachments-container").append($newFormHtml);
-      totalForms++;
-      $("#id_attachments-TOTAL_FORMS").val(totalForms);
+      // Clone the empty form template
+      const $template = $("#empty-form-template .attachment-form").clone();
+      const formRegex = /__prefix__/g;
+
+      // Update all input names and IDs
+      $template.find("input, select, textarea, label").each(function () {
+        if ($(this).attr("name")) {
+          $(this).attr("name", $(this).attr("name").replace(formRegex, totalForms));
+        }
+        if ($(this).attr("id")) {
+          $(this).attr("id", $(this).attr("id").replace(formRegex, totalForms));
+        }
+        if ($(this).is("input[type='file']")) {
+          $(this).val("");  // Clear file input
+        }
+      });
+
+      // Append to the form container
+      $("#attachments-container").append($template);
+
+      // Increment the form count
+      $("#id_attachments-TOTAL_FORMS").val(totalForms + 1);
     });
 
+    // Remove button logic
     $("#attachments-container").on("click", ".remove-attachment", function () {
       const $form = $(this).closest(".attachment-form");
-      const $deleteCheckbox = $form.find("input[type='checkbox'][name$='-DELETE']");
+      const $deleteInput = $form.find("input[type='checkbox'][name$='-DELETE']");
 
-      if ($deleteCheckbox.length > 0) {
-        $deleteCheckbox.prop("checked", true);
-        $form.hide(); // Keep it in DOM so Django deletes it
+      if ($deleteInput.length) {
+        $deleteInput.prop("checked", true);
+        $form.hide();
       } else {
         $form.remove();
-        totalForms--;
-        $("#id_attachments-TOTAL_FORMS").val(totalForms);
+        const updatedCount = $("#attachments-container .attachment-form").length;
+        $("#id_attachments-TOTAL_FORMS").val(updatedCount);
       }
     });
 
-
-
-
     // ===== Initial Setup =====
-    preloadFromServer();
-    loadFilters();
-    loadSelectedRecipients();
-    updateBranchVisibility();
-    updateRoleVisibility();
-    updateStaffTypeVisibility();
-    updateStudentClassVisibility();
-    loadRecipients();
+    preloadFromServer(); // Handles filters + visibility
 
+    loadRecipients();
+    updateRecipientTableCheckboxStates(); // Reflect selected recipients
+    });
   });
 </script>
+
+<script>
+  $("form").on("submit", function () {
+    $("#upload-spinner").show(); // Show the spinner
+    $(this).find("button[type='submit']").prop("disabled", true); // Disable submit buttons
+  });
+</script> 
 
 {% endblock %}

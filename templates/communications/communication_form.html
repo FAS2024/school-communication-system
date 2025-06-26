@@ -45,154 +45,94 @@
     font-weight: 500;
   }
 </style>
-
-
-  
+<!-- Target Group Filter Form -->
 <form id="target-group-form" method="get" style="margin-bottom: 1rem;">
   <fieldset id="form-fields-container">
     <legend>Select Target Group</legend>
 
     {% if user_role != "student" and user_role != "parent" %}
-    <div id="branch-field" class="form-group">
-      <label for="id_branch" class="form-label">Branch:</label>
-      {{ target_group_form.branch }} {% if target_group_form.branch.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.branch.errors }}
+      <div id="branch-field" class="form-group">
+        <label for="id_branch" class="form-label">Branch:</label>
+        {{ target_group_form.branch }}
+        {% if target_group_form.branch.errors %}
+          <div class="text-danger">{{ target_group_form.branch.errors }}</div>
+        {% endif %}
       </div>
-      {% endif %}
-    </div>
     {% else %}
-    <input
-      type="hidden"
-      id="id_branch"
-      name="branch"
-      value="{{ user_branch_id }}"
-    />
+      <input type="hidden" id="id_branch" name="branch" value="{{ user_branch_id }}" />
     {% endif %}
 
-    <div
-      id="role-field"
-      class="form-group"
-      style="{% if target_group_form.role.errors %}display: block{% else %}display: none{% endif %}"
-    >
-      <label for="id_role" class="form-label">Role:</label>
-      {{ target_group_form.role }} {% if target_group_form.role.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.role.errors }}
-      </div>
+    <!-- Render individual fields manually -->
+    <div id="role-field" class="form-group" style="display: none;">
+      <label for="{{ target_group_form.role.id_for_label }}" class="form-label">{{ target_group_form.role.label }}:</label>
+      {{ target_group_form.role }}
+      {% if target_group_form.role.errors %}
+        <div class="text-danger">{{ target_group_form.role.errors }}</div>
       {% endif %}
     </div>
 
-    <div id="staff-type-field" class="form-group" style="display: none">
-      <label for="id_staff_type" class="form-label">Staff Type:</label>
-      {{ target_group_form.staff_type }} 
+    <div id="staff-type-field" class="form-group" style="display: none;">
+      <label for="{{ target_group_form.staff_type.id_for_label }}" class="form-label">{{ target_group_form.staff_type.label }}:</label>
+      {{ target_group_form.staff_type }}
       {% if target_group_form.staff_type.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.staff_type.errors }}
-      </div>
+        <div class="text-danger">{{ target_group_form.staff_type.errors }}</div>
       {% endif %}
     </div>
 
-    <div id="teaching-positions-field" class="form-group" style="display: none">
-      <label for="id_teaching_positions" class="form-label"
-        >Teaching Positions:</label
-      >
-      {{ target_group_form.teaching_positions }} 
+    <div id="teaching-positions-field" class="form-group" style="display: none;">
+      <label class="form-label">Teaching Positions:</label>
+      <div id="id_teaching_positions">
+        {% for position in target_group_form.fields.teaching_positions.queryset %}
+          <div class="form-check">
+            <input
+              type="checkbox"
+              name="teaching_positions"
+              value="{{ position.id }}"
+              class="form-check-input"
+              data-is-class-teacher="{% if position.is_class_teacher %}1{% else %}0{% endif %}"
+              {% if position in target_group_form.initial.teaching_positions %}checked{% endif %}
+              id="teaching_pos_{{ position.id }}"
+            >
+            <label class="form-check-label" for="teaching_pos_{{ position.id }}">
+              {{ position.name }}
+            </label>
+          </div>
+        {% endfor %}
+      </div>
       {% if target_group_form.teaching_positions.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.teaching_positions.errors }}
-      </div>
+        <div class="text-danger">{{ target_group_form.teaching_positions.errors }}</div>
       {% endif %}
     </div>
 
-    <div
-      id="non-teaching-positions-field"
-      class="form-group"
-      style="display: none"
-    >
-      <label for="id_non_teaching_positions" class="form-label"
-        >Non-Teaching Positions:</label
-      >
-      {{ target_group_form.non_teaching_positions }} 
+    <div id="non-teaching-positions-field" class="form-group" style="display: none;">
+      <label for="{{ target_group_form.non_teaching_positions.id_for_label }}" class="form-label">{{ target_group_form.non_teaching_positions.label }}:</label>
+      {{ target_group_form.non_teaching_positions }}
       {% if target_group_form.non_teaching_positions.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.non_teaching_positions.errors }}
-      </div>
+        <div class="text-danger">{{ target_group_form.non_teaching_positions.errors }}</div>
       {% endif %}
     </div>
 
-    <div id="student-class-field" class="form-group" style="display: none">
-      <label for="id_student_class" class="form-label">Student Class:</label>
-      {{ target_group_form.student_class }} 
+    <div id="student-class-field" class="form-group" style="display: none;">
+      <label for="{{ target_group_form.student_class.id_for_label }}" class="form-label">{{ target_group_form.student_class.label }}:</label>
+      {{ target_group_form.student_class }}
       {% if target_group_form.student_class.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.student_class.errors }}
-      </div>
+        <div class="text-danger">{{ target_group_form.student_class.errors }}</div>
       {% endif %}
     </div>
 
-    <div id="class-arm-field" class="form-group" style="display: none">
-      <label for="id_class_arm" class="form-label">Class Arm:</label>
-      {{ target_group_form.class_arm }} 
+    <div id="class-arm-field" class="form-group" style="display: none;">
+      <label for="{{ target_group_form.class_arm.id_for_label }}" class="form-label">{{ target_group_form.class_arm.label }}:</label>
+      {{ target_group_form.class_arm }}
       {% if target_group_form.class_arm.errors %}
-      <div class="text-danger" style="color: red; margin-top: 0.25rem">
-        {{ target_group_form.class_arm.errors }}
-      </div>
+        <div class="text-danger">{{ target_group_form.class_arm.errors }}</div>
       {% endif %}
     </div>
+
   </fieldset>
 </form>
 
 
-{% if communication_form.non_field_errors %}
-  <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
-    {% for error in communication_form.non_field_errors %}
-      <div>{{ error }}</div>
-    {% endfor %}
-  </div>
-{% endif %}
-
-
-<h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
-<table
-  id="recipients-table"
-  class="table table-striped"
-  style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
->
-  <thead style="background-color: #007bff; color: white">
-    <tr>
-      <th style="padding: 0.5rem; text-align: center">
-        <input type="checkbox" id="select-all-recipients" />
-      </th>
-      <th style="padding: 0.5rem; text-align: center">S/N</th>
-      <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
-      <th style="padding: 0.5rem; text-align: center">Branch</th>
-      <th style="padding: 0.5rem; text-align: left">Name</th>
-      <th style="padding: 0.5rem; text-align: left">Email</th>
-    </tr>
-  </thead>
-  <tbody style="border: 1px solid #ddd">
-    <tr>
-      <td></td>
-      <td></td>
-      <td
-        colspan="6"
-        style="
-          padding: 1rem;
-          text-align: center;
-          font-style: italic;
-          color: #555;
-        "
-      >
-        Select filters above to view recipients.
-      </td>
-      <td></td>
-      <td></td>
-      <td></td>
-    </tr>
-  </tbody>
-</table>
-
+<!-- Communication Form -->
 <form
   id="communication-form"
   method="post"
@@ -203,29 +143,65 @@
 >
   {% csrf_token %}
 
-  {% if attachment_formset.non_form_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ attachment_formset.non_form_errors }}
-  </div>
+  {% if form_error %}
+    <div class="alert alert-warning" role="alert">
+      There was an error with your previous submission. Please correct the highlighted fields.
+    </div>
   {% endif %}
 
-  <div
-    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;  background-color:rgb(242, 243, 245);"
-  >
-    <!-- Left Column: Message Details -->
-    <fieldset
-      style="
-        flex: 1 1 600px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 1rem;
-      "
-    >
-      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
-        Message Details
-      </legend>
+  {% if attachment_formset.non_form_errors %}
+    <div class="alert alert-danger" style="margin-bottom: 1rem;">
+      {{ attachment_formset.non_form_errors }}
+    </div>
+  {% endif %}
 
-      {# First loop: render all fields except is_draft and requires_response #}
+  {% if communication_form.non_field_errors %}
+    <div style="color: red; background-color: white; border: 1px solid red; padding: 0.75rem; margin-bottom: 1rem;">
+      {% for error in communication_form.non_field_errors %}
+        <div>{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Recipients Table -->
+  <h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
+  <table
+    id="recipients-table"
+    class="table table-striped"
+    style="width: 100%; border-collapse: collapse; margin-bottom: 2rem"
+  >
+    <thead style="background-color: #007bff; color: white">
+      <tr>
+        <th style="padding: 0.5rem; text-align: center">
+          <input type="checkbox" id="select-all-recipients" />
+        </th>
+        <th style="padding: 0.5rem; text-align: center">S/N</th>
+        <th style="padding: 0.5rem; text-align: center">Profile Picture</th>
+        <th style="padding: 0.5rem; text-align: center">Branch</th>
+        <th style="padding: 0.5rem; text-align: left">Name</th>
+        <th style="padding: 0.5rem; text-align: left">Email</th>
+      </tr>
+    </thead>
+    <tbody style="border: 1px solid #ddd">
+      <tr>
+        <td></td>
+        <td></td>
+        <td colspan="6" style="padding: 1rem; text-align: center; font-style: italic; color: #555;">
+          Select filters above to view recipients.
+        </td>
+        <td></td>
+        <td></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Main Content: Message and Attachments -->
+  <div style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap; background-color: rgb(242, 243, 245);">
+    <!-- Message Section -->
+    <fieldset style="flex: 1 1 600px; border: 1px solid #ccc; border-radius: 8px; padding: 1rem;">
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">Message Details</legend>
+
       {% for field in communication_form %}
         {% if field.name != 'is_draft' and field.name != 'requires_response' %}
           <div class="form-group mb-3 d-flex flex-column">
@@ -243,7 +219,7 @@
         {% endif %}
       {% endfor %}
 
-      {# Render is_draft and requires_response as toggle switches #}
+      <!-- Toggle Switches -->
       <div class="form-switch-group p-4 mt-4 rounded-4" style="background-color:#ddd;">
         <h6 class="text-black mb-3 fw-semibold">Additional Options</h6>
         <div class="d-flex flex-column flex-md-row gap-4">
@@ -265,82 +241,57 @@
           {% endfor %}
         </div>
       </div>
-
     </fieldset>
 
-    <!-- Right Column: Attachments -->
-    <fieldset
-      style="
-        flex: 1 1 200px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        padding: 1rem;
-      "
-    >
-      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">
-        Attachments
-      </legend>
+    <!-- Attachment Section -->
+    <fieldset style="flex: 1 1 200px; border: 1px solid #ccc; border-radius: 8px; padding: 1rem;">
+      <legend style="font-weight: 600; font-size: 1.2rem; padding: 0 0.5rem">Attachments</legend>
       {{ attachment_formset.management_form }}
+
       <div id="attachments-container">
         {% for form in attachment_formset.forms %}
-        <div
-          class="attachment-form {% if forloop.counter > 2 %}extra-attachment{% endif %}"
-          style="margin-bottom: 1rem; position: relative"
-        >
-          {{ form.as_p }}
-          {% if forloop.counter > 2 %}
-          <button
-            type="button"
-            class="btn btn-danger remove-attachment"
-            style="position: absolute; top: 10px; right: 10px"
-          >
-            Remove
-          </button>
-          {% endif %}
-        </div>
+          <div class="attachment-form {% if forloop.counter > 1 %}extra-attachment{% endif %}" style="margin-bottom: 1rem; position: relative">
+            {{ form.as_p }}
+            {% if forloop.counter > 1 %}
+              <button type="button" class="btn btn-sm btn-danger remove-attachment mt-1"
+                style="position: absolute; top: 10px; right: 10px">
+                <i class="fas fa-times"></i>
+              </button>
+            {% endif %}
+          </div>
         {% endfor %}
       </div>
-      <button
-        type="button"
-        id="add-attachment"
-        class="btn btn-success"
-        style="margin-top: 0.75rem"
-      >
+
+      <button type="button" id="add-attachment" class="btn btn-success" style="margin-top: 0.75rem">
         Add More Files
       </button>
     </fieldset>
   </div>
 
+  <!-- Hidden Recipients and Filter Memory -->
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-   <button
-    type="submit"
-    class="btn btn-primary"
-    name="action"
-    value="draft"
-    id="save-draft"
-    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
-  >
+  <input type="hidden" name="saved_branch" id="hidden-branch">
+  <input type="hidden" name="saved_role" id="hidden-role">
+  <input type="hidden" name="saved_staff_type" id="hidden-staff-type">
+  <input type="hidden" name="saved_student_class" id="hidden-student-class">
+  <input type="hidden" name="saved_class_arm" id="hidden-class-arm">
+  <input type="hidden" name="saved_teaching_positions" id="hidden-teaching-positions">
+  <input type="hidden" name="saved_non_teaching_positions" id="hidden-non-teaching-positions">
+
+  <!-- Action Buttons -->
+  <button type="submit" class="btn btn-primary" name="action" value="draft"
+    id="save-draft" style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem">
     Save as Draft
   </button>
-  <button
-    type="submit"
-    class="btn btn-success"
-    name="action"
-    value="send"
-    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem"
-  >
+  <button type="submit" class="btn btn-success" name="action" value="send"
+    style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem">
     Send Message
   </button>
-
-
 </form>
 
-
-
-<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<!-- SweetAlert2 CDN -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 
 <script>
   let recipientsTable;
@@ -446,21 +397,21 @@
 
     function updateRoleVisibility() {
       const role = fields.role.val();
+
       if (role === "staff") {
         $("#staff-type-field").show();
-        $("#student-class-field, #class-arm-field").hide();
-        resetFields(["studentClass", "classArm"]);
         updateStaffTypeVisibility();
       } else if (role === "student") {
         $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field").hide();
         resetFields(["staffType", "teaching", "nonTeaching"]);
-        $("#student-class-field").show();
-        updateStudentClassVisibility();
       } else {
-        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field, #student-class-field, #class-arm-field").hide();
-        resetFields(["staffType", "teaching", "nonTeaching", "studentClass", "classArm"]);
+        $("#staff-type-field, #teaching-positions-field, #non-teaching-positions-field").hide();
+        resetFields(["staffType", "teaching", "nonTeaching"]);
       }
+
+      checkIfClassTeacherSelected(); // << ADD THIS HERE
     }
+
 
     function updateStaffTypeVisibility() {
       const type = fields.staffType.val();
@@ -480,6 +431,8 @@
         $teaching.hide().find("input[type=checkbox]").prop("checked", false);
         $nonTeaching.hide().find("input[type=checkbox]").prop("checked", false);
       }
+
+      checkIfClassTeacherSelected(); 
     }
 
     function updateStudentClassVisibility() {
@@ -515,18 +468,40 @@
         return;
       }
 
-      if (userRole === "student") {
-        if (fields.role.val() === "student") {
-          const studentClass = fields.studentClass.val();
-          const classArm = fields.classArm.val();
-          if (!studentClass || !classArm) {
-            recipientsTable.clear().draw();
-            $selectAll.prop("checked", false);
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
-            return;
-          }
+      // Handle student class/arm requirement
+      if (fields.role.val() === "student") {
+        const studentClass = fields.studentClass.val();
+        const classArm = fields.classArm.val();
+        if (!studentClass || !classArm) {
+          recipientsTable.clear().draw();
+          $selectAll.prop("checked", false);
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+          return;
         }
       }
+
+      // Handle class teacher requirement
+      if (
+          fields.role.val() === "staff" &&
+          ["teaching", "both"].includes(fields.staffType.val())
+        ) {
+          const isClassTeacherSelected = $("#id_teaching_positions input[type=checkbox]:checked").filter(function () {
+            return $(this).data("is-class-teacher") == "1";
+          }).length > 0;
+
+          if (isClassTeacherSelected) {
+            const studentClass = fields.studentClass.val();
+            const classArm = fields.classArm.val();
+            if (!studentClass || !classArm) {
+              recipientsTable.clear().draw();
+              $selectAll.prop("checked", false);
+              $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm for class teachers.</td></tr>');
+              return;
+            }
+          }
+        }
+
+
 
       const queryData = $form.serializeArray().filter(item => {
         const val = item.value && item.value.trim();
@@ -605,22 +580,8 @@
       loadRecipients();
     }
 
-    // ===== Events =====
-    fields.branch.on("change", () => {
-      updateBranchVisibility(); updateRoleVisibility(); handleDependencyChange();
-    });
 
-    fields.role.on("change", () => {
-      updateRoleVisibility(); handleDependencyChange();
-    });
 
-    fields.staffType.on("change", () => {
-      updateStaffTypeVisibility(); handleDependencyChange();
-    });
-
-    fields.studentClass.on("change", () => {
-      updateStudentClassVisibility(); handleDependencyChange();
-    });
 
     $form.find("select, input[type=checkbox]").not("#select-all-recipients").on("change", handleDependencyChange);
 
@@ -753,13 +714,13 @@
         clearFiltersStorage();
         localStorage.removeItem("selectedRecipients");
       }
-
+      syncFilterDataToHiddenFields();
       $communicationForm.off("submit").submit();
     });
 
 
     // ===== Attachment Handling =====
-    const maxAttachments = 10;
+    const maxAttachments = 5;
     let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
 
     $("#add-attachment").on("click", function () {
@@ -772,7 +733,12 @@
         if ($(this).is(":checkbox, :radio")) $(this).prop("checked", false);
       });
       $newForm.find(".remove-attachment").remove();
-      $newForm.append('<button type="button" class="btn btn-danger remove-attachment" style="position: absolute; top: 10px; right: 10px;">Remove</button>');
+      $newForm.append(`
+        <button type="button" class="btn btn-sm btn-danger remove-attachment" 
+                style="position: absolute; top: 8px; right: 8px; font-size: 0.75rem; padding: 2px 6px;">
+          <i class="fas fa-times"></i>
+        </button>
+      `);
       $("#attachments-container").append($newForm);
       totalForms++;
       $("#id_attachments-TOTAL_FORMS").val(totalForms);
@@ -784,14 +750,95 @@
       $("#id_attachments-TOTAL_FORMS").val(totalForms);
     });
 
+    function syncSelectToHidden(selectId, hiddenId) {
+      const values = Array.from($(selectId).find(":selected")).map(o => o.value);
+      $(hiddenId).val(values.join(","));
+    }
+
+    // ====== For saving Filters =======
+    function syncFilterDataToHiddenFields() {
+      $("#hidden-branch").val($("#id_branch").val() || "");
+      $("#hidden-role").val($("#id_role").val() || "");
+      $("#hidden-staff-type").val($("#id_staff_type").val() || "");
+      $("#hidden-student-class").val($("#id_student_class").val() || "");
+      $("#hidden-class-arm").val($("#id_class_arm").val() || "");
+
+      const teaching = Array.from($("#id_teaching_positions").find(":selected")).map(o => o.value);
+      const nonTeaching = Array.from($("#id_non_teaching_positions").find(":selected")).map(o => o.value);
+      $("#hidden-teaching-positions").val(teaching.join(","));
+      $("#hidden-non-teaching-positions").val(nonTeaching.join(","));
+    }
+
+    function checkIfClassTeacherSelected() {
+      const isClassTeacher = $("#id_teaching_positions input[type=checkbox]:checked").filter(function () {
+        return $(this).data("is-class-teacher") == "1";
+      }).length > 0;
+
+      const shouldShowClassFields =
+        fields.role.val() === "student" ||
+        (fields.role.val() === "staff" && ["teaching", "both"].includes(fields.staffType.val()) && isClassTeacher);
+
+      if (shouldShowClassFields) {
+        $("#student-class-field").slideDown();
+        $("#class-arm-field").slideDown();
+      } else {
+        $("#student-class-field").slideUp();
+        $("#class-arm-field").slideUp();
+        fields.studentClass.val("");
+        fields.classArm.val("");
+      }
+
+      updateStudentClassVisibility(); // <- Always check visibility
+    }
+
+    // ================= Events  =========================
+    fields.branch.on("change", () => {
+      updateBranchVisibility();
+      updateRoleVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.role.on("change", () => {
+      updateRoleVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.staffType.on("change", () => {
+      updateStaffTypeVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.teaching.on("change", () => {
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.studentClass.on("change", () => {
+      updateStudentClassVisibility();
+      handleDependencyChange();
+    });
+
+    fields.classArm.on("change", handleDependencyChange);
+
+
+
+
     // ===== Initial Setup =====
+
     loadFilters();
-    loadSelectedRecipients();
-    updateBranchVisibility();
+    updateBranchVisibility(); // Needed because role may be prefilled
     updateRoleVisibility();
     updateStaffTypeVisibility();
+    checkIfClassTeacherSelected();
     updateStudentClassVisibility();
+    loadSelectedRecipients();
     loadRecipients();
+    syncFilterDataToHiddenFields();
+
+
   });
 </script>
 
