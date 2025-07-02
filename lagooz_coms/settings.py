@@ -215,3 +215,22 @@ MAX_SINGLE_ATTACHMENT_MB = 10
 MAX_TOTAL_ATTACHMENT_MB = 20
 MAX_ATTACHMENT_COUNT = 5
 MAX_FILE_SIZE_MB = 10
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': { 'class': 'logging.StreamHandler' },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        '__main__': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    }
+}

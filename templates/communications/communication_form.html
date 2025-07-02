@@ -1,7 +1,11 @@
 {% extends "base.html" %} {% load static %} 
 
 {% block content %}
-<h2 style="margin-bottom: 1rem">Create Communication</h2>
+<h2 style="margin-bottom: 1rem; color: green;">
+  <i class="fas fa-plus-circle" style="color: green; margin-right: 0.5rem;"></i>
+  Create Communication
+</h2>
+
 
 <style>
   #form-fields-container {
@@ -315,7 +319,6 @@
 
     let selectedRecipients = new Set();
 
-    // ===== Initialize DataTable =====
     if (!$.fn.DataTable.isDataTable("#recipients-table")) {
       recipientsTable = $("#recipients-table").DataTable({
         columnDefs: [{ targets: 0, orderable: false, searchable: false }],
@@ -325,7 +328,6 @@
       recipientsTable = $("#recipients-table").DataTable();
     }
 
-    // ===== Utility Functions =====
     function areFiltersEmpty() {
       for (const key in fields) {
         const field = fields[key];
@@ -409,9 +411,8 @@
         resetFields(["staffType", "teaching", "nonTeaching"]);
       }
 
-      checkIfClassTeacherSelected(); // << ADD THIS HERE
+      checkIfClassTeacherSelected();
     }
-
 
     function updateStaffTypeVisibility() {
       const type = fields.staffType.val();
@@ -432,7 +433,7 @@
         $nonTeaching.hide().find("input[type=checkbox]").prop("checked", false);
       }
 
-      checkIfClassTeacherSelected(); 
+      checkIfClassTeacherSelected();
     }
 
     function updateStudentClassVisibility() {
@@ -461,93 +462,83 @@
     }
 
     function loadRecipients() {
-      if (areFiltersEmpty()) {
-        recipientsTable.clear().draw();
-        $selectAll.prop("checked", false);
-        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
-        return;
+      const role = fields.role.val();
+      const staffType = fields.staffType.val();
+      const studentClass = fields.studentClass.val();
+      const classArm = fields.classArm.val();
+      const branch = fields.branch.val();
+
+      const hasTeaching = fields.teaching.find("input:checked").length > 0;
+      const hasNonTeaching = fields.nonTeaching.find("input:checked").length > 0;
+
+      let isClassTeacherSelected = false;
+      if (["teaching", "both"].includes(staffType)) {
+        isClassTeacherSelected = $("#id_teaching_positions input[type=checkbox]:checked").toArray()
+          .some(cb => $(cb).data("is-class-teacher") == "1");
       }
 
-      // Handle student class/arm requirement
-      if (fields.role.val() === "student") {
-        const studentClass = fields.studentClass.val();
-        const classArm = fields.classArm.val();
-        if (!studentClass || !classArm) {
+      const queryData = [];
+
+      // === Always include if selected ===
+      if (branch) queryData.push({ name: "branch", value: branch });
+      if (role) queryData.push({ name: "role", value: role });
+      if (staffType) queryData.push({ name: "staff_type", value: staffType });
+
+      // === Teaching/Non-teaching positions
+      if (["staff"].includes(role)) {
+        if (["teaching", "both"].includes(staffType) && hasTeaching) {
+          fields.teaching.find("input:checked").each(function () {
+            queryData.push({ name: "teaching_positions", value: $(this).val() });
+          });
+        }
+
+        if (["non_teaching", "both"].includes(staffType) && hasNonTeaching) {
+          fields.nonTeaching.find("input:checked").each(function () {
+            queryData.push({ name: "non_teaching_positions", value: $(this).val() });
+          });
+        }
+
+        if (["teaching"].includes(staffType) && !hasTeaching ||
+            ["non_teaching"].includes(staffType) && !hasNonTeaching ||
+            ["both"].includes(staffType) && !hasTeaching && !hasNonTeaching) {
           recipientsTable.clear().draw();
-          $selectAll.prop("checked", false);
-          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+          $recipientsTableBody.html(`<tr><td colspan="6" class="text-center p-4">
+            Please select at least one ${staffType.replace("_", "-")} position.
+          </td></tr>`);
           return;
         }
       }
 
-      // Handle class teacher requirement
-      if (
-          fields.role.val() === "staff" &&
-          ["teaching", "both"].includes(fields.staffType.val())
-        ) {
-          const isClassTeacherSelected = $("#id_teaching_positions input[type=checkbox]:checked").filter(function () {
-            return $(this).data("is-class-teacher") == "1";
-          }).length > 0;
-
-          if (isClassTeacherSelected) {
-            const studentClass = fields.studentClass.val();
-            const classArm = fields.classArm.val();
-            if (!studentClass || !classArm) {
-              recipientsTable.clear().draw();
-              $selectAll.prop("checked", false);
-              $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm for class teachers.</td></tr>');
-              return;
-            }
-          }
+      // === Class/class arm inclusion (only if class teacher selected)
+      if (isClassTeacherSelected && studentClass) {
+        queryData.push({ name: "student_class", value: studentClass });
+        if (classArm) {
+          queryData.push({ name: "class_arm", value: classArm });
         }
-
-
-
-      const queryData = $form.serializeArray().filter(item => {
-        const val = item.value && item.value.trim();
-        if (!val) return false;
-
-        const role = fields.role.val();
-        const staffType = fields.staffType.val();
-
-        if (role !== "student" && (item.name === "student_class" || item.name === "class_arm")) return false;
-        if (role !== "staff" && item.name === "staff_type") return false;
-
-        if (role === "staff") {
-          const hasTeaching = fields.teaching.find("input:checked").length > 0;
-          const hasNonTeaching = fields.nonTeaching.find("input:checked").length > 0;
-
-          if (staffType === "both" && !hasTeaching && !hasNonTeaching) {
-            recipientsTable.clear().draw();
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching or Non-Teaching position.</td></tr>');
-            return false;
-          }
-
-          if (staffType === "non_teaching" && !hasNonTeaching) {
-            recipientsTable.clear().draw();
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Non-Teaching position.</td></tr>');
-            return false;
-          }
-
-          if (staffType === "teaching" && !hasTeaching) {
-            recipientsTable.clear().draw();
-            $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching position.</td></tr>');
-            return false;
-          }
-        }
-
-        return true;
-      });
-
-      if (queryData.length === 0) {
-        recipientsTable.clear().draw();
-        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please apply valid filters to see results.</td></tr>');
-        return;
       }
 
-      $.get("{% url 'get_filtered_users' %}", $.param(queryData), function (response) {
+      // === Student-specific validation
+      if (role === "student") {
+        if (!studentClass) {
+          recipientsTable.clear().draw();
+          $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class to view students.</td></tr>');
+          return;
+        }
+        queryData.push({ name: "student_class", value: studentClass });
+        if (classArm) {
+          queryData.push({ name: "class_arm", value: classArm });
+        }
+      }
+
+      // Prevent sending empty/blank filters
+      const cleanQueryData = queryData.filter(q => q.value !== undefined && q.value !== null && q.value !== "");
+      
+      // === Submit AJAX request
+      $.get("{% url 'get_filtered_users' %}", $.param(cleanQueryData), function (response) {
+
         recipientsTable.clear();
-        if (response.length === 0) {
+
+        if (!response.length) {
           recipientsTable.draw();
           $selectAll.prop("checked", false);
           $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
@@ -562,7 +553,7 @@
             `<input type="checkbox" class="recipient-checkbox" value="${user.id}" ${isChecked ? "checked" : ""}>`,
             index + 1,
             `<img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;">`,
-            user.branch__name,
+            user.branch__name || "-",
             `${user.first_name} ${user.last_name}`,
             user.email,
           ]);
@@ -580,8 +571,92 @@
       loadRecipients();
     }
 
+    $form.find("select, input[type=checkbox]").not("#select-all-recipients").on("change", handleDependencyChange);
 
+    $recipientsTableBody.on("change", ".recipient-checkbox", function () {
+      const id = $(this).val();
+      $(this).is(":checked") ? selectedRecipients.add(id) : selectedRecipients.delete(id);
+      saveSelectedRecipients();
+      updateRecipientTableCheckboxStates();
+    });
 
+    $selectAll.on("change", function () {
+      const checked = this.checked;
+      $(".recipient-checkbox").each(function () {
+        $(this).prop("checked", checked);
+        const id = $(this).val();
+        checked ? selectedRecipients.add(id) : selectedRecipients.delete(id);
+      });
+      saveSelectedRecipients();
+    });
+
+    // Add nonTeaching field listener (FIXED)
+    fields.nonTeaching.on("change", () => {
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    // Existing teaching listener
+    fields.teaching.on("change", () => {
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.branch.on("change", () => {
+      updateBranchVisibility();
+      updateRoleVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.role.on("change", () => {
+      updateRoleVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.staffType.on("change", () => {
+      updateStaffTypeVisibility();
+      checkIfClassTeacherSelected();
+      handleDependencyChange();
+    });
+
+    fields.studentClass.on("change", () => {
+      updateStudentClassVisibility();
+      handleDependencyChange();
+    });
+
+    fields.classArm.on("change", handleDependencyChange);
+
+    function checkIfClassTeacherSelected() {
+      const isClassTeacher = $("#id_teaching_positions input[type=checkbox]:checked").filter(function () {
+        return $(this).data("is-class-teacher") == "1";
+      }).length > 0;
+
+      const shouldShowClassFields =
+        fields.role.val() === "student" ||
+        (fields.role.val() === "staff" && ["teaching", "both"].includes(fields.staffType.val()) && isClassTeacher);
+
+      if (shouldShowClassFields) {
+        $("#student-class-field").slideDown();
+        $("#class-arm-field").slideDown();
+      } else {
+        $("#student-class-field").slideUp();
+        $("#class-arm-field").slideUp();
+        fields.studentClass.val("");
+        fields.classArm.val("");
+      }
+
+      updateStudentClassVisibility();
+    }
+
+    
+    function handleDependencyChange() {
+      clearSelectedRecipients();
+      $selectAll.prop("checked", false);
+      saveFilters();
+      loadRecipients();
+    }
 
     $form.find("select, input[type=checkbox]").not("#select-all-recipients").on("change", handleDependencyChange);
 
@@ -718,7 +793,6 @@
       $communicationForm.off("submit").submit();
     });
 
-
     // ===== Attachment Handling =====
     const maxAttachments = 5;
     let totalForms = parseInt($("#id_attachments-TOTAL_FORMS").val());
@@ -754,7 +828,6 @@
       const values = Array.from($(selectId).find(":selected")).map(o => o.value);
       $(hiddenId).val(values.join(","));
     }
-
     // ====== For saving Filters =======
     function syncFilterDataToHiddenFields() {
       $("#hidden-branch").val($("#id_branch").val() || "");
@@ -823,9 +896,6 @@
 
     fields.classArm.on("change", handleDependencyChange);
 
-
-
-
     // ===== Initial Setup =====
 
     loadFilters();
@@ -838,8 +908,126 @@
     loadRecipients();
     syncFilterDataToHiddenFields();
 
-
   });
 </script>
 
 {% endblock %}
+
+
+{% comment %} function loadRecipients() {
+  const userRole = $("#user-role").val(); // hidden input or context data
+
+  if (areFiltersEmpty()) {
+    recipientsTable.clear().draw();
+    $selectAll.prop("checked", false);
+    $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
+    return;
+  }
+
+  const role = fields.role.val();
+  const staffType = fields.staffType.val();
+  const studentClass = fields.studentClass.val();
+  const classArm = fields.classArm.val();
+  const hasTeaching = fields.teaching.find("input:checked").length > 0;
+  const hasNonTeaching = fields.nonTeaching.find("input:checked").length > 0;
+
+  // === Student-specific validation ===
+  if (role === "student") {
+    if (!studentClass || !classArm) {
+      recipientsTable.clear().draw();
+      $selectAll.prop("checked", false);
+      $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class and arm to view students.</td></tr>');
+      return;
+    }
+  }
+
+  // === Staff class teacher validation ===
+  let isClassTeacherSelected = false;
+  if (role === "staff" && ["teaching", "both"].includes(staffType)) {
+    isClassTeacherSelected = $("#id_teaching_positions input[type=checkbox]:checked").filter(function () {
+      return $(this).data("is-class-teacher") == "1";
+    }).length > 0;
+
+    if (isClassTeacherSelected && !studentClass) {
+      recipientsTable.clear().draw();
+      $selectAll.prop("checked", false);
+      $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select class (and optionally arm) to view class teachers.</td></tr>');
+      return;
+    }
+  }
+
+  // === Build queryData, preserve staff_type ===
+  const queryData = $form.serializeArray().filter(item => {
+    const val = item.value && item.value.trim();
+    if (!val) return false;
+
+    // Prevent student_class/class_arm from being sent when not needed
+    if (role !== "student" && !isClassTeacherSelected &&
+        (item.name === "student_class" || item.name === "class_arm")) {
+      return false;
+    }
+
+    // Always include staff_type if role is staff
+    if (role === "staff" && item.name === "staff_type") {
+      return true;
+    }
+
+    // Validate positions
+    if (role === "staff") {
+      if (staffType === "both" && !hasTeaching && !hasNonTeaching) {
+        recipientsTable.clear().draw();
+        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching or Non-Teaching position.</td></tr>');
+        return false;
+      }
+
+      if (staffType === "non_teaching" && !hasNonTeaching) {
+        recipientsTable.clear().draw();
+        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Non-Teaching position.</td></tr>');
+        return false;
+      }
+
+      if (staffType === "teaching" && !hasTeaching) {
+        recipientsTable.clear().draw();
+        $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please select at least one Teaching position.</td></tr>');
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (queryData.length === 0) {
+    recipientsTable.clear().draw();
+    $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">Please apply valid filters to see results.</td></tr>');
+    return;
+  }
+
+  // === AJAX Request ===
+  $.get("{% url 'get_filtered_users' %}", $.param(queryData), function (response) {
+    recipientsTable.clear();
+
+    if (response.length === 0) {
+      recipientsTable.draw();
+      $selectAll.prop("checked", false);
+      $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
+      return;
+    }
+
+    response.forEach((user, index) => {
+      const profilePic = (user.profile_picture && user.profile_picture.url) || "/static/assets/img/profile-pic.png";
+      const isChecked = selectedRecipients.has(user.id.toString());
+
+      recipientsTable.row.add([
+        `<input type="checkbox" class="recipient-checkbox" value="${user.id}" ${isChecked ? "checked" : ""}>`,
+        index + 1,
+        `<img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;">`,
+        user.branch__name,
+        `${user.first_name} ${user.last_name}`,
+        user.email,
+      ]);
+    });
+
+    recipientsTable.draw();
+    updateRecipientTableCheckboxStates();
+  });
+}  {% endcomment %}

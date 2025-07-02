@@ -1,6 +1,9 @@
 {% extends "base.html" %} {% load static %} {% load custom_filters %} {% load
 widget_tweaks %} {% block content %}
-<h2 style="margin-bottom: 1rem">Edit Communication</h2>
+<h2 style="margin-bottom: 1rem">
+  <i class="fas fa-edit" style="color:blue; margin-right: 0.5rem;"></i>
+  <strong style="color:blue">Edit Communication</strong>
+</h2>
 
 <style>
   #form-fields-container {
@@ -139,6 +142,9 @@ widget_tweaks %} {% block content %}
     </div>
   </fieldset>
 </form>
+<script>
+  const savedSelectedRecipients = {{ saved_selected_recipients_json|safe }};
+</script>
 
 {% if communication_form.non_field_errors %}
 <div
@@ -385,6 +391,9 @@ widget_tweaks %} {% block content %}
     const $selectAll = $("#select-all-recipients");
     const $communicationForm = $("#communication-form");
     const userRole = $communicationForm.data("user-role");
+    const $communicationForm = $("#communication-form");
+    const $draftCheckbox = $("#id_is_draft");
+    const $saveDraftButton = $("#save-draft");
 
     const fields = {
       branch: $("#id_branch"),
@@ -634,18 +643,25 @@ widget_tweaks %} {% block content %}
         return;
       }
 
+      let savedSelectedRecipients = JSON.parse(localStorage.getItem("selectedRecipients") || "[]");
+
       $.get("{% url 'get_filtered_users' %}", $.param(queryData), function (response) {
         recipientsTable.clear();
-        if (response.length === 0) {
+        $recipientsTableBody.empty();  // Clear any existing rows manually if needed
+
+        const returnedIds = new Set(response.map(user => String(user.id)));
+
+        if (response.length === 0 && selectedRecipients.size === 0) {
           recipientsTable.draw();
           $selectAll.prop("checked", false);
           $recipientsTableBody.html('<tr><td colspan="6" class="text-center p-4">No users found.</td></tr>');
           return;
         }
 
+        // Add users returned by current filter
         response.forEach((user, index) => {
           const profilePic = (user.profile_picture && user.profile_picture.url) || "/static/assets/img/profile-pic.png";
-          const isChecked = selectedRecipients.has(user.id.toString());
+          const isChecked = selectedRecipients.has(String(user.id));
 
           recipientsTable.row.add([
             `<input type="checkbox" class="recipient-checkbox" value="${user.id}" ${isChecked ? "checked" : ""}>`,
@@ -657,9 +673,46 @@ widget_tweaks %} {% block content %}
           ]);
         });
 
-        recipientsTable.draw();
-        updateRecipientTableCheckboxStates();
+        // Handle selected recipients not in current filter response
+        if (isEditingDraft) {
+          const saved = Array.from(selectedRecipients).map(String);
+          const missing = saved.filter(id => !returnedIds.has(id));
+
+          let pending = missing.length;
+          if (pending === 0) {
+            recipientsTable.draw();
+            updateRecipientTableCheckboxStates();
+            return;
+          }
+
+          missing.forEach((id) => {
+            $.get("{% url 'get_user_by_id' %}", { id: id }, function (user) {
+              if (user && user.id) {
+                const profilePic = (user.profile_picture && user.profile_picture.url) || "/static/assets/img/profile-pic.png";
+                recipientsTable.row.add([
+                  `<input type="checkbox" class="recipient-checkbox" value="${user.id}" checked>`,
+                  recipientsTable.rows().count() + 1,
+                  `<img src="${profilePic}" alt="Profile Picture" width="30" height="30" style="border-radius: 50%; object-fit: cover;">`,
+                  user.branch__name,
+                  `${user.first_name} ${user.last_name}`,
+                  user.email,
+                ]);
+              }
+            }).always(() => {
+              pending -= 1;
+              if (pending === 0) {
+                recipientsTable.draw();
+                updateRecipientTableCheckboxStates();
+              }
+            });
+          });
+        } else {
+          recipientsTable.draw();
+          updateRecipientTableCheckboxStates();
+        }
+
       });
+
     }
 
     function handleDependencyChange() {
@@ -731,10 +784,6 @@ widget_tweaks %} {% block content %}
     }
 
     // Submit validation with SweetAlert
-    const $communicationForm = $("#communication-form");
-    const $draftCheckbox = $("#id_is_draft");
-    const $saveDraftButton = $("#save-draft");
-    const userRole = $communicationForm.data("user-role");
 
     function isDraftModeEnabled() {
       return $draftCheckbox.is(":checked");

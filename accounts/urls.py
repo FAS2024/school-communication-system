@@ -95,6 +95,7 @@ urlpatterns = [
     # path('communications/ajax/get_student_classes/', views.get_student_classes, name='get_student_classes'),
     # path('communications/ajax/get_class_arms/', views.get_class_arms, name='get_class_arms'),
     path('communications/ajax/get_filtered_users/', views.get_filtered_users, name='get_filtered_users'),
+    path('communications/get-user-by-id/', views.get_user_by_id, name='get_user_by_id'),
     path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
     path('communications/sent/', views.communication_success, name='communication_success'),
     path('communications/scheduled/', views.communication_scheduled, name='communication_scheduled'),
