@@ -1,86 +1,58 @@
-from django.contrib.auth import authenticate, login
-from django.contrib import messages
-from django.contrib.auth import logout as auth_logout
-from .forms import (
-        TeachingPositionForm, 
-        NonTeachingPositionForm, 
-        StaffCreationForm, 
-        StaffProfileForm,
-        BranchForm,
-        StudentCreationForm,
-        StudentClassForm,
-        ClassArmForm,
-        ParentCreationForm,
-        StudentProfileForm,
-        CommunicationForm,
-        CommunicationRecipientForm,
-        CommunicationTargetGroupForm,
-        AttachmentFormSet
-    )
-from .models import (
-        CustomUser, 
-        StudentProfile, 
-        ParentProfile, 
-        StaffProfile,
-        TeachingPosition,
-        NonTeachingPosition,
-        Branch,
-        StudentClass,
-        ClassArm,
-        Communication,
-        CommunicationAttachment,
-        CommunicationComment,
-        CommunicationRecipient,
-        CommunicationTargetGroup,
-        SentMessageDelete
-    )
-
-# views.py
+# Standard Library
 import json
+import os
+import logging
 from datetime import datetime
 
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
-from django.utils.timezone import make_aware
-from django.views.generic import TemplateView
-
-
-from django.shortcuts import render, redirect, get_object_or_404
+# Django Core
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, get_user_model, login, logout as auth_logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponseForbidden
-from django.core.paginator import Paginator
-from django.contrib.auth import get_user_model
-from django.http import Http404
-
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
-from django.urls import reverse_lazy
-from django.db import IntegrityError
-from django.http import HttpResponseRedirect
-from django.utils.decorators import method_decorator
-from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from . import utility
-from django.db import transaction
-from django.core.exceptions import PermissionDenied
-
-CustomUser = get_user_model()
-
-from django.db.models import Q
-from django.views.decorators.http import require_GET
-from django.views.decorators.csrf import csrf_exempt
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
-
-
-from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.core.paginator import Paginator
 from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.db.models import Q, F
+from django.db.models.functions import Coalesce
+from django.http import (
+    JsonResponse, HttpResponse, HttpResponseRedirect, 
+    HttpResponseForbidden, HttpResponseServerError, FileResponse, Http404
+)
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.utils.http import urlencode
+from django.utils.timezone import make_aware
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET, require_POST
+from django.views.generic import (
+    TemplateView, ListView, CreateView, UpdateView, 
+    DeleteView, DetailView
+)
 
-
+# Project-Specific Imports
+from . import utility
 from .utils import send_communication_to_recipients
-from django.conf import settings  # Make sure this is imported at the top
+from .forms import (
+    TeachingPositionForm, NonTeachingPositionForm, StaffCreationForm, StaffProfileForm,
+    BranchForm, StudentCreationForm, StudentClassForm, ClassArmForm,
+    ParentCreationForm, StudentProfileForm, CommunicationForm,
+    CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet
+)
+from .models import (
+    CustomUser, StudentProfile, ParentProfile, StaffProfile,
+    TeachingPosition, NonTeachingPosition, Branch, StudentClass, ClassArm,
+    Communication, CommunicationAttachment, CommunicationComment,
+    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete,MessageReply
+)
 
-
+# Logger
+logger = logging.getLogger(__name__)
 
 def home(request):
     return render(request, 'home.html')
@@ -1242,66 +1214,6 @@ def delete_class_arm(request, pk):
     return render(request, 'class-arms/confirm_delete_class_arm.html', {'class_arm': class_arm})
 
 
-# @login_required
-# @require_GET
-# def ajax_get_filtered_users(request):
-#     # Define filter fields from the form
-#     filter_fields = CommunicationTargetGroupForm.Meta.fields
-
-#     # Extract raw GET parameters for filter fields
-#     raw_filter_values = {
-#         field: request.GET.get(field, None)
-#         for field in filter_fields
-#     }
-
-#     # If any filter field is present and has an empty string '', return empty result immediately
-#     if any(value == '' for value in raw_filter_values.values() if value is not None):
-#         return JsonResponse([], safe=False)
-
-#     # Clean and prepare data from GET parameters (convert empty strings to None)
-#     cleaned_data = {
-#         field: (value if value else None)
-#         for field, value in raw_filter_values.items()
-#         if value is not None
-#     }
-
-#     # Instantiate the form with user context
-#     form = CommunicationTargetGroupForm(user=request.user, data=cleaned_data)
-
-#     if not form.is_valid():
-#         return JsonResponse({'errors': form.errors}, status=400)
-
-#     try:
-#         # Get filtered recipients
-#         users_qs = form.get_filtered_recipients(form.cleaned_data)
-
-#         # Optimize DB queries (ensure related fields are prefetched)
-#         users_qs = users_qs.select_related('branch')  # if applicable
-
-#         users_list = []
-#         for user in users_qs:
-#             profile_picture_url = None
-#             if hasattr(user, 'profile_picture'):
-#                 profile_picture = user.profile_picture
-#                 if profile_picture and hasattr(profile_picture, 'url'):
-#                     profile_picture_url = profile_picture.url
-
-#             users_list.append({
-#                 'id': user.id,
-#                 'first_name': user.first_name,
-#                 'last_name': user.last_name,
-#                 'email': user.email,
-#                 'branch__name': getattr(user.branch, 'name', 'N/A') if hasattr(user, 'branch') else 'N/A',
-#                 'profile_picture': {
-#                     'url': profile_picture_url
-#                 }
-#             })
-
-#         return JsonResponse(users_list, safe=False)
-
-#     except ValidationError as e:
-#         return JsonResponse({'error': str(e)}, status=400)
-
 @login_required
 @require_GET
 def ajax_get_filtered_users(request):
@@ -1376,18 +1288,6 @@ def get_filtered_users(request):
     return JsonResponse({'error': 'Invalid filter data'}, status=400)
 
 
-# @login_required
-# def communication_index(request):
-    
-#     context = {
-#         'communication_form': CommunicationForm(user=request.user),
-#         'target_group_form': CommunicationTargetGroupForm(user=request.user),
-#         'attachment_formset': AttachmentFormSet(),
-#         'user_role': request.user.role,
-#         'user_branch_id': request.user.branch.id if request.user.branch else '',
-#     }
-#     return render(request, 'communications/communication_form.html', context)
-
 @login_required
 def communication_index(request):
     communication_data = request.session.pop('communication_form_data', None)
@@ -1413,145 +1313,14 @@ def communication_index(request):
     }
     return render(request, 'communications/communication_form.html', context)
 
-# @method_decorator([login_required, require_POST], name='dispatch')
-# class SendCommunicationView(View):
-#     def post(self, request):
-#         communication_form = CommunicationForm(request.POST, user=request.user)
-#         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
-#         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
-
-#         if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
-#             communication = communication_form.save(commit=False)
-#             communication.sender = request.user
-#             communication.save()
-
-#             # Save attachments
-#             for form in attachment_formset:
-#                 if form.cleaned_data and form.cleaned_data.get('file'):
-#                     form.instance.communication = communication
-#                     form.save()
-
-#             # Step 1: Get allowed recipients from form filtering (excluding sender)
-#             allowed_recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data).exclude(id=request.user.id)
-
-#             # Step 2: Get selected recipients from POST (from AJAX-selected user checkboxes)
-#             selected_recipient_ids = request.POST.getlist('selected_recipients')  # ['1', '2', '3']
-#             recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
-
-#             # Step 3: Process manual email list (e.g. 'a@b.com, c@d.com')
-#             manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-#             manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-            
-#             valid_manual_emails = []
-#             for email in manual_emails_list:
-#                 try:
-#                     validate_email(email)
-#                     valid_manual_emails.append(email)
-#                 except ValidationError:
-#                     messages.warning(request, f"Invalid email skipped: {email}")
-
-#             # Step 4: Save CommunicationRecipient entries
-#             with transaction.atomic():
-#                 for user_recipient in recipients_qs:
-#                     CommunicationRecipient.objects.create(
-#                         communication=communication,
-#                         recipient=user_recipient
-#                     )
-#                 for manual_email in valid_manual_emails:
-#                     CommunicationRecipient.objects.create(
-#                         communication=communication,
-#                         email=manual_email
-#                     )
-
-#             messages.success(request, "Communication sent successfully.")
-#             return redirect('communication_success')
-
-#         messages.error(request, "There was an error with your submission.")
-#         return redirect('communication_index')
-
-
-# @method_decorator([login_required, require_POST], name='dispatch')
-# class SendCommunicationView(View):
-#     def post(self, request):
-#         communication_form = CommunicationForm(request.POST, user=request.user)
-#         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
-#         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
-
-#         if communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid():
-#             communication = communication_form.save(commit=False)
-#             communication.sender = request.user
-#             communication.sent = False
-#             communication.save()
-
-#             # Save attachments
-#             for form in attachment_formset:
-#                 if form.cleaned_data and form.cleaned_data.get('file'):
-#                     form.instance.communication = communication
-#                     form.save()
-
-#             # Step 1: Filter allowed recipients (excluding sender)
-#             allowed_recipients = target_group_form.get_filtered_recipients(
-#                 target_group_form.cleaned_data
-#             ).exclude(id=request.user.id)
-
-#             if not allowed_recipients.exists():
-#                 form.add_error(None, "No recipients match the selected criteria. Please adjust your filters.")
-#             else:
-#                 # Step 2: Get selected recipients
-#                 selected_recipient_ids = request.POST.getlist('selected_recipients')
-#                 recipients_qs = allowed_recipients.filter(id__in=selected_recipient_ids)
-
-#                 # Step 3: Manual emails
-#                 manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
-#                 manual_emails_list = [email.strip() for email in manual_emails_raw.split(',') if email.strip()]
-#                 valid_manual_emails = []
-#                 for email in manual_emails_list:
-#                     try:
-#                         validate_email(email)
-#                         valid_manual_emails.append(email)
-#                     except ValidationError:
-#                         messages.warning(request, f"Invalid email skipped: {email}")
-
-#                 # Step 4: Send now or schedule
-#                 if communication.is_due():
-#                     with transaction.atomic():
-#                         for user_recipient in recipients_qs:
-#                             CommunicationRecipient.objects.create(
-#                                 communication=communication,
-#                                 recipient=user_recipient
-#                             )
-#                         for manual_email in valid_manual_emails:
-#                             CommunicationRecipient.objects.create(
-#                                 communication=communication,
-#                                 email=manual_email
-#                             )
-
-#                     send_communication_to_recipients(communication)
-#                     communication.sent = True
-#                     communication.save()
-#                     messages.success(request, "Communication sent immediately.")
-#                 else:
-#                     # Don't save recipients yet. Let Celery handle that at scheduled time.
-#                     messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
-
-#                 return redirect('communication_success')
-
-#         messages.error(request, "There was an error with your submission.")
-#         return redirect('communication_index')
-
 @method_decorator([login_required, require_POST], name='dispatch')
 class SendCommunicationView(View):
     def _get_allowed_recipients(self, target_group_form, user):
-        # Exclude the sender themselves from recipient list
         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
         return recipients.exclude(id=user.id)
 
     def _get_selected_recipients(self, request, allowed_recipients):
-        # 'selected_recipients' must be the exact name attribute of your checkboxes in the form
         selected_ids = request.POST.getlist('selected_recipients')
-        
-        print("POST data:", request.POST)
-        # Filter to only allowed recipients by their ids
         return allowed_recipients.filter(id__in=selected_ids)
 
     def _parse_manual_emails(self, email_string):
@@ -1560,7 +1329,7 @@ class SendCommunicationView(View):
         for email in emails:
             try:
                 validate_email(email)
-                valid_emails.append(email.lower())  # normalize to lowercase for comparison
+                valid_emails.append(email.lower())
             except ValidationError:
                 messages.warning(self.request, f"Invalid manual email skipped: {email}")
         return valid_emails
@@ -1570,10 +1339,7 @@ class SendCommunicationView(View):
             selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
             duplicates = selected_emails.intersection(set(manual_emails))
             if duplicates:
-                form.add_error(
-                    None,
-                    f"The following manual email(s) are already among selected recipients: {', '.join(duplicates)}"
-                )
+                form.add_error(None, f"Duplicate manual email(s): {', '.join(duplicates)}")
                 return False
         return True
 
@@ -1581,15 +1347,11 @@ class SendCommunicationView(View):
         self.request.session['communication_form_data'] = self.request.POST.dict()
         self.request.session['target_group_form_data'] = self.request.POST.dict()
         self.request.session['attachment_formset_data'] = self.request.POST.dict()
-        
-        # Convert non-field errors to plain list of strings
         non_field_errors = communication_form.non_field_errors()
         self.request.session['non_field_errors'] = [str(error) for error in non_field_errors]
-
         self.request.session['form_error'] = True
         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
         return redirect('communication_index')
-
 
     def post(self, request):
         self.request = request
@@ -1598,11 +1360,9 @@ class SendCommunicationView(View):
         target_group_form = CommunicationTargetGroupForm(request.POST, user=request.user)
         attachment_formset = AttachmentFormSet(request.POST, request.FILES)
 
-        # Validate all forms first
         if not (communication_form.is_valid() and target_group_form.is_valid() and attachment_formset.is_valid()):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Adjust branch for students/parents if needed
         if request.user.role in ['student', 'parent']:
             branch = request.user.branch
             target_group_form.cleaned_data['branch'] = branch
@@ -1610,37 +1370,28 @@ class SendCommunicationView(View):
                 target_group_form.instance.branch = branch
 
         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
-        print("Allowed Recipients:", allowed_recipients)
-
         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
-        print("Selected Recipients:", selected_recipients)
-
 
         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
 
-        # Check at least one recipient selected or valid manual email provided
         if not selected_recipients.exists() and not valid_manual_emails:
-            if request.user.role in ['student', 'parent']:
-                communication_form.add_error(
-                    None,
-                    "Please select at least one recipient."
-                )
-            else:  # For superadmin, branch_admin, or staff
-                communication_form.add_error(
-                    None,
-                    "Please select at least one recipient or provide a valid manual email."
-                )
+            error_msg = "Please select at least one recipient."
+            if request.user.role not in ['student', 'parent']:
+                error_msg += " Or provide a valid manual email."
+            communication_form.add_error(None, error_msg)
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Ensure no duplicates between selected user emails and manual emails
         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset)
 
-        # Save communication
+        # Save the communication
         communication = communication_form.save(commit=False)
         communication.sender = request.user
+        communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
+        communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
+        communication.manual_emails = valid_manual_emails
         communication.save()
 
         # Save attachments
@@ -1649,23 +1400,28 @@ class SendCommunicationView(View):
                 form.instance.communication = communication
                 form.save()
 
-        # Save recipients and send or schedule communication
+        # Immediate send
         if communication.is_due():
-            with transaction.atomic():
-                for recipient in selected_recipients:
-                    CommunicationRecipient.objects.create(communication=communication, recipient=recipient)
-                for email in valid_manual_emails:
-                    CommunicationRecipient.objects.create(communication=communication, email=email)
-
-            send_communication_to_recipients(communication)
+            send_communication_to_recipients(
+                communication=communication,
+                selected_recipients=selected_recipients,
+                manual_emails=valid_manual_emails
+            )
             communication.sent = True
+            communication.sent_at = timezone.now()
             communication.save()
-            messages.success(request, "Communication sent immediately.")
+
+            messages.success(request, "Communication sent successfully.")
+            return redirect('communication_success')
+
         else:
-            messages.success(request, f"Communication scheduled for {communication.scheduled_time}.")
-
-        return redirect('communication_success')
-
+            url = reverse('communication_scheduled')
+            query_string = urlencode({
+                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),  # ← FIXED
+                'sent': 'false'
+            })
+            messages.success(request, f"Communication scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+            return redirect(f"{url}?{query_string}")
 
 
 def communication_success(request):
@@ -1673,46 +1429,270 @@ def communication_success(request):
     return render(request, 'communications/communication_success.html')
 
 
+def communication_scheduled(request):
+    scheduled_time_str = request.GET.get('scheduled_time', None)
+    scheduled_time = None
+    is_sent = False
 
-# class RecipientsPreviewAjaxView(View):
-#     def post(self, request):
-#         # Parse filters from request.POST
-#         data = request.POST.dict()
-#         form = CommunicationForm(data, user=request.user)
+    if scheduled_time_str:
+        try:
+            # Try parsing 12-hour format (with AM/PM)
+            scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %I:%M:%S %p')
+            scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+        except ValueError:
+            try:
+                # Fallback to 24-hour format
+                scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
+                scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+            except ValueError:
+                scheduled_time = None
 
-#         # We want to call get_filtered_recipients to return the preview list
-#         recipients_preview = ""
-#         if form.is_valid():
-#             # If send_to_all is true, show 'All users'
-#             if form.cleaned_data.get('send_to_all'):
-#                 recipients_preview = "All users"
-#             else:
-#                 # Get recipients from saved_target_group or manual selection
-#                 if form.cleaned_data.get('saved_target_group'):
-#                     group = form.cleaned_data['saved_target_group']
-#                     target_group_data = {
-#                         'branch': group.branch_id,
-#                         'role': group.role,
-#                         'staff_type': group.staff_type,
-#                         'teaching_positions': group.teaching_positions.values_list('id', flat=True),
-#                         'non_teaching_positions': group.non_teaching_positions.values_list('id', flat=True),
-#                         'student_class': group.student_class_id,
-#                         'class_arm': group.class_arm_id,
-#                     }
-#                     recipients = form.get_filtered_recipients(target_group_data)
-#                     recipients_preview = ", ".join([u.get_full_name() or u.username for u in recipients[:10]])
-#                 elif form.cleaned_data.get('individual_users'):
-#                     recipients = form.cleaned_data['individual_users']
-#                     recipients_preview = ", ".join([u.get_full_name() or u.username for u in recipients[:10]])
-#                 else:
-#                     recipients_preview = form.cleaned_data.get('manual_emails', '')
+    if scheduled_time:
+        is_sent = timezone.now() >= scheduled_time
 
-#         return JsonResponse({'recipients_preview': recipients_preview})
+    context = {
+        'scheduled_time': scheduled_time,
+        'is_sent': is_sent,
+    }
+    return render(request, 'communications/scheduled_success.html', context)
 
 
-# def send_notification_email(recipient, communication):
-#     subject = f"New Message: {communication.title or 'Untitled'}"
-#     message = communication.body
-#     from_email = 'no-reply@example.com'
-#     recipient_list = [recipient.email]
-#     send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+@login_required(login_url='login')
+@require_GET
+def inbox_view(request):
+    try:
+        # Ensure user has an allowed role
+        allowed_roles = ['superadmin', 'branch_admin', 'staff', 'student', 'parent']
+        user_role = getattr(request.user, 'role', '').lower()
+
+        if user_role not in allowed_roles:
+            logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access inbox.")
+            return HttpResponseForbidden("You do not have permission to view this inbox.")
+
+        # Fetch and sort received messages by sent or created date
+        received_messages = CommunicationRecipient.objects.filter(
+            recipient=request.user,
+            deleted=False,
+            communication__sent=True
+        ).select_related(
+            'communication', 'communication__sender'
+        ).annotate(
+            display_time=Coalesce('communication__sent_at', 'communication__created_at')
+        ).order_by(
+            F('display_time').desc()
+        )
+
+        return render(request, 'communications/inbox.html', {
+            'received_messages': received_messages
+        })
+
+    except Exception as e:
+        logger.error(f"Unexpected error loading inbox for user {request.user.pk}: {e}", exc_info=True)
+        return HttpResponseServerError("Sorry, there was an error loading your inbox. Please try again later.")
+
+
+@login_required
+def read_message(request, pk):
+    recipient_entry = get_object_or_404(
+        CommunicationRecipient,
+        pk=pk,
+        recipient=request.user,
+        deleted=False
+    )
+    recipient_entry.mark_as_read()
+
+    return render(request, 'communications/message_detail.html', {
+        'message': recipient_entry.communication,
+        'recipient_entry': recipient_entry
+    })
+
+
+@login_required
+@require_POST  # Only allow POST for delete operation
+def delete_message(request, pk):
+    recipient_message = get_object_or_404(
+        CommunicationRecipient,
+        pk=pk,
+        recipient=request.user,
+        deleted=False
+    )
+
+    recipient_message.deleted = True
+    recipient_message.save()
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
+
+    messages.success(request, "Message deleted successfully.")
+    return redirect('inbox')
+
+
+@login_required
+def download_attachment(request, pk):
+    attachment = get_object_or_404(CommunicationAttachment, pk=pk)
+
+    # Optional: Check if user has permission to access the attachment here,
+    # for example by verifying ownership or related communication permissions.
+
+    try:
+        # Ensure file exists and can be opened
+        file_handle = attachment.file.open('rb')
+    except FileNotFoundError:
+        raise Http404("Attachment file not found on the server.")
+    except Exception as e:
+        # Log the error if you have logging set up
+        # logger.error(f"Error opening attachment {pk}: {e}")
+        raise Http404("Unable to access the attachment.")
+
+    response = FileResponse(
+        file_handle,
+        as_attachment=True,
+        filename=os.path.basename(attachment.basename)
+    )
+    return response
+
+
+@login_required(login_url='login')
+@require_GET
+def outbox_view(request):
+    try:
+        # Optional: restrict roles that can send messages
+        allowed_roles = ['superadmin', 'branch_admin', 'staff', 'student', 'parent']
+        user_role = getattr(request.user, 'role', '').lower()
+
+        if user_role not in allowed_roles:
+            logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access outbox.")
+            return HttpResponseForbidden("You do not have permission to view this outbox.")
+
+        # Fetch sent messages excluding soft-deleted ones
+        sent_messages = Communication.objects.filter(
+            sender=request.user,
+            sent=True,
+            is_draft=False
+        ).exclude(
+            sent_deletes__sender=request.user,
+            sent_deletes__deleted=True
+        ).select_related(
+            'sender'
+        ).prefetch_related(
+            'attachments',
+            'recipients__recipient'
+        ).annotate(
+            display_time=Coalesce('sent_at', 'created_at')
+        ).order_by(
+            F('display_time').desc()
+        )
+
+        logger.info(f"[OUTBOX] User {request.user.pk} has {sent_messages.count()} sent messages (excluding deleted).")
+
+        return render(request, 'communications/outbox.html', {
+            'sent_messages': sent_messages
+        })
+
+    except Exception as e:
+        logger.error(f"Error loading outbox for user {request.user.pk}: {e}", exc_info=True)
+        return HttpResponseServerError("Sorry, there was an error loading your outbox. Please try again later.")
+
+
+@login_required
+def read_sent_message(request, pk):
+    # Get the sent communication by the logged-in user that is not deleted
+    communication = get_object_or_404(
+        Communication,
+        pk=pk,
+        sender=request.user
+    )
+
+    # Check if the sender has marked this message as deleted
+    sent_delete_entry = SentMessageDelete.objects.filter(
+        communication=communication,
+        sender=request.user,
+        deleted=True
+    ).first()
+
+    if sent_delete_entry:
+        # Optionally, you can raise 404 if the message is deleted by sender
+        raise Http404("This message was deleted.")
+
+    return render(request, 'communications/sent_message_detail.html', {
+        'sent_message': communication,
+    })
+
+
+
+@login_required
+def delete_sent_message(request, pk):
+    if request.method == 'POST':
+        communication = get_object_or_404(Communication, pk=pk, sender=request.user)
+
+        sent_delete_entry, created = SentMessageDelete.objects.get_or_create(
+            communication=communication,
+            sender=request.user,
+            defaults={'deleted': True}
+        )
+
+        if not created:
+            sent_delete_entry.deleted = True
+            sent_delete_entry.save()
+
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success', 'message': 'Message deleted.'})
+
+        messages.success(request, "Sent message deleted successfully.")
+        return redirect('outbox')  # Replace 'outbox' with your actual outbox URL name
+
+    # If GET or other method, redirect back or show error
+    return redirect('outbox')
+
+
+@login_required
+def delete_all_inbox_messages(request):
+    if request.method == "POST":
+        user = request.user
+        CommunicationRecipient.objects.filter(recipient=user, deleted=False).update(deleted=True)
+        messages.success(request, "All your inbox messages have been deleted.")
+    return redirect('inbox') 
+
+
+@login_required
+def delete_all_sent_messages(request):
+    if request.method == "POST":
+        user = request.user
+        sent_messages = Communication.objects.filter(sender=user, sent=True)
+
+        for msg in sent_messages:
+            SentMessageDelete.objects.update_or_create(
+                communication=msg,
+                sender=user,
+                defaults={'deleted': True}
+            )
+    return redirect('outbox')
+
+
+@login_required
+def submit_reply(request, recipient_id):
+    recipient_entry = get_object_or_404(
+        CommunicationRecipient,
+        pk=recipient_id,
+        recipient=request.user,
+        deleted=False,
+        requires_response=True
+    )
+
+    if request.method == 'POST':
+        reply_text = request.POST.get('reply', '').strip()
+        if reply_text:
+            # Save actual reply
+            MessageReply.objects.create(
+                recipient_entry=recipient_entry,
+                responder=request.user,
+                reply_text=reply_text
+            )
+
+            recipient_entry.has_responded = True
+            recipient_entry.save()
+            messages.success(request, "Your reply has been submitted.")
+        else:
+            messages.error(request, "Reply cannot be empty.")
+
+    return redirect('inbox')

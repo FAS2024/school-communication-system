@@ -1,0 +1,362 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container py-5">
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">📤 Outbox</h2>
+    <div>
+      <a href="{% url 'communication_index' %}" class="btn btn-primary btn-sm shadow-sm me-2">
+        <i class="fas fa-edit me-1"></i> Compose
+      </a>
+      {% if sent_messages %}
+      <a href="#" id="delete-all-outbox-btn" class="btn btn-danger btn-sm shadow-sm">
+        <i class="fas fa-trash-alt me-1"></i> Delete All
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if sent_messages %}
+  <div class="card shadow rounded-4">
+    <div class="card-body p-0">
+      <div class="position-relative">
+        <div class="overflow-auto mb-0" style="overflow-y: hidden; max-width: 100%;" id="top-scroll">
+          <div style="width: max-content; visibility: hidden; height: 1px;"></div>
+        </div>
+
+        <div class="overflow-auto" style="overflow-y: hidden;" id="bottom-scroll">
+          <table id="outbox-table" class="table table-striped align-middle mb-0" style="min-width: 1000px;">
+            <thead class="table-light">
+              <tr class="text-center">
+                <th>S/N</th>
+                <th>Title & Message</th>
+                <th>Type</th>
+                <th>To</th>
+                <th>Sent</th>
+                <th>Attachments</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for msg in sent_messages %}
+              <tr>
+                <td class="text-center"></td>
+
+                <td>
+                  <a href="{% url 'read_sent_message' msg.pk %}" class="d-inline-block text-primary fw-semibold"
+                     style="text-decoration: none;" onmouseover="this.style.textDecoration='underline';"
+                     onmouseout="this.style.textDecoration='none';">
+                    <i class="fas fa-paper-plane text-primary me-1"></i>
+                    {{ msg.title|default:"(Untitled)" }}
+                  </a>
+                  <div class="small text-muted">{{ msg.short_body }}</div>
+                </td>
+
+                <td class="text-center">
+                  <span class="badge bg-info text-dark text-capitalize">{{ msg.message_type }}</span>
+                </td>
+
+                <td>
+                  {% with recipients=msg.recipients.all %}
+                    {% for recipient in recipients|slice:":2" %}
+                      {% if recipient.recipient %}
+                        {% if recipient.recipient.profile_picture %}
+                          <img src="{{ recipient.recipient.profile_picture.url }}" alt="Profile" width="20" height="20" class="rounded-circle me-1" style="object-fit: cover;" />
+                        {% else %}
+                          <img src="{% static 'assets/img/profile-pic.png' %}" alt="Default" width="20" height="20" class="rounded-circle me-1" style="object-fit: cover;" />
+                        {% endif %}
+                        <span class="small">{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</span>
+                      {% elif recipient.email %}
+                        <span class="small">{{ recipient.email }}</span>
+                      {% endif %}
+                      {% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                    {% if recipients|length > 2 %}
+                      <br />
+                      <a href="#" class="small text-primary text-decoration-none d-block mt-1" data-bs-toggle="modal" data-bs-target="#recipientsModal{{ msg.id }}">
+                        +{{ recipients|length|add:"-2" }} more recipient{{ recipients|length|add:"-2"|pluralize }}
+                      </a>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+
+                <td>{{ msg.sent_at|date:"D, M d, Y - h:i A" }}</td>
+
+                <td class="text-center">
+                  {% if msg.attachments.exists %}
+                    <i class="fas fa-paperclip text-secondary"></i> {{ msg.attachments.count }}
+                  {% else %}
+                    <span class="text-muted small">None</span>
+                  {% endif %}
+                </td>
+
+                <td class="text-center">
+                  <form method="post" action="{% url 'delete_sent_message' msg.pk %}" class="delete-form d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals outside the table loop -->
+  {% for msg in sent_messages %}
+  <div class="modal fade" id="recipientsModal{{ msg.id }}" tabindex="-1" aria-labelledby="recipientsModalLabel{{ msg.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content rounded-4 shadow-lg">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title fw-bold" id="recipientsModalLabel{{ msg.id }}">📋 All Recipients for "{{ msg.title }}"
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body px-4 py-3">
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle w-100 recipients-table" id="recipients-table-{{ msg.id }}">
+              <thead class="table-light text-center">
+                <tr>
+                  <th>S/N</th>
+                  <th>Profile</th>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Branch</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for recipient in msg.recipients.all %}
+                <tr class="text-center">
+                  <td></td>
+                  <td>
+                    {% if recipient.recipient and recipient.recipient.profile_picture %}
+                      <img src="{{ recipient.recipient.profile_picture.url }}" width="40" height="40" class="rounded-circle border" style="object-fit: cover;" />
+                    {% else %}
+                      <img src="{% static 'assets/img/profile-pic.png' %}" width="40" height="40" class="rounded-circle border" style="object-fit: cover;" />
+                    {% endif %}
+                  </td>
+                  <td>{{ recipient.recipient.get_full_name|default:recipient.recipient.username }}</td>
+                  <td>{{ recipient.recipient.role|default:"-" }}</td>
+                  <td>{{ recipient.recipient.branch.name|default:"-" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="alert alert-info text-center mt-4">No sent messages found.</div>
+  {% endif %}
+</div>
+
+<!-- Delete All Form -->
+<form method="post" action="{% url 'delete_all_outbox_messages' %}" id="delete-all-outbox-form" style="display: none;">
+  {% csrf_token %}
+</form>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  $(document).ready(function () {
+    const table = $('#outbox-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[5, 'desc']], // Assuming Sent At is column 5
+      language: {
+        searchPlaceholder: "🔍 Search sent messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 6, orderable: false } // Actions column
+      ]
+    });
+
+    // Handle modal tables (recipients)
+    $('.modal').on('shown.bs.modal', function () {
+      const table = $(this).find('.recipients-table');
+      if (!$.fn.DataTable.isDataTable(table)) {
+        table.DataTable({
+          paging: true,
+          searching: true,
+          ordering: true,
+          responsive: true,
+          language: {
+            searchPlaceholder: "🔍 Search...",
+            search: "",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ recipients",
+          },
+          columnDefs: [
+            { targets: 0, orderable: false, searchable: false }
+          ],
+          drawCallback: function (settings) {
+            const api = this.api();
+            api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+              cell.innerHTML = i + 1;
+            });
+          }
+        });
+      }
+    });
+
+    // Delete single message confirmation
+    $(".delete-form").on("submit", function (e) {
+      e.preventDefault();
+      const form = this;
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This message will be permanently deleted from your outbox!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+
+    // Delete all messages confirmation
+    $("#delete-all-outbox-btn").on("click", function (e) {
+      e.preventDefault();
+      Swal.fire({
+        title: "Delete All Sent Messages?",
+        text: "⚠️ This will remove all messages from your outbox. This action is irreversible.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $("#delete-all-outbox-form").submit();
+        }
+      });
+    });
+  });
+</script>
+
+{% comment %} <script>
+  $(document).ready(function () {
+    const table = $('#outbox-table').DataTable({
+      paging: true,
+      responsive: true,
+      order: [[1, 'asc']],
+      language: {
+        searchPlaceholder: "🔍 Search sent messages...",
+        search: "",
+        lengthMenu: "Show _MENU_ entries per page",
+        info: "Showing _START_ to _END_ of _TOTAL_ messages",
+      },
+      columnDefs: [
+        { targets: 0, orderable: false, searchable: false },
+        { targets: 6, orderable: false }
+      ],
+      drawCallback: function (settings) {
+        const api = this.api();
+        api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+          cell.innerHTML = i + 1;
+        });
+      }
+    });
+
+    $('.modal').on('shown.bs.modal', function () {
+      const table = $(this).find('.recipients-table');
+      if (!$.fn.DataTable.isDataTable(table)) {
+        table.DataTable({
+          paging: true,
+          searching: true,
+          ordering: true,
+          responsive: true,
+          language: {
+            searchPlaceholder: "🔍 Search...",
+            search: "",
+            lengthMenu: "Show _MENU_ entries",
+            info: "Showing _START_ to _END_ of _TOTAL_ recipients",
+          },
+          columnDefs: [
+            { targets: 0, orderable: false, searchable: false }
+          ],
+          drawCallback: function (settings) {
+            const api = this.api();
+            api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+              cell.innerHTML = i + 1;
+            });
+          }
+        });
+      }
+    });
+
+    // Delete confirmation
+    $(".delete-form").on("submit", function (e) {
+      e.preventDefault();
+      const form = this;
+      Swal.fire({
+        title: "Are you sure?",
+        text: "This message will be permanently deleted from your outbox!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete it!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          form.submit();
+        }
+      });
+    });
+
+    $("#delete-all-outbox-btn").on("click", function (e) {
+      e.preventDefault();
+      Swal.fire({
+        title: "Delete All Sent Messages?",
+        text: "⚠️ This will remove all messages from your outbox. This action is irreversible.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Yes, delete all!",
+        reverseButtons: true
+      }).then((result) => {
+        if (result.isConfirmed) {
+          $("#delete-all-outbox-form").submit();
+        }
+      });
+    });
+  });
+
+  drawCallback: function (settings) {
+    const api = this.api();
+    api.column(0, { page: 'current' }).nodes().each(function (cell, i) {
+      cell.innerHTML = i + 1;
+    });
+  }
+
+</script> {% endcomment %}
+{% endblock %}

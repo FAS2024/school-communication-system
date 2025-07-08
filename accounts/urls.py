@@ -96,7 +96,19 @@ urlpatterns = [
     # path('communications/ajax/get_class_arms/', views.get_class_arms, name='get_class_arms'),
     path('communications/ajax/get_filtered_users/', views.get_filtered_users, name='get_filtered_users'),
     path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
-    path('communication/sent/', views.communication_success, name='communication_success')
+    path('communications/sent/', views.communication_success, name='communication_success'),
+    path('communications/scheduled/', views.communication_scheduled, name='communication_scheduled'),
+    path('communications/inbox/', views.inbox_view, name='inbox'),
+    path('communications/inbox/read/<int:pk>/', views.read_message, name='read_message'),
+    path('communication/<int:pk>/delete/', views.delete_message, name='delete_message'),
+    path('communication/attachments/download/<int:pk>/', views.download_attachment, name='download_attachment'),
+    path('communications/outbox/', views.outbox_view, name='outbox'),
+    path('communications/outbox/read/<int:pk>/', views.read_sent_message, name='read_sent_message'),
+    path('communications/outbox/delete/<int:pk>/', views.delete_sent_message, name='delete_sent_message'),
+    path('communications/inbox/delete-all/', views.delete_all_inbox_messages, name='delete_all_inbox_messages'),
+    path('communications/sent/delete-all/', views.delete_all_sent_messages, name='delete_all_outbox_messages'),
+    path('communications/reply/<int:recipient_id>/', views.submit_reply, name='submit_reply'),
+
 
 
 ]

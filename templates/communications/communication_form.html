@@ -1,4 +1,6 @@
-{% extends "base.html" %} {% load static %} {% block content %}
+{% extends "base.html" %} {% load static %} 
+
+{% block content %}
 <h2 style="margin-bottom: 1rem">Create Communication</h2>
 
 <style>
@@ -15,7 +17,7 @@
     overflow-x: visible;
     white-space: normal;
     /* New background color */
-    background-color: #f9f9fb; /* very light gray-blue */
+    background-color:rgb(242, 243, 245);
 
     /* Optional subtle shadow for nice depth */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
@@ -45,7 +47,8 @@
 </style>
 
 
-<form id="target-group-form" method="get" style="margin-bottom: 1rem">
+  
+<form id="target-group-form" method="get" style="margin-bottom: 1rem;">
   <fieldset id="form-fields-container">
     <legend>Select Target Group</legend>
 
@@ -150,8 +153,6 @@
 {% endif %}
 
 
-
-
 <h3 style="margin-bottom: 1rem">Filtered Recipients</h3>
 <table
   id="recipients-table"
@@ -197,16 +198,10 @@
   method="post"
   action="{% url 'send_communication' %}"
   enctype="multipart/form-data"
-  style="max-width: 900px"
+  style="max-width: 100%"
   data-user-role="{{ request.user.role }}"
 >
   {% csrf_token %}
-
-  {% comment %} {% if communication_form.non_field_errors %}
-  <div class="alert alert-danger" style="margin-bottom: 1rem;">
-    {{ communication_form.non_field_errors }}
-  </div>
-  {% endif %} {% endcomment %}
 
   {% if attachment_formset.non_form_errors %}
   <div class="alert alert-danger" style="margin-bottom: 1rem;">
@@ -215,12 +210,12 @@
   {% endif %}
 
   <div
-    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap"
+    style="display: flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;  background-color:rgb(242, 243, 245);"
   >
     <!-- Left Column: Message Details -->
     <fieldset
       style="
-        flex: 1 1 300px;
+        flex: 1 1 600px;
         border: 1px solid #ccc;
         border-radius: 8px;
         padding: 1rem;
@@ -230,37 +225,56 @@
         Message Details
       </legend>
 
+      {# First loop: render all fields except is_draft and requires_response #}
       {% for field in communication_form %}
-      <div
-        class="form-group"
-        style="margin-bottom: 1rem; display: flex; flex-direction: column"
-      >
-        <label
-          for="{{ field.id_for_label }}"
-          class="form-label"
-          style="font-weight: 600; margin-bottom: 0.25rem"
-        >
-          {{ field.label }}:
-        </label>
-        {{ field }}
-        {% if field.help_text %}
-        <small class="form-text text-muted" style="margin-top: 0.25rem">
-          {{ field.help_text }}
-        </small>
+        {% if field.name != 'is_draft' and field.name != 'requires_response' %}
+          <div class="form-group mb-3 d-flex flex-column">
+            <label for="{{ field.id_for_label }}" class="form-label fw-semibold mb-1">
+              {{ field.label }}:
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="form-text text-muted">{{ field.help_text }}</small>
+            {% endif %}
+            {% if field.errors %}
+              <div class="text-danger mt-1">{{ field.errors }}</div>
+            {% endif %}
+          </div>
         {% endif %}
-        {% if field.errors %}
-        <div class="text-danger" style="margin-top: 0.25rem">
-          {{ field.errors }}
-        </div>
-        {% endif %}
-      </div>
       {% endfor %}
+
+      {# Render is_draft and requires_response as toggle switches #}
+      <div class="form-switch-group p-4 mt-4 rounded-4" style="background-color:#ddd;">
+      <h6 class="text-black mb-3 fw-semibold">Additional Options</h6>
+      <div class="d-flex flex-column flex-md-row gap-4">
+        {% for field in communication_form %}
+          {% if field.name == 'is_draft' or field.name == 'requires_response' %}
+            <div class="form-check form-switch text-white">
+              {{ field }}
+              <label class="form-check-label fw-semibold ms-2" for="{{ field.id_for_label }}">
+                {{ field.label }}
+              </label>
+              {% if field.help_text %}
+                <div class="form-text text-light small">{{ field.help_text }}</div>
+              {% endif %}
+              {% if field.errors %}
+                <div class="text-danger small">{{ field.errors }}</div>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+
+
+
     </fieldset>
 
     <!-- Right Column: Attachments -->
     <fieldset
       style="
-        flex: 1 1 300px;
+        flex: 1 1 200px;
         border: 1px solid #ccc;
         border-radius: 8px;
         padding: 1rem;
@@ -310,6 +324,7 @@
     Send Message
   </button>
 </form>
+
 
 
 <!-- jQuery -->

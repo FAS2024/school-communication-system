@@ -52,47 +52,75 @@
     {% comment %} i JUST ADDED THE CODE below {% endcomment %}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 
-      <style>
-        #django-messages {
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          z-index: 9999;
-          width: auto;
-          max-width: 300px;
-        }
 
-        .django-message {
-          padding: 15px;
-          margin-bottom: 10px;
-          border-radius: 5px;
-          color: white;
-          font-weight: bold;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-          transition: opacity 1s ease-out;
-        }
+    <style>
+      #django-messages {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        width: auto;
+        max-width: 300px;
+      }
 
-        .django-message.success {
-          background-color: #28a745; /* Green */
-        }
+      .django-message {
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transition: opacity 1s ease-out;
+      }
 
-        .django-message.error {
-          background-color: #dc3545; /* Red */
-        }
+      .django-message.success {
+        background-color: #28a745; /* Green */
+      }
 
-        .django-message.warning {
-          background-color: #ff9800; /* Amber */
-        }
+      .django-message.error {
+        background-color: #dc3545; /* Red */
+      }
 
-        .django-message.info {
-          background-color: #17a2b8; /* Teal/Blue */
-        }
-      </style>
+      .django-message.warning {
+        background-color: #ff9800; /* Amber */
+      }
+
+      .django-message.info {
+        background-color: #17a2b8; /* Teal/Blue */
+      }
+    </style>
+    
+    <!-- for 12 Hours Time and Date -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_green.css">
+    <style>
+      .flatpickr-input {
+      background-color: white !important;
+      color: #212529 !important;
+      cursor: text !important;
+      border: 1px solid #ced4da !important;
+      border-radius: 0.375rem !important;
+      padding: 0.5rem 0.75rem !important;
+      font-size: 1rem;
+      opacity: 1 !important; /* This is key to remove the "faded" look */
+    }
+
+    .flatpickr-input:focus {
+      border-color: #80bdff !important;
+      outline: 0;
+      box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+
+    </style>
+    <!-- End for 12 Hours Time and Date -->
+
 
       {% block extra_css %}{% endblock %}
 
 
-  
+    {% comment %} for inbox {% endcomment %}
+    <!-- Bootstrap & FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+   
     </head>
   <body>
     <div class="wrapper">
@@ -100,15 +128,17 @@
       <div class="sidebar" data-background-color="dark">
         <div class="sidebar-logo">
           <!-- Logo Header -->
-          <div class="logo-header" data-background-color="dark">
-            <a href="" class="logo" style='color:white'>
+          <div class="logo-header" style="background-color:rgb(5, 11, 27);">
+            <a href="" class="logo d-flex align-items-center" style="color: white; text-decoration: none;">
               <img
                 src="{% static 'assets/img/school-logo.jpg' %}"
                 alt="school-logo"
-                class="navbar-brand"
+                class="navbar-brand rounded-circle"
                 height="50"
                 width="50"
-              /> <strong> Lagooz School</strong>
+                style="object-fit: cover;"
+              />
+              <strong class="ms-2">Lagooz School</strong>
             </a>
             <div class="nav-toggle">
               <button class="btn btn-toggle toggle-sidebar">
@@ -124,258 +154,40 @@
           </div>
           <!-- End Logo Header -->
         </div>
+        
         <div class="sidebar-wrapper scrollbar scrollbar-inner">
           <div class="sidebar-content">
-           
             <ul class="nav nav-secondary sidebar-menu">
-
+              
               <!-- SUPERADMIN MENU -->
               {% if request.user.role == 'superadmin' %}
-                <li class="nav-item">
-                  <a href="{% url 'superadmin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#branchMenu" role="button" aria-expanded="false" aria-controls="branchMenu">
-                    <i class="fas fa-user-graduate"></i><p>Branch Management</p>
-                  </a>
-                  <ul class="collapse" id="branchMenu">
-                    <li><a href="{% url 'branch_list' %}">Branch List</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Staff Management</p>
-                  </a>
-                  <ul class="collapse" id="staffMenu">
-                    <li><a href="{% url 'staff_list' %}">Registered Staff</a></li>
-                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
-                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
-                  </ul>
-                </li>
-                
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
-                    <i class="fas fa-user-graduate"></i><p>Student Management</p>
-                  </a>
-                  <ul class="collapse" id="studentMenu">
-                    <li><a href="{% url 'student_list' %}">Student List</a></li>
-                    <li><a href="#">Student Attendance</a></li>
-                    <li><a href="#">Student Reports</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
-                  </a>
-                  <ul class="collapse" id="parentMenu">
-                    <li><a href="{% url 'parent_list' %}">Parent List</a></li>
-                    <li><a href="#">Attendance</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#classandarmsMenu" role="button" aria-expanded="false" aria-controls="classandarmsMenu">
-                    <i class="fas fa-user-tie"></i><p>Class & Arms Management</p>
-                  </a>
-                  <ul class="collapse" id="classandarmsMenu">
-                    <li><a href="{% url 'class_arm_list' %}">Arms List</a></li>
-                    <li><a href="{% url 'student_class_list' %}">Class List</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
-                    <i class="fas fa-user-tie"></i><p>Messages</p>
-                  </a>
-                  <ul class="collapse" id="messages">
-                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
-                    <li><a href="">Received from Staff(INBOX)</a></li>
-                    <li><a href="">Sent to Student(OUTBOX)</a></li>
-                    <li><a href="">Received from Student(INBOX)</a></li>
-                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
-                    <li><a href="">Received from Parent(INBOX)</a></li>
-                    
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-clipboard-list"></i><p>Reports</p></a>
-                </li>
+                {% include 'user-sidebar-code/superadmin.html' %}
             
               <!-- BRANCH ADMIN MENU -->
               {% elif request.user.role == 'branch_admin' %}
-                <li class="nav-item">
-                  <a href="{% url 'branch_admin_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#staffMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fabranchie"></i><p>Staff Position</p>
-                  </a>
-                  <ul class="collapse" id="staffMenu">
-                    <li><a href="{% url 'teaching_position_list' %}">Teaching Staff Position</a></li>
-                    <li><a href="{% url 'non_teaching_position_list' %}">Non Teaching Staff Position</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#studentMenu" role="button" aria-expanded="false" aria-controls="studentMenu">
-                    <i class="fas fa-user-tie"></i><p>Student Management</p>
-                  </a>
-                  <ul class="collapse" id="studentMenu">
-                    <li><a href="{% url 'student_list' %}">Student List</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#parentMenu" role="button" aria-expanded="false" aria-controls="staffMenu">
-                    <i class="fas fa-user-tie"></i><p>Parent Management</p>
-                  </a>
-                  <ul class="collapse" id="parentMenu">
-                    <li><a href="{% url 'parent_list' %}">Parent List</a></li>
-                    <li><a href="#">Attendance</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#classandarmsMenu" role="button" aria-expanded="false" aria-controls="classandarmsMenu">
-                    <i class="fas fa-user-tie"></i><p>Class & Arms Management</p>
-                  </a>
-                  <ul class="collapse" id="classandarmsMenu">
-                    <li><a href="#">Arms List</a></li>
-                    <li><a href="{% url 'student_class_list' %}">Class List</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Class Timetables</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
-                </li>
-
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
-                    <i class="fas fa-user-tie"></i><p>Messages</p>
-                  </a>
-                  <ul class="collapse" id="messages">
-                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
-                    <li><a href="">Received from Staff(INBOX)</a></li>
-                    <li><a href="">Sent to Student(OUTBOX)</a></li>
-                    <li><a href="">Received from Student(INBOX)</a></li>
-                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
-                    <li><a href="">Received from Parent(INBOX)</a></li>
-                  </ul>
-                </li>
+                {% include 'user-sidebar-code/branch_admin.html' %}
             
               <!-- STAFF MENU -->
               {% elif request.user.role == 'staff' %}
-                <li class="nav-item">
-                  <a href="{% url 'staff_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
-                    <i class="fas fa-user-tie"></i><p>Messages</p>
-                  </a>
-                  <ul class="collapse" id="messages">
-                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
-                    <li><a href="">Received from Staff(INBOX)</a></li>
-                    <li><a href="">Sent to Student(OUTBOX)</a></li>
-                    <li><a href="">Received from Student(INBOX)</a></li>
-                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
-                    <li><a href="">Received from Parent(INBOX)</a></li>
-                  </ul>
-                </li>
-            
-                {% if request.user.staff_type == 'teaching' or request.user.staff_type == 'both' %}
-                  <li class="nav-item">
-                    <a data-bs-toggle="collapse" href="#teachingMenu" role="button" aria-expanded="false" aria-controls="teachingMenu">
-                      <i class="fas fa-chalkboard-teacher"></i><p>Teaching</p>
-                    </a>
-                    <ul class="collapse" id="teachingMenu">
-                      <li><a href="#">My Classes</a></li>
-                      <li><a href="#">Attendance</a></li>
-                      <li><a href="#">Assignment</a></li>
-                      <li><a href="#">Lesson Plans</a></li>
-                      <li><a href="#">Resources</a></li>
-                      <li><a href="#">Calendar</a></li>
-                      <li><a href="#">Results</a></li>
-                    </ul>
-                  </li>
-                {% endif %}
-            
-                {% if request.user.staff_type == 'non_teaching' or request.user.staff_type == 'both' %}
-                  <li class="nav-item">
-                    <a data-bs-toggle="collapse" href="#nonTeachingMenu" role="button" aria-expanded="false" aria-controls="nonTeachingMenu">
-                      <i class="fas fa-tools"></i><p>Non-Teaching</p>
-                    </a>
-                    <ul class="collapse" id="nonTeachingMenu">
-                      <li><a href="#">Duties</a></li>
-                      <li><a href="#">Reports</a></li>
-                    </ul>
-                  </li>
-                {% endif %}
+                {% include 'user-sidebar-code/staff.html' %}
 
-
-              
               <!-- STUDENT MENU -->
               {% elif request.user.role == 'student' %}
-                <li class="nav-item">
-                  <a href="{% url 'student_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-book"></i><p>My Courses</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-clipboard-list"></i><p>Assignments</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-calendar-check"></i><p>Exam Schedules</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href=""><i class="fas fa-tachometer-alt"></i><p>Notices/Posts</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
-                    <i class="fas fa-user-tie"></i><p>Messages</p>
-                  </a>
-                  <ul class="collapse" id="messages">
-                    <li><a href="">Sent to School(OUTBOX)</a></li>
-                    <li><a href="">Received from school(INBOX)</a></li>
-                  </ul>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-cogs"></i><p>Settings</p></a>
-                </li>
-            
+                {% include 'user-sidebar-code/student.html' %}
+
               <!-- PARENT MENU -->
               {% elif request.user.role == 'parent' %}
-                <li class="nav-item">
-                  <a href="{% url 'parent_dashboard' %}"><i class="fas fa-tachometer-alt"></i><p>Dashboard</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-user-graduate"></i><p>My Children</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-calendar-alt"></i><p>Events</p></a>
-                </li>
-                <li class="nav-item">
-                  <a href="#"><i class="fas fa-bell"></i><p>Notifications</p></a>
-                </li>
-                <li class="nav-item">
-                  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
-                    <i class="fas fa-user-tie"></i><p>Messages</p>
-                  </a>
-                  <ul class="collapse" id="messages">
-                    <li><a href="">Sent to Staff(OUTBOX)</a></li>
-                    <li><a href="">Received from Staff(INBOX)</a></li>
-                    <li><a href="">Sent to Student(OUTBOX)</a></li>
-                    <li><a href="">Received from Student(INBOX)</a></li>
-                    <li><a href="">Sent to Parent(OUTBOX)</a></li>
-                    <li><a href="">Received from Parent(INBOX)</a></li>
-                  </ul>
-                </li>
-            
+                {% include 'user-sidebar-code/parent.html' %}
+              
               {% endif %}
-              <!-- LOGOUT -->
+              
+              <li class="nav-item">
+                <a href="{% url 'communication_index' %}">
+                <i class="fas fa-pen"></i> Compose
+                </a>
+              </li>
+
+                <!-- LOGOUT -->
               <li class="nav-item mt-4">
                 <a class="dropdown-item btn btn-primary text-white" href="{% url 'logout' %}" onclick="return confirm('Are you sure you want to logout?');">
                   <i class="fas fa-right-from-bracket"></i> Logout
@@ -394,414 +206,7 @@
       <!-- End Sidebar -->
 
       <div class="main-panel">
-        <div class="main-header">
-          <div class="main-header-logo">
-            <!-- Logo Header -->
-            <div class="logo-header" data-background-color="dark">
-              <a href="index.html" class="logo">
-                <img
-                  src="{% static 'assets/img/kaiadmin/logo_light.svg' %}"
-                  alt="navbar brand"
-                  class="navbar-brand"
-                  height="20"
-                />
-              </a>
-              <div class="nav-toggle">
-                <button class="btn btn-toggle toggle-sidebar">
-                  <i class="gg-menu-right"></i>
-                </button>
-                <button class="btn btn-toggle sidenav-toggler">
-                  <i class="gg-menu-left"></i>
-                </button>
-              </div>
-              <button class="topbar-toggler more">
-                <i class="gg-more-vertical-alt"></i>
-              </button>
-            </div>
-            <!-- End Logo Header -->
-          </div>
-          <!-- Navbar Header -->
-          <nav
-            class="navbar navbar-header navbar-header-transparent navbar-expand-lg border-bottom"
-          >
-            <div class="container-fluid">
-              <nav
-                class="navbar navbar-header-left navbar-expand-lg navbar-form nav-search p-0 d-none d-lg-flex"
-              >
-                <div class="input-group">
-                  <div class="input-group-prepend">
-                    <button type="submit" class="btn btn-search pe-1">
-                      <i class="fa fa-search search-icon"></i>
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search ..."
-                    class="form-control"
-                  />
-                </div>
-              </nav>
-
-              <ul class="navbar-nav topbar-nav ms-md-auto align-items-center">
-                
-                <p class="welcome-text text-success fw-semibold fs-5 mt-3">
-                    👋 Welcome, {{ request.user.get_full_name }} &nbsp;
-                    (<span class="text-danger">{{ request.user.role }}</span>)
-                  </p>
-                  
-                  
-                <li
-                  class="nav-item topbar-icon dropdown hidden-caret d-flex d-lg-none"
-                >
-                  <a
-                    class="nav-link dropdown-toggle"
-                    data-bs-toggle="dropdown"
-                    href="#"
-                    role="button"
-                    aria-expanded="false"
-                    aria-haspopup="true"
-                  >
-                    <i class="fa fa-search"></i>
-                  </a>
-                  <ul class="dropdown-menu dropdown-search animated fadeIn">
-                    <form class="navbar-left navbar-form nav-search">
-                      <div class="input-group">
-                        <input
-                          type="text"
-                          placeholder="Search ..."
-                          class="form-control"
-                        />
-                      </div>
-                    </form>
-                  </ul>
-                </li>
-                <li class="nav-item topbar-icon dropdown hidden-caret">
-                  <a
-                    class="nav-link dropdown-toggle"
-                    href="#"
-                    id="messageDropdown"
-                    role="button"
-                    data-bs-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <i class="fa fa-envelope"></i>
-                  </a>
-                  <ul
-                    class="dropdown-menu messages-notif-box animated fadeIn"
-                    aria-labelledby="messageDropdown"
-                  >
-                    <li>
-                      <div
-                        class="dropdown-title d-flex justify-content-between align-items-center"
-                      >
-                        Messages
-                        <a href="#" class="small">Mark all as read</a>
-                      </div>
-                    </li>
-                    <li>
-                      <div class="message-notif-scroll scrollbar-outer">
-                        <div class="notif-center">
-                          <a href="#">
-                            <div class="notif-img">
-                              <img
-                                src="{% static 'assets/img/jm_denis.jpg' %}"
-                                alt="Img Profile"
-                              />
-                            </div>
-                            <div class="notif-content">
-                              <span class="subject">Jimmy Denis</span>
-                              <span class="block"> How are you ? </span>
-                              <span class="time">5 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-img">
-                              <img
-                                src="{% static 'assets/img/chadengle.jpg' %}"
-                                alt="Img Profile"
-                              />
-                            </div>
-                            <div class="notif-content">
-                              <span class="subject">Chad</span>
-                              <span class="block"> Ok, Thanks ! </span>
-                              <span class="time">12 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-img">
-                              <img
-                                src="{% static 'assets/img/mlane.jpg' %}"
-                                alt="Img Profile"
-                              />
-                            </div>
-                            <div class="notif-content">
-                              <span class="subject">Jhon Doe</span>
-                              <span class="block">
-                                Ready for the meeting today...
-                              </span>
-                              <span class="time">12 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-img">
-                              <img
-                                src="assets/img/talha.jpg"
-                                alt="Img Profile"
-                              />
-                            </div>
-                            <div class="notif-content">
-                              <span class="subject">Talha</span>
-                              <span class="block"> Hi, Apa Kabar ? </span>
-                              <span class="time">17 minutes ago</span>
-                            </div>
-                          </a>
-                        </div>
-                      </div>
-                    </li>
-                    <li>
-                      <a class="see-all" href="javascript:void(0);"
-                        >See all messages<i class="fa fa-angle-right"></i>
-                      </a>
-                    </li>
-                  </ul>
-                </li>
-                <li class="nav-item topbar-icon dropdown hidden-caret">
-                  <a
-                    class="nav-link dropdown-toggle"
-                    href="#"
-                    id="notifDropdown"
-                    role="button"
-                    data-bs-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <i class="fa fa-bell"></i>
-                    <span class="notification">4</span>
-                  </a>
-                  <ul
-                    class="dropdown-menu notif-box animated fadeIn"
-                    aria-labelledby="notifDropdown"
-                  >
-                    <li>
-                      <div class="dropdown-title">
-                        You have 4 new notification
-                      </div>
-                    </li>
-                    <li>
-                      <div class="notif-scroll scrollbar-outer">
-                        <div class="notif-center">
-                          <a href="#">
-                            <div class="notif-icon notif-primary">
-                              <i class="fa fa-user-plus"></i>
-                            </div>
-                            <div class="notif-content">
-                              <span class="block"> New user registered </span>
-                              <span class="time">5 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-icon notif-success">
-                              <i class="fa fa-comment"></i>
-                            </div>
-                            <div class="notif-content">
-                              <span class="block">
-                                Rahmad commented on Admin
-                              </span>
-                              <span class="time">12 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-img">
-                              <img
-                                src="assets/img/profile2.jpg"
-                                alt="Img Profile"
-                              />
-                            </div>
-                            <div class="notif-content">
-                              <span class="block">
-                                Reza send messages to you
-                              </span>
-                              <span class="time">12 minutes ago</span>
-                            </div>
-                          </a>
-                          <a href="#">
-                            <div class="notif-icon notif-danger">
-                              <i class="fa fa-heart"></i>
-                            </div>
-                            <div class="notif-content">
-                              <span class="block"> Farrah liked Admin </span>
-                              <span class="time">17 minutes ago</span>
-                            </div>
-                          </a>
-                        </div>
-                      </div>
-                    </li>
-                    <li>
-                      <a class="see-all" href="javascript:void(0);"
-                        >See all notifications<i class="fa fa-angle-right"></i>
-                      </a>
-                    </li>
-                  </ul>
-                </li>
-                <li class="nav-item topbar-icon dropdown hidden-caret">
-                  <a
-                    class="nav-link"
-                    data-bs-toggle="dropdown"
-                    href="#"
-                    aria-expanded="false"
-                  >
-                    <i class="fas fa-layer-group"></i>
-                  </a>
-                  <div class="dropdown-menu quick-actions animated fadeIn">
-                    <div class="quick-actions-header">
-                      <span class="title mb-1">Quick Actions</span>
-                      <span class="subtitle op-7">Shortcuts</span>
-                    </div>
-                    <div class="quick-actions-scroll scrollbar-outer">
-                      <div class="quick-actions-items">
-                        <div class="row m-0">
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div class="avatar-item bg-danger rounded-circle">
-                                <i class="far fa-calendar-alt"></i>
-                              </div>
-                              <span class="text">Calendar</span>
-                            </div>
-                          </a>
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div
-                                class="avatar-item bg-warning rounded-circle"
-                              >
-                                <i class="fas fa-map"></i>
-                              </div>
-                              <span class="text">Maps</span>
-                            </div>
-                          </a>
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div class="avatar-item bg-info rounded-circle">
-                                <i class="fas fa-file-excel"></i>
-                              </div>
-                              <span class="text">Reports</span>
-                            </div>
-                          </a>
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div
-                                class="avatar-item bg-success rounded-circle"
-                              >
-                                <i class="fas fa-envelope"></i>
-                              </div>
-                              <span class="text">Emails</span>
-                            </div>
-                          </a>
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div
-                                class="avatar-item bg-primary rounded-circle"
-                              >
-                                <i class="fas fa-file-invoice-dollar"></i>
-                              </div>
-                              <span class="text">Invoice</span>
-                            </div>
-                          </a>
-                          <a class="col-6 col-md-4 p-0" href="#">
-                            <div class="quick-actions-item">
-                              <div
-                                class="avatar-item bg-secondary rounded-circle"
-                              >
-                                <i class="fas fa-credit-card"></i>
-                              </div>
-                              <span class="text">Payments</span>
-                            </div>
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-
-                <li class="nav-item topbar-user dropdown hidden-caret">
-                  <a
-                    class="dropdown-toggle profile-pic"
-                    data-bs-toggle="dropdown"
-                    href="#"
-                    aria-expanded="false"
-                  >
-                    <div class="avatar-sm">
-                        <img
-                            src="{{ request.user.get_profile_picture_url }}"
-                            alt="Profile Picture"
-                            class="avatar-img rounded"
-                          />
-                    </div>
-                    <span class="profile-username">
-                      <span class="op-7">Hi,</span>
-                      <span class="fw-bold">{{request.user.last_name}}</span>
-                    </span>
-                  </a>
-                  <ul class="dropdown-menu dropdown-user animated fadeIn">
-                    <div class="dropdown-user-scroll scrollbar-outer">
-                      <li>
-                        <div class="user-box">
-                          <div class="avatar-lg">
-                            <img
-                              src="{{ request.user.get_profile_picture_url }}"
-                              alt="Profile Picture"
-                              class="avatar-img rounded"
-                            />
-                          </div>
-                          <div class="u-text">
-                            <h4>{{request.user.last_name}}</h4>
-                            <p class="text-muted">{{request.user.email}}</p>
-                            {% if request.user.role == 'staff' or request.user.role == 'branchadmin' or request.user.role == 'superadmin'%}
-                              <a
-                                href="{% url 'staff_detail'  request.user.id %}"
-                                class="btn btn-xs btn-secondary btn-sm"
-                                >View Profile</a
-                              >
-                            {% elif request.user.role == 'student' %}
-                              <a
-                                href="{% url 'student_detail'  request.user.id %}"
-                                class="btn btn-xs btn-secondary btn-sm"
-                                >View Profile</a
-                              >
-                            {% else %}
-                              <a
-                                href="{% url 'parent_detail'  request.user.id %}"
-                                class="btn btn-xs btn-secondary btn-sm"
-                                >View Profile</a
-                              >
-                            {% endif %}
-                            
-                          </div>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#">Inbox</a>
-                        <a class="dropdown-item" href="#">Outbox</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="#">Account Setting</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item btn btn-primary"
-                        href="{% url 'logout' %}"
-                        onclick="return confirm('Are you sure you want to logout?');">
-                        <i class="fas fa-right-from-bracket"></i>Logout
-                        </a>
-
-                      </li>
-                    </div>
-                  </ul>
-                </li>
-              </ul>
-            </div>
-          </nav>
-          <!-- End Navbar -->
-        </div>
-
+        {% include 'main-header-code/main_header.html' %}
         
         <div class="container">
             <div class="page-inner">
@@ -915,6 +320,22 @@
       {% comment %} <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script> {% endcomment %}
       <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script> 
 
+      <!-- for 12 Hours Time and Date -->
+      <!-- Flatpickr JS -->
+      <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+      <script>
+          flatpickr("#scheduledTimePicker", {
+            enableTime: true,
+            dateFormat: "d-m-Y h:i K",  // DD-MM-YYYY h:mm AM/PM
+            time_24hr: false,
+            allowInput: true
+          });
+      </script>
+      <!-- End for 12 Hours Time and Date -->
+      
+      <!-- SweetAlert2 (optional for nicer delete confirmation) -->
+      <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   </body>
 </html>

@@ -2,44 +2,99 @@ from django.core.mail import EmailMessage
 from django.conf import settings
 from django.utils.timezone import now
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-# def send_communication_to_recipients(communication):
+# def send_communication_to_recipients(communication, selected_recipients=None, manual_emails=None):
 #     from .models import CommunicationRecipient
+#     from django.contrib.auth import get_user_model
+#     from django.core.mail import EmailMessage
+#     from django.utils.timezone import now
+#     from django.conf import settings
+#     from django.db import transaction
+#     import logging
+
+#     logger = logging.getLogger(__name__)
+#     User = get_user_model()
+
 #     subject = communication.title or (communication.body[:50] + '...')
 #     message = communication.body
-#     from_email = communication.sender.email if communication.sender and communication.sender.email else settings.DEFAULT_FROM_EMAIL
+#     from_email = (
+#         communication.sender.email
+#         if communication.sender and communication.sender.email
+#         else settings.DEFAULT_FROM_EMAIL
+#     )
 
+#     # Step 1: Save recipients if provided
+#     if selected_recipients or manual_emails:
+#         with transaction.atomic():
+#             if selected_recipients:
+#                 for recipient in selected_recipients:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         recipient=recipient
+#                     )
+#             if manual_emails:
+#                 for email in manual_emails:
+#                     CommunicationRecipient.objects.create(
+#                         communication=communication,
+#                         email=email
+#                     )
+
+#     # Step 2: Send to manual emails (not in-app users)
 #     recipients = CommunicationRecipient.objects.filter(communication=communication)
+#     attachments = list(communication.attachments.all())
+
+#     registered_emails = set(
+#         email.lower() for email in User.objects.values_list('email', flat=True)
+#     )
 
 #     for recipient in recipients:
 #         if recipient.recipient:
-#             # Skip in-app recipients (handled elsewhere)
+#             logger.debug(f"Skipping in-app recipient: {recipient.recipient}")
 #             continue
 
-#         elif recipient.email:
+#         if recipient.email:
+#             if recipient.email.lower() in registered_emails:
+#                 logger.info(f"Skipping {recipient.email} (registered user)")
+#                 continue
+
 #             try:
-#                 email = EmailMessage(
+#                 email_msg = EmailMessage(
 #                     subject=subject,
 #                     body=message,
 #                     from_email=from_email,
 #                     to=[recipient.email],
 #                 )
-#                 # Attach all files related to the communication
-#                 for attachment in communication.attachments.all():
-#                     content_type = getattr(attachment.file.file, 'content_type', None) or 'application/octet-stream'
-#                     email.attach(attachment.file.name, attachment.file.read(), content_type)
-                
-#                 email.send(fail_silently=False)
-#             except Exception as e:
-#                 print(f"Failed to send to {recipient.email}: {e}")
 
-def send_communication_to_recipients(communication):
+#                 for attachment in attachments:
+#                     try:
+#                         content_type = getattr(attachment.file.file, 'content_type', 'application/octet-stream')
+#                         email_msg.attach(attachment.basename, attachment.file.read(), content_type)
+#                     except Exception as e:
+#                         logger.warning(f"Attachment issue for {recipient.email}: {e}")
+
+#                 email_msg.send(fail_silently=False)
+#                 recipient.delivered = True
+#                 recipient.delivered_at = now()
+#                 recipient.save()
+#                 logger.info(f"Email sent to {recipient.email}")
+
+#             except Exception as e:
+#                 logger.error(f"Failed to send to {recipient.email}: {e}", exc_info=True)
+
+def send_communication_to_recipients(communication, selected_recipients=None, manual_emails=None):
     from .models import CommunicationRecipient
     from django.contrib.auth import get_user_model
     from django.core.mail import EmailMessage
+    from django.utils.timezone import now
     from django.conf import settings
+    from django.db import transaction
+    import logging
 
+    logger = logging.getLogger(__name__)
     User = get_user_model()
 
     subject = communication.title or (communication.body[:50] + '...')
@@ -50,38 +105,65 @@ def send_communication_to_recipients(communication):
         else settings.DEFAULT_FROM_EMAIL
     )
 
+    # Step 1: Save recipients if provided
+    if selected_recipients or manual_emails:
+        with transaction.atomic():
+            if selected_recipients:
+                for recipient in selected_recipients:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        recipient=recipient,
+                        requires_response=communication.requires_response
+                    )
+            if manual_emails:
+                for email in manual_emails:
+                    CommunicationRecipient.objects.create(
+                        communication=communication,
+                        email=email,
+                        requires_response=communication.requires_response
+                    )
+
+    # Step 2: Send to manual emails (not in-app users)
     recipients = CommunicationRecipient.objects.filter(communication=communication)
-    
-    #  Fetch all registered user emails just once
-    registered_emails = set(email.lower() for email in User.objects.values_list('email', flat=True))
+    attachments = list(communication.attachments.all())
+
+    registered_emails = set(
+        email.lower() for email in User.objects.values_list('email', flat=True)
+    )
 
     for recipient in recipients:
         if recipient.recipient:
-            continue  # Skip in-app recipients
+            logger.debug(f"Skipping in-app recipient: {recipient.recipient}")
+            continue
 
-        elif recipient.email:
-            #  Skip if email belongs to a registered user
+        if recipient.email:
             if recipient.email.lower() in registered_emails:
+                logger.info(f"Skipping {recipient.email} (registered user)")
                 continue
 
             try:
-                email = EmailMessage(
+                email_msg = EmailMessage(
                     subject=subject,
                     body=message,
                     from_email=from_email,
                     to=[recipient.email],
                 )
 
-                #  Attach any uploaded files
-                for attachment in communication.attachments.all():
-                    content_type = getattr(attachment.file.file, 'content_type', None) or 'application/octet-stream'
-                    email.attach(attachment.file.name, attachment.file.read(), content_type)
+                for attachment in attachments:
+                    try:
+                        content_type = getattr(attachment.file.file, 'content_type', 'application/octet-stream')
+                        email_msg.attach(attachment.basename, attachment.file.read(), content_type)
+                    except Exception as e:
+                        logger.warning(f"Attachment issue for {recipient.email}: {e}")
 
-                email.send(fail_silently=False)
+                email_msg.send(fail_silently=False)
+                recipient.delivered = True
+                recipient.delivered_at = now()
+                recipient.save()
+                logger.info(f"Email sent to {recipient.email}")
 
             except Exception as e:
-                print(f"Failed to send to {recipient.email}: {e}")
-
+                logger.error(f"Failed to send to {recipient.email}: {e}", exc_info=True)
 
 
 def generate_profile_number(role_prefix, model_class):

@@ -1,33 +1,30 @@
+# Standard Library
+import re
+
+# Django Core
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import get_user_model
+from django.contrib.auth import password_validation
+from django.contrib.auth.forms import ReadOnlyPasswordHashField, UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import EmailValidator, RegexValidator
-from django.contrib.auth.forms import ReadOnlyPasswordHashField
-from django.contrib.auth.password_validation import validate_password
-from django.db import transaction
-from django.contrib.auth import password_validation
-from django.contrib.auth import get_user_model
-
-
-from django.forms import inlineformset_factory
-from .models import (
-    Communication, CommunicationAttachment,
-    CommunicationRecipient, CommunicationTargetGroup,
-    CustomUser, TeachingPosition, NonTeachingPosition, 
-    Branch, StaffProfile,StudentProfile,StudentClass, 
-    ClassArm, ParentProfile, CommunicationComment
-)
-        
-from django.forms.widgets import ClearableFileInput
-
-from django.contrib.auth import get_user_model
-from django.forms.widgets import CheckboxSelectMultiple
+from django.db import transaction, models
 from django.db.models import Q
-from django.utils.timezone import localtime
-import re
-from django.contrib.contenttypes.models import ContentType
+from django.forms import inlineformset_factory
+from django.forms.widgets import CheckboxSelectMultiple, ClearableFileInput
 from django.http import QueryDict
+from django.utils import timezone
+from django.utils.timezone import localtime
+from django.contrib.contenttypes.models import ContentType
 
+# Local App Imports
+from .models import (
+    Branch, ClassArm, Communication, CommunicationAttachment, 
+    CommunicationComment, CommunicationRecipient, CommunicationTargetGroup,
+    CustomUser, NonTeachingPosition, ParentProfile, StaffProfile, 
+    StudentClass, StudentProfile, TeachingPosition
+)
 
 class UserRegistrationForm(forms.ModelForm):
     class Meta:
@@ -861,7 +858,18 @@ class CommunicationForm(forms.ModelForm):
         }),
         help_text="Add emails manually (e.g., external contacts)"
     )
-
+    scheduled_time = forms.DateTimeField(
+        input_formats=['%d-%m-%Y %I:%M %p'],
+        widget=forms.DateTimeInput(
+            attrs={
+                'type': 'text',
+                'id': 'scheduledTimePicker',
+                'class': 'form-control',
+                'placeholder': 'You can schedule in this format 01-01-2025 9:10 AM'
+            }
+        ),
+        required=False
+    )
     class Meta:
         model = Communication
         fields = [
@@ -870,14 +878,24 @@ class CommunicationForm(forms.ModelForm):
             'body',
             'is_draft',
             'scheduled_time',
+            'requires_response',
         ]
-        widgets = {
-            'scheduled_time': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-        }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        
+        self.fields['requires_response'].label = "Does this message require a reply?"
+        self.fields['requires_response'].widget.attrs.update({'class': 'form-check-input'})
+        
+        # Customize checkbox widgets here
+        self.fields['is_draft'].widget = forms.CheckboxInput(attrs={
+            'class': 'form-check-input', 'role': 'switch'
+        })
+        self.fields['requires_response'].widget = forms.CheckboxInput(attrs={
+            'class': 'form-check-input', 'role': 'switch'
+        })
+
 
         # Format scheduled_time for display
         if self.instance and self.instance.scheduled_time:
@@ -908,31 +926,13 @@ class CommunicationForm(forms.ModelForm):
             self.fields['title'].required = True  
             self.fields['body'].required = True  
 
-    # def clean(self):
-    #     cleaned_data = super().clean()
-    #     message_type = cleaned_data.get('message_type')
-    #     title = cleaned_data.get('title')
-    #     body = cleaned_data.get('body')
-
-    #     # Check for required fields manually to improve clarity
-    #     if not message_type:
-    #         self.add_error('message_type', "Message type is required.")
-    #     if not title:
-    #         self.add_error('title', "Title is required.")
-    #     if not body:
-    #         self.add_error('body', "Body is required.")
-
-    #     # Raise global form error if any of the above is missing
-    #     if self.errors:
-    #         raise ValidationError("Please correct the required fields.")
-
-    #     return cleaned_data
     def clean(self):
         cleaned_data = super().clean()
         message_type = cleaned_data.get('message_type')
         title = cleaned_data.get('title')
         body = cleaned_data.get('body')
         manual_emails = cleaned_data.get('manual_emails')
+        scheduled_time = cleaned_data.get('scheduled_time')  # ← Get the field
 
         # Validate required fields
         if not message_type:
@@ -947,7 +947,6 @@ class CommunicationForm(forms.ModelForm):
             emails = [e.strip() for e in manual_emails.split(',') if e.strip()]
             registered_emails = CustomUser.objects.filter(email__in=emails).values_list('email', flat=True)
 
-            invalid_emails = []
             for email in emails:
                 if email in registered_emails:
                     self.add_error(
@@ -956,7 +955,10 @@ class CommunicationForm(forms.ModelForm):
                     )
                 elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
                     self.add_error('manual_emails', f"The email '{email}' is not a valid format.")
-                    invalid_emails.append(email)
+
+        # Prevent past scheduled times
+        if scheduled_time and scheduled_time < timezone.now():
+            self.add_error('scheduled_time', "Scheduled time cannot be in the past.")
 
         return cleaned_data
 
