@@ -1,0 +1,224 @@
+<style>
+  /* Active top-level nav link */
+  .nav-item > a.active {
+    background-color: rgb(0, 119, 255);
+    color: white !important;
+    font-weight: bold;
+    border-radius: 0.375rem;
+  }
+
+  /* Active submenu link */
+  .collapse li a.active {
+    background-color: rgb(0, 0, 0);
+    color: #000 !important;
+    font-weight: bold;
+  }
+
+  /* Submenu arrow rotation */
+  .dropdown-arrow {
+    float: right;
+    transition: transform 0.3s ease;
+  }
+
+  .nav-item > a[aria-expanded="true"] .dropdown-arrow {
+    transform: rotate(90deg);
+  }
+
+  /* Submenu styling */
+  .collapse {
+    list-style: none;
+    padding-left: 0;
+    margin-left: 0;
+  }
+
+  .collapse li {
+    list-style-type: none;
+    padding-left: 1.5rem;
+  }
+
+  .collapse li a {
+    display: block;
+    padding: 6px 12px;
+    text-decoration: none;
+    color: #333;
+    border-radius: 0.25rem;
+  }
+
+  .collapse li a:hover {
+    background-color:rgb(0, 0, 0);
+  }
+</style>
+
+<li class="nav-item">
+  <a href="{% url 'staff_dashboard' %}" class="{% if request.path == '/staff/dashboard/' %}active{% endif %}">
+    <i class="fas fa-tachometer-alt"></i>
+    <p>Dashboard</p>
+  </a>
+</li>
+
+<li class="nav-item">
+  <a href="#" class="{% if request.path == '/notices/' %}active{% endif %}">
+    <i class="fas fa-bullhorn"></i>
+    <p>Notices/Posts</p>
+  </a>
+</li>
+
+<li class="nav-item">
+  <a data-bs-toggle="collapse" href="#messages" role="button" aria-expanded="false" aria-controls="messages">
+    <i class="fas fa-envelope"></i>
+    <p>Messages</p>
+    <i class="fas fa-angle-right dropdown-arrow"></i>
+  </a>
+  <ul class="collapse" id="messages">
+    {% comment %} <li><a href="#">Sent to Staff(OUTBOX)</a></li>
+    <li><a href="#">Received from Staff(INBOX)</a></li>
+    <li><a href="#">Sent to Student(OUTBOX)</a></li>
+    <li><a href="#">Received from Student(INBOX)</a></li>
+    <li><a href="#">Sent to Parent(OUTBOX)</a></li>
+    <li><a href="#">Received from Parent(INBOX)</a></li> {% endcomment %}
+    <li><a href="#">Important</a></li>
+    <li><a href="{% url 'outbox' %}">Sent(Outbox)</a></li>
+    <li><a href="{% url 'inbox' %}">Inbox</a></li>
+    <li><a href="{% url 'scheduled_messages' %}">Scheduled</a></li>
+    <li><a href="{% url 'draft_messages' %}">Drafts</a></li>
+    <li><a href="#">Trash</a></li>
+  </ul>
+</li>
+
+{% if request.user.staff_type == 'teaching' or request.user.staff_type == 'both' %}
+<li class="nav-item">
+  <a data-bs-toggle="collapse" href="#teachingMenu" role="button" aria-expanded="false" aria-controls="teachingMenu">
+    <i class="fas fa-chalkboard-teacher"></i>
+    <p>Teaching</p>
+    <i class="fas fa-angle-right dropdown-arrow"></i>
+  </a>
+  <ul class="collapse" id="teachingMenu">
+    <li><a href="#">My Classes</a></li>
+    <li><a href="#">Attendance</a></li>
+    <li><a href="#">Assignment</a></li>
+    <li><a href="#">Lesson Plans</a></li>
+    <li><a href="#">Resources</a></li>
+    <li><a href="#">Calendar</a></li>
+    <li><a href="#">Results</a></li>
+  </ul>
+</li>
+{% endif %}
+
+{% if request.user.staff_type == 'non_teaching' or request.user.staff_type == 'both' %}
+<li class="nav-item">
+  <a data-bs-toggle="collapse" href="#nonTeachingMenu" role="button" aria-expanded="false" aria-controls="nonTeachingMenu">
+    <i class="fas fa-tools"></i>
+    <p>Non-Teaching</p>
+    <i class="fas fa-angle-right dropdown-arrow"></i>
+  </a>
+  <ul class="collapse" id="nonTeachingMenu">
+    <li><a href="#">Duties</a></li>
+    <li><a href="#">Reports</a></li>
+  </ul>
+</li>
+{% endif %}
+
+
+
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const currentPath = window.location.pathname;
+
+    document.querySelectorAll('.nav-item a[href]').forEach(link => {
+      const linkPath = link.getAttribute('href');
+
+      if (linkPath && (linkPath === currentPath || currentPath.startsWith(linkPath))) {
+        link.classList.add('active');
+
+        // Expand submenu if inside one
+        const parentCollapse = link.closest('.collapse');
+        if (parentCollapse) {
+          parentCollapse.classList.add('show');
+          const toggleLink = parentCollapse.previousElementSibling;
+          if (toggleLink && toggleLink.tagName === "A") {
+            toggleLink.setAttribute('aria-expanded', 'true');
+            toggleLink.classList.add('active');
+          }
+        }
+      }
+    });
+  });
+</script>
+
+
+{% comment %} <li class="nav-item">
+  <a href="{% url 'staff_dashboard' %}"
+    ><i class="fas fa-tachometer-alt"></i>
+    <p>Dashboard</p></a
+  >
+</li>
+<li class="nav-item">
+  <a href=""
+    ><i class="fas fa-tachometer-alt"></i>
+    <p>Notices/Posts</p></a
+  >
+</li>
+<li class="nav-item">
+  <a
+    data-bs-toggle="collapse"
+    href="#messages"
+    role="button"
+    aria-expanded="false"
+    aria-controls="messages"
+  >
+    <i class="fas fa-user-tie"></i>
+    <p>Messages</p>
+  </a>
+  <ul class="collapse" id="messages">
+    <li><a href="">Sent to Staff(OUTBOX)</a></li>
+    <li><a href="">Received from Staff(INBOX)</a></li>
+    <li><a href="">Sent to Student(OUTBOX)</a></li>
+    <li><a href="">Received from Student(INBOX)</a></li>
+    <li><a href="">Sent to Parent(OUTBOX)</a></li>
+    <li><a href="">Received from Parent(INBOX)</a></li>
+  </ul>
+</li>
+
+{% if request.user.staff_type == 'teaching' or request.user.staff_type == 'both' %}
+<li class="nav-item">
+  <a
+    data-bs-toggle="collapse"
+    href="#teachingMenu"
+    role="button"
+    aria-expanded="false"
+    aria-controls="teachingMenu"
+  >
+    <i class="fas fa-chalkboard-teacher"></i>
+    <p>Teaching</p>
+  </a>
+  <ul class="collapse" id="teachingMenu">
+    <li><a href="#">My Classes</a></li>
+    <li><a href="#">Attendance</a></li>
+    <li><a href="#">Assignment</a></li>
+    <li><a href="#">Lesson Plans</a></li>
+    <li><a href="#">Resources</a></li>
+    <li><a href="#">Calendar</a></li>
+    <li><a href="#">Results</a></li>
+  </ul>
+</li>
+{% endif %} 
+{% if request.user.staff_type == 'non_teaching' or request.user.staff_type == 'both' %}
+<li class="nav-item">
+  <a
+    data-bs-toggle="collapse"
+    href="#nonTeachingMenu"
+    role="button"
+    aria-expanded="false"
+    aria-controls="nonTeachingMenu"
+  >
+    <i class="fas fa-tools"></i>
+    <p>Non-Teaching</p>
+  </a>
+  <ul class="collapse" id="nonTeachingMenu">
+    <li><a href="#">Duties</a></li>
+    <li><a href="#">Reports</a></li>
+  </ul>
+</li>
+{% endif %} 
+ {% endcomment %}

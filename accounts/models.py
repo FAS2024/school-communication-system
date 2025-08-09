@@ -1,16 +1,25 @@
-from django.db import models
-from django.contrib.auth.models import BaseUserManager,AbstractBaseUser, PermissionsMixin
-from django.conf import settings
-from django.templatetags.static import static
+# Standard Library
 import datetime
+import os
 from datetime import date
 
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from phonenumber_field.modelfields import PhoneNumberField
-from accounts.utils import generate_profile_number, get_prefix_for_user
+# Django Core
+from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.templatetags.static import static
+from django.utils import timezone
+
+# Third-Party
+from phonenumber_field.modelfields import PhoneNumberField
+
+# Local App Imports
+from accounts.utils import generate_profile_number, get_prefix_for_user
+from django.utils.html import strip_tags
+
 
 class StudentClass(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -290,6 +299,7 @@ class StaffProfile(models.Model):
 
         super().save(*args, **kwargs)
 
+
 class Communication(models.Model):
     MESSAGE_TYPE_CHOICES = [
         ('announcement', 'Announcement'),
@@ -300,34 +310,38 @@ class Communication(models.Model):
         ('group', 'Group'),
     ]
 
-    sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_communications')
+    sender = models.ForeignKey('CustomUser', on_delete=models.CASCADE, related_name='sent_communications')
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPE_CHOICES)
     title = models.CharField(max_length=255, blank=True, null=True)
     body = models.TextField()
     is_draft = models.BooleanField(default=False)
     scheduled_time = models.DateTimeField(blank=True, null=True)
     sent = models.BooleanField(default=False)
-    # send_to_all = models.BooleanField(blank=True, null=True)
+    sent_at = models.DateTimeField(null=True, blank=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    selected_recipient_ids = models.JSONField(blank=True, default=list)
+    manual_emails = models.JSONField(blank=True, default=list)
+    requires_response = models.BooleanField(default=False)
+    saved_filter_data = models.JSONField(blank=True, null=True)
+
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=["sender", "is_draft"]),
+            models.Index(fields=["sent", "scheduled_time"]),
+        ]
 
     def short_body(self):
-        return self.body[:75] + "..." if len(self.body) > 75 else self.body
-    
+        clean_text = strip_tags(self.body)
+        return clean_text[:75] + "..." if len(clean_text) > 75 else clean_text
+
     def is_due(self):
         return self.scheduled_time is None or self.scheduled_time <= timezone.now()
 
     def __str__(self):
         return f"{self.message_type.title()} from {self.sender.username}"
-    
-    # def log_sent(self, user):
-    #     # Example simple audit logging, extend as needed
-    #     CommunicationAuditLog.objects.create(
-    #         communication=self,
-    #         sent_by=user,
-    #         sent_at=timezone.now(),
-    #         recipient_count=self.communicationrecipient_set.count()
-    #     )
+
 
 class CommunicationAttachment(models.Model):
     communication = models.ForeignKey(Communication, on_delete=models.CASCADE, related_name='attachments')
@@ -336,7 +350,10 @@ class CommunicationAttachment(models.Model):
 
     def __str__(self):
         return self.file.name
-
+    
+    @property
+    def basename(self):
+        return os.path.basename(self.file.name)
 
 class CommunicationTargetGroup(models.Model):
     ROLE_CHOICES = [
@@ -414,6 +431,8 @@ class CommunicationRecipient(models.Model):
     read_at = models.DateTimeField(null=True, blank=True)
     delivered = models.BooleanField(default=False)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    requires_response = models.BooleanField(default=False)
+    has_responded = models.BooleanField(default=False)
 
     def mark_as_read(self):
         if not self.read:
@@ -451,3 +470,25 @@ class SentMessageDelete(models.Model):
 
     def __str__(self):
         return f"Sent message {self.communication.id} deleted by {self.sender.username}"
+
+class MessageReply(models.Model):
+    recipient_entry = models.ForeignKey(CommunicationRecipient, on_delete=models.CASCADE, related_name='replies')
+    responder = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    reply_text = models.TextField()
+    replied_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Reply by {self.responder.username} on {self.recipient_entry.communication.title or 'Untitled'}"
+
+
+class ReplyAttachment(models.Model):
+    reply = models.ForeignKey(MessageReply, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='reply_attachments/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name
+
+    @property
+    def basename(self):
+        return os.path.basename(self.file.name)
