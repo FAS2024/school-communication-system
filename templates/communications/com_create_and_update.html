@@ -272,13 +272,14 @@
 
   <!-- Hidden Recipients and Filter Memory -->
   <input type="hidden" name="selected_recipients" id="selected-recipients" />
-  <input type="hidden" name="saved_branch" id="hidden-branch">
-  <input type="hidden" name="saved_role" id="hidden-role">
-  <input type="hidden" name="saved_staff_type" id="hidden-staff-type">
-  <input type="hidden" name="saved_student_class" id="hidden-student-class">
-  <input type="hidden" name="saved_class_arm" id="hidden-class-arm">
-  <input type="hidden" name="saved_teaching_positions" id="hidden-teaching-positions">
-  <input type="hidden" name="saved_non_teaching_positions" id="hidden-non-teaching-positions">
+  <input type="hidden" name="saved_branch" id="hidden-branch" />
+  <input type="hidden" name="saved_role" id="hidden-role" />
+  <input type="hidden" name="saved_staff_type" id="hidden-staff-type" />
+  <input type="hidden" name="saved_student_class" id="hidden-student-class" />
+  <input type="hidden" name="saved_class_arm" id="hidden-class-arm" />
+  <input type="hidden" name="saved_teaching_positions" id="hidden-teaching-positions" />
+  <input type="hidden" name="saved_non_teaching_positions" id="hidden-non-teaching-positions" />
+  <input type="hidden" name="user_timezone" id="userTimezone" />
 
   <!-- Action Buttons -->
   <button type="submit" class="btn btn-primary" name="action" value="draft"
@@ -289,7 +290,35 @@
     style="margin-top: 2rem; padding: 0.75rem 2rem; font-size: 1rem">
     Send Message
   </button>
+
 </form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const scheduledInput = document.querySelector('input[name="scheduled_time"]');
+    if (!scheduledInput) return;
+
+    const isoFormatRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+    let val = scheduledInput.value.trim();
+
+    if (val && !isoFormatRegex.test(val)) {
+      // Try parsing "DD-MM-YYYY hh:mm AM/PM" format
+      const dtParts = val.match(/^(\d{2})-(\d{2})-(\d{4}) (\d{1,2}):(\d{2}) (\w{2})$/);
+      if (dtParts) {
+        let [_, day, month, year, hour, minute, ampm] = dtParts;
+        hour = parseInt(hour, 10);
+        if (ampm.toUpperCase() === 'PM' && hour < 12) hour += 12;
+        if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+        hour = hour.toString().padStart(2, '0');
+        scheduledInput.value = `${year}-${month}-${day}T${hour}:${minute}`;
+      } else {
+        // Clear invalid
+        scheduledInput.value = '';
+      }
+    }
+  });
+
+</script>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

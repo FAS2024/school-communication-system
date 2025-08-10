@@ -119,6 +119,8 @@ urlpatterns = [
 
     path('communications/edit/<int:pk>/', views.CommunicationCreateUpdateView.as_view(), name='communication_edit_draft'),
 
+    path('communications/status/', views.communication_status, name='communication_status'),
+
 
 ]
 
