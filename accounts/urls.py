@@ -96,7 +96,7 @@ urlpatterns = [
     # path('communications/ajax/get_class_arms/', views.get_class_arms, name='get_class_arms'),
     path('communications/ajax/get_filtered_users/', views.get_filtered_users, name='get_filtered_users'),
     path('communications/get-user-by-id/', views.get_user_by_id, name='get_user_by_id'),
-    path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
+    # path('communications/send/', views.SendCommunicationView.as_view(), name='send_communication'),
     path('communications/sent/', views.communication_success, name='communication_success'),
     path('communications/scheduled/', views.communication_scheduled, name='communication_scheduled'),
     path('communications/inbox/', views.inbox_view, name='inbox'),
@@ -111,8 +111,14 @@ urlpatterns = [
     path('communications/reply/<int:recipient_id>/', views.submit_reply, name='submit_reply'),
     path('communications/scheduled/', views.scheduled_messages_view, name='scheduled_messages'),
     path('communications/drafts/', views.draft_messages_view, name='draft_messages'),
-    path('communications/drafts/<int:pk>/edit/', views.EditDraftMessageView.as_view(), name='edit_draft_message'),
+    # path('communications/drafts/<int:pk>/edit/', views.EditDraftMessageView.as_view(), name='edit_draft_message'),
     path('communications/drafts/<int:pk>/delete/', views.delete_draft_message, name='delete_draft_message'),
     path('communications/drafts/delete_all/', views.DeleteAllDraftMessagesView.as_view(), name='delete_all_draft_messages'),
+    
+    path('communications/create/', views.CommunicationCreateUpdateView.as_view(), name='communication_create'),
+
+    path('communications/edit/<int:pk>/', views.CommunicationCreateUpdateView.as_view(), name='communication_edit_draft'),
+
+
 ]
 
