@@ -803,10 +803,22 @@
     });
 
     $("#attachments-container").on("click", ".remove-attachment", function () {
-        $(this).closest(".attachment-form").remove();
-        totalForms--;
-        $("#id_attachments-TOTAL_FORMS").val(totalForms);
+        const $form = $(this).closest(".attachment-form");
+        const $deleteCheckbox = $form.find("input[type=checkbox][name$='-DELETE']");
+        const $idField = $form.find("input[type=hidden][name$='-id']");
+        
+        if ($idField.length && $idField.val()) {
+            // Existing form: mark for deletion and hide visually
+            $deleteCheckbox.prop("checked", true);
+            $form.hide();
+        } else {
+            // New form: remove from DOM and decrement total forms
+            $form.remove();
+            totalForms--;
+            $("#id_attachments-TOTAL_FORMS").val(totalForms);
+        }
     });
+
 
     // ===== Initial Setup =====
     loadFilters();

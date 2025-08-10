@@ -65,13 +65,13 @@
                 <td>{{ message.created_at|date:"M d, Y h:i A" }}</td>
 
                 <td class="text-center">
-                  {% if message.attachments.count > 0 %}
-                    <i class="fas fa-paperclip text-secondary"></i> {{ message.attachments.count }}
+                  {% if message.attachment_count > 0 %}
+                    <i class="fas fa-paperclip text-secondary"></i> {{ message.attachment_count }}
                   {% else %}
                     <span class="text-muted small">None</span>
                   {% endif %}
                 </td>
-
+                
                 <td class="text-center">
                     <a href="{% url 'communication_edit_draft' message.pk %}" class="btn btn-sm btn-outline-primary" title="Edit">
                         <i class="fas fa-edit"></i>

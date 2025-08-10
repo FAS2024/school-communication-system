@@ -1662,7 +1662,7 @@ AttachmentFormSet = inlineformset_factory(
     Communication,
     CommunicationAttachment,
     form=CommunicationAttachmentModelForm,
-    extra=1,
+    extra=0,
     can_delete=True
 )
 
