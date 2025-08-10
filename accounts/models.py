@@ -1,8 +1,4 @@
-# Standard Library
-import datetime
 import os
-from datetime import date
-
 # Django Core
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin

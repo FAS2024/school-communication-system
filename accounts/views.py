@@ -7,18 +7,16 @@ from datetime import datetime
 # Django Core
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, get_user_model, login, logout as auth_logout
+from django.contrib.auth import authenticate, login, logout as auth_logout
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
-from django.db.models import Q, F
+from django.db import transaction
+from django.db.models import F
 from django.db.models.functions import Coalesce
 from django.http import (
-    JsonResponse, HttpResponse, HttpResponseRedirect, 
+    JsonResponse, HttpResponseRedirect, 
     HttpResponseForbidden, HttpResponseServerError, FileResponse, Http404
 )
 from django.shortcuts import render, redirect, get_object_or_404
@@ -26,31 +24,28 @@ from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.http import urlencode
-from django.utils.timezone import make_aware
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import (
-    TemplateView, ListView, CreateView, UpdateView, 
+    ListView, CreateView, UpdateView, 
     DeleteView, DetailView
 )
 
 # Project-Specific Imports
-from . import utility
 from .utils import send_communication_to_recipients
 from .forms import (
     TeachingPositionForm, NonTeachingPositionForm, StaffCreationForm, StaffProfileForm,
     BranchForm, StudentCreationForm, StudentClassForm, ClassArmForm,
     ParentCreationForm, StudentProfileForm, CommunicationForm,
-    CommunicationRecipientForm, CommunicationTargetGroupForm, AttachmentFormSet,
-    CommunicationAttachmentModelForm,ReplyAttachmentFormSet  
+    CommunicationTargetGroupForm, AttachmentFormSet,
+    ReplyAttachmentFormSet  
     
 )
 from .models import (
-    CustomUser, StudentProfile, ParentProfile, StaffProfile,
+    CustomUser, StudentProfile, StaffProfile,
     TeachingPosition, NonTeachingPosition, Branch, StudentClass, ClassArm,
-    Communication, CommunicationAttachment, CommunicationComment,
-    CommunicationRecipient, CommunicationTargetGroup, SentMessageDelete,MessageReply, ReplyAttachment
+    Communication, CommunicationAttachment,
+    CommunicationRecipient, SentMessageDelete,MessageReply, ReplyAttachment
 )
 from django.http import QueryDict
 from django.views.decorators.http import require_http_methods
@@ -1336,12 +1331,15 @@ def get_user_by_id(request):
     try:
         user = CustomUser.objects.get(pk=user_id)
         return JsonResponse({
-            "id": user.id,
+            "id": user.pk,
             "first_name": user.first_name,
             "last_name": user.last_name,
             "email": user.email,
             "branch__name": user.branch.name if user.branch else "",
-            "profile_picture": {"url": user.profile_picture.url if user.profile_picture else ""}
+            "profile_picture": {
+                "url": getattr(user.profile_picture, "url", "")
+            }
+
         })
     except CustomUser.DoesNotExist:
         return JsonResponse({}, status=404)
