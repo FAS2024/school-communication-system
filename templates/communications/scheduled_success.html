@@ -2,8 +2,15 @@
 
 {% block content %}
 <style>
+  /* Modern clean styling */
+
   body {
-    background: linear-gradient(135deg, #fff0f5, #ffffff);
+    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+      Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 0;
+    color: #333;
   }
 
   .scheduled-wrapper {
@@ -12,101 +19,129 @@
     justify-content: center;
     align-items: center;
     padding: 2rem;
+    box-sizing: border-box;
   }
 
   .scheduled-card {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 1rem;
     padding: 3rem 2.5rem;
-    max-width: 460px;
-    box-shadow: 0 10px 30px rgba(220, 53, 69, 0.1);
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     text-align: center;
-    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    transition: transform 0.3s ease;
+  }
+  .scheduled-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
   }
 
   .scheduled-emoji {
-    font-size: 5rem;
-    color: #dc3545;
+    font-size: 6rem;
+    color: #3f51b5;
     margin-bottom: 1.5rem;
+    user-select: none;
   }
 
   h2 {
-    font-weight: 800;
-    margin-bottom: 0.8rem;
-    font-size: 2.2rem;
-  }
-
-  h2.sent-message {
-    color: #c82333;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-size: 2.5rem;
+    letter-spacing: 0.03em;
   }
 
   h2.scheduled-message {
-    color: #28a745 !important;
+    color: #4caf50; /* fresh green */
+  }
+
+  h2.sent-message {
+    color: #e91e63; /* pink/red */
   }
 
   p.lead {
-    color: #495057;
-    font-size: 1.2rem;
+    font-size: 1.25rem;
+    color: #555;
     margin-bottom: 2.5rem;
+    line-height: 1.5;
   }
 
   .btn-group {
     display: flex;
     justify-content: center;
     gap: 1rem;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
 
   .btn {
-    font-weight: 700;
-    padding: 0.7rem 2rem;
-    border-radius: 30px;
-    font-size: 1rem;
+    font-weight: 600;
+    padding: 0.75rem 2.5rem;
+    border-radius: 50px;
+    font-size: 1.1rem;
     cursor: pointer;
-    transition: all 0.3s ease;
     text-decoration: none;
     display: inline-block;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(63, 81, 181, 0.3);
   }
 
   .btn-primary {
-    background-color: #dc3545;
-    border: none;
+    background-color: #3f51b5;
     color: white;
-    box-shadow: 0 5px 12px rgba(220, 53, 69, 0.4);
+    border: none;
   }
 
-  .btn-primary:hover {
-    background-color: #bd2130;
-    box-shadow: 0 8px 20px rgba(189, 33, 48, 0.6);
+  .btn-primary:hover,
+  .btn-primary:focus {
+    background-color: #303f9f;
+    box-shadow: 0 6px 20px rgba(48, 63, 159, 0.6);
   }
 
   .btn-outline {
     background-color: transparent;
-    border: 2px solid #dc3545;
-    color: #dc3545;
+    border: 2px solid #e91e63;
+    color: #e91e63;
+    box-shadow: none;
   }
 
-  .btn-outline:hover {
-    background-color: #dc3545;
+  .btn-outline:hover,
+  .btn-outline:focus {
+    background-color: #e91e63;
     color: white;
+    box-shadow: 0 6px 20px rgba(233, 30, 99, 0.5);
+  }
+
+  /* Responsive */
+  @media (max-width: 520px) {
+    .scheduled-card {
+      padding: 2rem 1.5rem;
+      max-width: 90vw;
+    }
+    .btn {
+      padding: 0.65rem 1.8rem;
+      font-size: 1rem;
+    }
   }
 </style>
 
-<div class="scheduled-wrapper">
+<div class="scheduled-wrapper" role="main" aria-label="Scheduled Communication Status">
   <div class="scheduled-card" role="alert" aria-live="polite" aria-atomic="true">
     <div class="scheduled-emoji" aria-hidden="true">🕓</div>
+
     {% if scheduled_time %}
       {% if not is_sent %}
         <h2 class="scheduled-message">Message Scheduled</h2>
         <p class="lead">
           Your message has been successfully scheduled. It will be delivered at:
-          <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong>.
+          <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong>
+          ({{ user_timezone }}).
         </p>
       {% else %}
         <h2 class="sent-message">Scheduled Message Submitted</h2>
         <p class="lead">
           Your communication scheduled for
           <strong>{{ scheduled_time|date:"M d, Y h:i A" }}</strong>
+          ({{ user_timezone }})
           has now been submitted successfully.
         </p>
       {% endif %}
@@ -117,11 +152,75 @@
       </p>
     {% endif %}
 
-
     <div class="btn-group">
-      <a href="{% url 'communication_index' %}" class="btn btn-primary">Send Another Message</a>
-      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline">Go to Dashboard</a>
+      <a href="{% url 'communication_create' %}" class="btn btn-primary" role="button">Send Another Message</a>
+      <a href="{% url 'superadmin_dashboard' %}" class="btn btn-outline" role="button">Go to Dashboard</a>
     </div>
   </div>
 </div>
+
+<!-- SweetAlert2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const scheduledTime = "{{ scheduled_time|date:'c' }}"; // ISO 8601 datetime
+    const userTimezone = "{{ user_timezone }}";
+
+    if (!scheduledTime) return;
+
+    const pollInterval = 10000;
+
+    function checkStatus() {
+      fetch(`/communications/status/?scheduled_time=${encodeURIComponent(scheduledTime)}&user_timezone=${encodeURIComponent(userTimezone)}`, {
+        credentials: 'same-origin'
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        console.log('Polling result:', data);
+        if (data.is_sent) {
+          const h2 = document.querySelector('h2');
+          h2.textContent = 'Scheduled Message Submitted';
+          h2.classList.remove('scheduled-message');
+          h2.classList.add('sent-message');
+
+          const scheduledDate = new Date(scheduledTime);
+
+          document.querySelector('p.lead').innerHTML = `
+            Your communication scheduled for
+            <strong>${scheduledDate.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: userTimezone })}</strong>
+            (${userTimezone})
+            has now been submitted successfully.
+          `;
+
+          Swal.fire({
+            icon: 'success',
+            title: 'Message Sent!',
+            text: 'Your scheduled message has been submitted successfully.',
+            confirmButtonText: 'OK',
+            timer: 5000,
+            timerProgressBar: true,
+            background: '#f0f9ff',
+            iconColor: '#4caf50',
+            customClass: {
+              popup: 'shadow-lg rounded-lg',
+              title: 'font-bold text-xl',
+              content: 'text-gray-700',
+              confirmButton: 'btn btn-primary',
+            }
+          });
+
+          clearInterval(pollingTimer);
+        }
+      })
+      .catch(err => console.error('Polling error:', err));
+    }
+
+    const pollingTimer = setInterval(checkStatus, pollInterval);
+  });
+</script>
+
 {% endblock %}

@@ -14,7 +14,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.db.models.functions import Coalesce
 from django.http import (
     JsonResponse, HttpResponseRedirect, 
@@ -51,7 +51,8 @@ from .models import (
 from django.http import QueryDict
 from django.views.decorators.http import require_http_methods
 
-from django.views.decorators.csrf import csrf_protect
+import pytz  
+
 
 logger = logging.getLogger(__name__)
 
@@ -1354,15 +1355,41 @@ def communication_index(request):
     non_field_errors = request.session.pop('non_field_errors', None)
     form_error = request.session.pop('form_error', False)
 
+    # Debug print the raw data loaded from session
+    print("DEBUG: communication_data loaded from session:", communication_data)
+
+    # Normalize scheduled_time format if needed
+    if communication_data and 'scheduled_time' in communication_data:
+        dt_str = communication_data['scheduled_time']
+        try:
+            # Try parse with seconds first (in case it was saved with seconds)
+            dt_obj = datetime.strptime(dt_str, '%Y-%m-%dT%H:%M:%S')
+            communication_data['scheduled_time'] = dt_obj.strftime('%Y-%m-%dT%H:%M')
+            print("DEBUG: normalized scheduled_time to:", communication_data['scheduled_time'])
+        except ValueError:
+            # If it doesn't have seconds or format is correct, ignore error
+            print("DEBUG: scheduled_time format OK or no seconds to strip.")
+
+    # Initialize communication form
     communication_form = CommunicationForm(data=communication_data, user=request.user) if communication_data else CommunicationForm(user=request.user)
 
-    # 🛠 Clean teaching_positions & non_teaching_positions if data exists
+    # Prepare target_group_data as a mutable QueryDict with cleaned IDs
     if target_group_data:
+        # Ensure it's a mutable QueryDict
         if not isinstance(target_group_data, QueryDict):
-            target_group_data = QueryDict('', mutable=True).copy()
+            # If it's a dict-like, convert to QueryDict
+            qd = QueryDict('', mutable=True)
+            for key, val in target_group_data.items():
+                # val could be list or single
+                if isinstance(val, list):
+                    qd.setlist(key, val)
+                else:
+                    qd[key] = val
+            target_group_data = qd
         else:
             target_group_data = target_group_data.copy()
 
+        # Clean teaching_positions and non_teaching_positions
         for name in ["teaching_positions", "non_teaching_positions"]:
             if name in target_group_data:
                 raw_values = target_group_data.getlist(name)
@@ -1371,35 +1398,41 @@ def communication_index(request):
                     try:
                         clean_ids.append(str(int(val)))
                     except (ValueError, TypeError):
+                        # skip invalid values
                         continue
                 target_group_data.setlist(name, clean_ids)
 
+    # Pass target_group_data if present, otherwise fallback to communication_data or None
     target_group_form = CommunicationTargetGroupForm(
         data=target_group_data or communication_data or None,
         user=request.user
     )
 
+    # Initialize attachment formset
     if attachment_data:
         qd = QueryDict('', mutable=True)
         for k, v in attachment_data.items():
+            # v could be list or single value
             qd.setlist(k, v if isinstance(v, list) else [v])
         attachment_formset = AttachmentFormSet(data=qd)
     else:
         attachment_formset = AttachmentFormSet()
 
+    # Add non-field errors to communication_form
     if non_field_errors:
         for msg in non_field_errors:
             communication_form.add_error(None, msg)
 
-    return render(request, 'communications/communication_form.html', {
+    return render(request, 'communications/com_create_and_update.html', {
         'communication_form': communication_form,
         'target_group_form': target_group_form,
         'attachment_formset': attachment_formset,
         'form_error': form_error,
         'user_role': request.user.role,
-        'user_branch_id': request.user.branch.id if request.user.branch else '',
+        'user_branch_id': request.user.branch.id if getattr(request.user, 'branch', None) else '',
     })
-    
+
+
 def validate_attachment_formset(formset):
     total_size = 0
     count = 0
@@ -1429,6 +1462,243 @@ def validate_attachment_formset(formset):
             f"Currently: {total_size:.2f}MB"
         )
 
+# @method_decorator(login_required, name='dispatch')
+# @method_decorator(require_http_methods(["GET", "POST"]), name='dispatch')
+# class CommunicationCreateUpdateView(View):
+
+#     def flatten_querydict(self, qd: QueryDict):
+#         return {k: v[0] if len(v) == 1 else v for k, v in qd.lists()}
+
+#     def _clean_id_list(self, raw_list):
+#         cleaned = []
+#         for item in raw_list:
+#             try:
+#                 cleaned.append(str(int(item.strip())))
+#             except (ValueError, TypeError):
+#                 continue
+#         return cleaned
+
+#     def _get_allowed_recipients(self, target_group_form, user):
+#         recipients = target_group_form.get_filtered_recipients(target_group_form.cleaned_data)
+#         return recipients.exclude(id=user.id)
+
+#     def _get_selected_recipients(self, request, allowed_recipients):
+#         selected_ids = request.POST.getlist('selected_recipients')
+#         return allowed_recipients.filter(id__in=selected_ids)
+
+#     def _parse_manual_emails(self, email_string):
+#         emails = [email.strip() for email in email_string.split(',') if email.strip()]
+#         valid_emails = []
+#         for email in emails:
+#             try:
+#                 validate_email(email)
+#                 valid_emails.append(email.lower())
+#             except ValidationError:
+#                 messages.warning(self.request, f"Invalid manual email skipped: {email}")
+#         return valid_emails
+
+#     def _check_for_duplicate_emails(self, selected_recipients, manual_emails, form):
+#         if selected_recipients.exists():
+#             selected_emails = set(email.lower() for email in selected_recipients.values_list('email', flat=True))
+#             duplicates = selected_emails.intersection(set(manual_emails))
+#             if duplicates:
+#                 form.add_error(None, f"Duplicate manual email(s): {', '.join(duplicates)}")
+#                 return False
+#         return True
+
+#     def _render_with_errors(self, communication_form, target_group_form, attachment_formset, draft=None):
+#         context = {
+#             'communication_form': communication_form,
+#             'target_group_form': target_group_form,
+#             'attachment_formset': attachment_formset,
+#             'editing_draft': draft is not None,
+#             'communication': draft,
+#             'user_role': self.request.user.role,
+#             'user_branch_id': getattr(self.request.user.branch, 'id', ''),
+#         }
+#         messages.error(self.request, "There was an error with your submission. Please correct the highlighted fields.")
+#         return render(self.request, 'communications/com_create_and_update.html', context)
+
+#     def get(self, request, pk=None):
+#         self.request = request
+#         draft = None
+#         if pk:
+#             draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+
+#         if draft:
+#             saved_filter_data = draft.saved_filter_data or {}
+#             selected_recipient_ids = draft.selected_recipient_ids or []
+
+#             initial_data = {
+#                 'branch': Branch.objects.filter(id=saved_filter_data.get('id_branch')).first() if saved_filter_data.get('id_branch') else None,
+#                 'role': saved_filter_data.get('id_role', ''),
+#                 'staff_type': saved_filter_data.get('id_staff_type', ''),
+#                 'student_class': StudentClass.objects.filter(id=saved_filter_data.get('id_student_class')).first() if saved_filter_data.get('id_student_class') else None,
+#                 'class_arm': ClassArm.objects.filter(id=saved_filter_data.get('id_class_arm')).first() if saved_filter_data.get('id_class_arm') else None,
+#                 'teaching_positions': TeachingPosition.objects.filter(
+#                     id__in=self._clean_id_list(saved_filter_data.get('id_teaching_positions', []))
+#                 ),
+#                 'non_teaching_positions': NonTeachingPosition.objects.filter(
+#                     id__in=self._clean_id_list(saved_filter_data.get('id_non_teaching_positions', []))
+#                 ),
+#             }
+
+#             target_group_form = CommunicationTargetGroupForm(initial=initial_data, user=request.user)
+
+#             dummy_data = QueryDict('', mutable=True)
+#             for key in ['id_branch', 'id_role', 'id_staff_type', 'id_student_class', 'id_class_arm']:
+#                 dummy_data[key] = saved_filter_data.get(key, '')
+#             dummy_data.setlist('id_teaching_positions', self._clean_id_list(saved_filter_data.get('id_teaching_positions', [])))
+#             dummy_data.setlist('id_non_teaching_positions', self._clean_id_list(saved_filter_data.get('id_non_teaching_positions', [])))
+
+#             dummy_form = CommunicationTargetGroupForm(data=dummy_data, user=request.user)
+#             if dummy_form.is_valid():
+#                 allowed_recipients = dummy_form.get_filtered_recipients(dummy_form.cleaned_data).exclude(id=request.user.id)
+#             else:
+#                 allowed_recipients = CustomUser.objects.filter(id__in=selected_recipient_ids)
+
+#             selected_recipients = allowed_recipients.filter(id__in=selected_recipient_ids)
+#             manual_emails_str = ", ".join(draft.manual_emails) if draft.manual_emails else ""
+#             communication_form = CommunicationForm(
+#                 instance=draft,
+#                 initial={'manual_emails': manual_emails_str},
+#                 user=request.user
+#             )
+
+#             attachment_formset = AttachmentFormSet(instance=draft, prefix="attachments")
+
+#             context = {
+#                 'communication_form': communication_form,
+#                 'target_group_form': target_group_form,
+#                 'attachment_formset': attachment_formset,
+#                 'communication': draft,
+#                 'saved_filter_data': json.dumps(saved_filter_data),
+#                 'selected_recipient_ids': json.dumps(selected_recipient_ids),
+#                 'recipients': allowed_recipients,
+#                 'selected_recipients': selected_recipients,
+#                 'editing_draft': True,
+#                 'user_branch_id': request.user.branch.id if getattr(request.user, 'branch', None) else '',
+#                 'user_role': request.user.role,
+#             }
+#             return render(request, 'communications/com_create_and_update.html', context)
+
+#         else:
+#             # New communication create
+#             communication_form = CommunicationForm(user=request.user)
+#             target_group_form = CommunicationTargetGroupForm(user=request.user)
+#             attachment_formset = AttachmentFormSet(prefix="attachments")
+#             context = {
+#                 'communication_form': communication_form,
+#                 'target_group_form': target_group_form,
+#                 'attachment_formset': attachment_formset,
+#                 'editing_draft': False,
+#                 'user_role': request.user.role,
+#                 'user_branch_id': getattr(request.user.branch, 'id', ''),
+#             }
+#             return render(request, 'communications/com_create_and_update.html', context)
+
+#     def post(self, request, pk=None):
+#         self.request = request
+#         draft = None
+#         if pk:
+#             draft = get_object_or_404(Communication, pk=pk, sender=request.user, is_draft=True, sent=False)
+
+#         communication_form = CommunicationForm(request.POST, request.FILES, instance=draft, user=request.user)
+#         attachment_formset = AttachmentFormSet(request.POST, request.FILES, instance=draft, prefix="attachments")
+
+#         saved_filter_data = {
+#             'branch': request.user.branch.id if request.user.role in ['student', 'parent'] else request.POST.get('saved_branch', ''),
+#             'role': request.POST.get('saved_role', ''),
+#             'staff_type': request.POST.get('saved_staff_type', ''),
+#             'student_class': request.POST.get('saved_student_class', ''),
+#             'class_arm': request.POST.get('saved_class_arm', ''),
+#             'teaching_positions': self._clean_id_list(request.POST.get('saved_teaching_positions', '').split(',')),
+#             'non_teaching_positions': self._clean_id_list(request.POST.get('saved_non_teaching_positions', '').split(',')),
+#         }
+
+#         form_data = QueryDict('', mutable=True)
+#         for key in ['branch', 'role', 'staff_type', 'student_class', 'class_arm']:
+#             form_data[key] = saved_filter_data[key]
+#         form_data.setlist('teaching_positions', saved_filter_data['teaching_positions'])
+#         form_data.setlist('non_teaching_positions', saved_filter_data['non_teaching_positions'])
+
+#         target_group_form = CommunicationTargetGroupForm(data=form_data, user=request.user)
+
+#         if not target_group_form.is_valid():
+#             communication_form.add_error(None, "Invalid target group filters.")
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         if not communication_form.is_valid() or not attachment_formset.is_valid():
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         try:
+#             validate_attachment_formset(attachment_formset)
+#         except ValidationError as e:
+#             messages.error(request, str(e))
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         branch = request.user.branch if request.user.role in ['student', 'parent'] else target_group_form.cleaned_data.get('branch')
+#         if not branch:
+#             target_group_form.add_error('branch', "Please select a Branch.")
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         allowed_recipients = self._get_allowed_recipients(target_group_form, request.user)
+#         selected_recipients = self._get_selected_recipients(request, allowed_recipients)
+
+#         manual_emails_raw = communication_form.cleaned_data.get('manual_emails', '')
+#         valid_manual_emails = self._parse_manual_emails(manual_emails_raw)
+
+#         if not selected_recipients.exists() and not valid_manual_emails:
+#             communication_form.add_error(None, "Please select at least one recipient or enter a valid manual email.")
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         if not self._check_for_duplicate_emails(selected_recipients, valid_manual_emails, communication_form):
+#             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
+
+#         communication = communication_form.save(commit=False)
+#         communication.sender = request.user
+#         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
+#         communication.sent = False
+#         communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
+#         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
+#         communication.manual_emails = valid_manual_emails
+#         communication.saved_filter_data = {
+#             f"id_{k}": v for k, v in saved_filter_data.items()
+#         }
+#         communication.save()
+
+#         for form in attachment_formset:
+#             if not form.cleaned_data.get('DELETE', False):
+#                 if form.cleaned_data.get('file'):
+#                     form.instance.communication = communication
+#         attachment_formset.save() 
+
+#         if not communication.is_draft and communication.is_due():
+#             send_communication_to_recipients(
+#                 communication=communication,
+#                 selected_recipients=selected_recipients,
+#                 manual_emails=valid_manual_emails
+#             )
+#             communication.sent = True
+#             communication.sent_at = timezone.now()
+#             communication.save()
+#             messages.success(request, "Communication sent successfully.")
+#             return redirect('communication_success')
+
+#         elif communication.is_draft:
+#             msg = "Draft updated successfully." if draft else "Communication saved as draft."
+#             messages.success(request, msg)
+#             return redirect('draft_messages')
+
+#         else:
+#             url = reverse('communication_scheduled')
+#             query_string = urlencode({
+#                 'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
+#                 'sent': 'false'
+#             })
+#             messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
+#             return redirect(f"{url}?{query_string}")
+
 @method_decorator(login_required, name='dispatch')
 @method_decorator(require_http_methods(["GET", "POST"]), name='dispatch')
 class CommunicationCreateUpdateView(View):
@@ -1441,7 +1711,7 @@ class CommunicationCreateUpdateView(View):
         for item in raw_list:
             try:
                 cleaned.append(str(int(item.strip())))
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, AttributeError):
                 continue
         return cleaned
 
@@ -1510,6 +1780,15 @@ class CommunicationCreateUpdateView(View):
                 ),
             }
 
+            if draft.scheduled_time:
+                user_tz_name = request.GET.get('user_timezone') or 'UTC'
+                try:
+                    user_tz = pytz.timezone(user_tz_name)
+                except pytz.UnknownTimeZoneError:
+                    user_tz = timezone.get_current_timezone()
+                local_dt = draft.scheduled_time.astimezone(user_tz)
+                initial_data['scheduled_time'] = local_dt.strftime('%Y-%m-%dT%H:%M')
+
             target_group_form = CommunicationTargetGroupForm(initial=initial_data, user=request.user)
 
             dummy_data = QueryDict('', mutable=True)
@@ -1526,12 +1805,12 @@ class CommunicationCreateUpdateView(View):
 
             selected_recipients = allowed_recipients.filter(id__in=selected_recipient_ids)
             manual_emails_str = ", ".join(draft.manual_emails) if draft.manual_emails else ""
+
             communication_form = CommunicationForm(
                 instance=draft,
-                initial={'manual_emails': manual_emails_str},
+                initial={'manual_emails': manual_emails_str, **({'scheduled_time': initial_data.get('scheduled_time')} if 'scheduled_time' in initial_data else {})},
                 user=request.user
             )
-
             attachment_formset = AttachmentFormSet(instance=draft, prefix="attachments")
 
             context = {
@@ -1544,13 +1823,12 @@ class CommunicationCreateUpdateView(View):
                 'recipients': allowed_recipients,
                 'selected_recipients': selected_recipients,
                 'editing_draft': True,
-                'user_branch_id': request.user.branch.id if getattr(request.user, 'branch', None) else '',
+                'user_branch_id': getattr(request.user.branch, 'id', ''),
                 'user_role': request.user.role,
             }
             return render(request, 'communications/com_create_and_update.html', context)
 
         else:
-            # New communication create
             communication_form = CommunicationForm(user=request.user)
             target_group_form = CommunicationTargetGroupForm(user=request.user)
             attachment_formset = AttachmentFormSet(prefix="attachments")
@@ -1596,6 +1874,9 @@ class CommunicationCreateUpdateView(View):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
 
         if not communication_form.is_valid() or not attachment_formset.is_valid():
+            print("DEBUG: Communication form errors:", communication_form.errors)
+            print("DEBUG: Raw scheduled_time from POST:", request.POST.get('scheduled_time'))
+            print("DEBUG: User timezone from POST:", request.POST.get('user_timezone'))
             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
 
         try:
@@ -1623,28 +1904,43 @@ class CommunicationCreateUpdateView(View):
             return self._render_with_errors(communication_form, target_group_form, attachment_formset, draft)
 
         communication = communication_form.save(commit=False)
+
+        user_tz_name = request.POST.get('user_timezone')
+        try:
+            user_tz = pytz.timezone(user_tz_name)
+        except (pytz.UnknownTimeZoneError, AttributeError):
+            user_tz = timezone.get_current_timezone()
+
+        scheduled_time_naive = communication_form.cleaned_data.get('scheduled_time')
+        print("DEBUG: cleaned scheduled_time:", scheduled_time_naive)
+        print("DEBUG: user_tz:", user_tz)
+
+        if scheduled_time_naive:
+            # scheduled_time_aware = user_tz.localize(scheduled_time_naive)
+            scheduled_time_aware = scheduled_time_naive.replace(tzinfo=user_tz)
+            communication.scheduled_time = scheduled_time_aware.astimezone(pytz.UTC)
+        else:
+            communication.scheduled_time = None
+
         communication.sender = request.user
         communication.requires_response = communication_form.cleaned_data.get('requires_response', False)
         communication.sent = False
         communication.is_draft = communication_form.cleaned_data.get('is_draft', False)
         communication.selected_recipient_ids = list(selected_recipients.values_list('id', flat=True))
         communication.manual_emails = valid_manual_emails
-        communication.saved_filter_data = {
-            f"id_{k}": v for k, v in saved_filter_data.items()
-        }
+        communication.saved_filter_data = {f"id_{k}": v for k, v in saved_filter_data.items()}
         communication.save()
 
         for form in attachment_formset:
-            if not form.cleaned_data.get('DELETE', False):
-                if form.cleaned_data.get('file'):
-                    form.instance.communication = communication
-        attachment_formset.save() 
+            if not form.cleaned_data.get('DELETE', False) and form.cleaned_data.get('file'):
+                form.instance.communication = communication
+        attachment_formset.save()
 
         if not communication.is_draft and communication.is_due():
             send_communication_to_recipients(
                 communication=communication,
                 selected_recipients=selected_recipients,
-                manual_emails=valid_manual_emails
+                manual_emails=valid_manual_emails,
             )
             communication.sent = True
             communication.sent_at = timezone.now()
@@ -1652,20 +1948,19 @@ class CommunicationCreateUpdateView(View):
             messages.success(request, "Communication sent successfully.")
             return redirect('communication_success')
 
-        elif communication.is_draft:
+        if communication.is_draft:
             msg = "Draft updated successfully." if draft else "Communication saved as draft."
             messages.success(request, msg)
             return redirect('draft_messages')
 
-        else:
-            url = reverse('communication_scheduled')
-            query_string = urlencode({
-                'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p'),
-                'sent': 'false'
-            })
-            messages.success(request, f"Scheduled for {communication.scheduled_time.strftime('%b %d, %Y at %I:%M %p')}.")
-            return redirect(f"{url}?{query_string}")
-
+        url = reverse('communication_scheduled')
+        scheduled_str = communication.scheduled_time.astimezone(user_tz).strftime('%b %d, %Y at %I:%M %p') if communication.scheduled_time else 'unknown time'
+        query_string = urlencode({
+            'scheduled_time': communication.scheduled_time.strftime('%Y-%m-%d %I:%M:%S %p') if communication.scheduled_time else '',
+            'sent': 'false'
+        })
+        messages.success(request, f"Scheduled for {scheduled_str}.")
+        return redirect(f"{url}?{query_string}")
 
 
 def communication_success(request):
@@ -1675,28 +1970,36 @@ def communication_success(request):
 
 def communication_scheduled(request):
     scheduled_time_str = request.GET.get('scheduled_time', None)
+    user_tz_str = request.GET.get('user_timezone', None)
     scheduled_time = None
     is_sent = False
 
+    current_tz = pytz.UTC  # default UTC
+
+    if user_tz_str:
+        try:
+            current_tz = pytz.timezone(user_tz_str)
+        except pytz.UnknownTimeZoneError:
+            pass
+
     if scheduled_time_str:
         try:
-            # Try parsing 12-hour format (with AM/PM)
-            scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %I:%M:%S %p')
-            scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+            naive_dt = datetime.strptime(scheduled_time_str, '%Y-%m-%d %I:%M:%S %p')
         except ValueError:
             try:
-                # Fallback to 24-hour format
-                scheduled_time = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
-                scheduled_time = timezone.make_aware(scheduled_time, timezone.get_current_timezone())
+                naive_dt = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')
             except ValueError:
-                scheduled_time = None
+                naive_dt = None
 
-    if scheduled_time:
-        is_sent = timezone.now() >= scheduled_time
+        if naive_dt:
+            scheduled_time = current_tz.localize(naive_dt)  # <-- Use localize here
+            scheduled_time_utc = scheduled_time.astimezone(pytz.UTC)
+            is_sent = timezone.now() >= scheduled_time_utc
 
     context = {
         'scheduled_time': scheduled_time,
         'is_sent': is_sent,
+        'user_timezone': user_tz_str or str(current_tz),
     }
     return render(request, 'communications/scheduled_success.html', context)
 
@@ -1978,7 +2281,6 @@ def submit_reply(request, recipient_id):
 @require_GET
 def scheduled_messages_view(request):
     try:
-        # Allow only specific roles to access scheduled messages
         allowed_roles = ['superadmin', 'branch_admin', 'staff']
         user_role = getattr(request.user, 'role', '').lower()
 
@@ -1986,16 +2288,15 @@ def scheduled_messages_view(request):
             logger.warning(f"Access denied: user {request.user.pk} with role '{user_role}' tried to access scheduled messages.")
             return HttpResponseForbidden("You do not have permission to view scheduled messages.")
 
-        # Fetch scheduled messages not sent yet and not drafts
         scheduled_messages = Communication.objects.filter(
             sender=request.user,
             sent=False,
             is_draft=False,
         ).annotate(
             display_time=Coalesce('scheduled_time', 'created_at')
-        ).order_by(F('display_time').asc())
+        ).order_by('display_time')
 
-        return render(request, 'communications/scheduled.html', {
+        return render(request, 'communications/scheduled_message.html', {
             'scheduled_messages': scheduled_messages
         })
 
@@ -2004,7 +2305,6 @@ def scheduled_messages_view(request):
         return HttpResponseServerError("An error occurred while loading scheduled messages.")
 
 
-from django.db.models import Count, Q
 
 @login_required(login_url='login')
 @require_GET
@@ -2041,3 +2341,52 @@ class DeleteAllDraftMessagesView(View):
     def post(self, request):
         Communication.objects.filter(sender=request.user, is_draft=True, sent=False).delete()
         return redirect('draft_messages')  # or wherever you want to go after deletion
+
+
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.utils import timezone
+import pytz
+from datetime import datetime
+
+@login_required
+def communication_status(request):
+    scheduled_time_str = request.GET.get('scheduled_time')
+    user_tz_str = request.GET.get('user_timezone')
+
+    if not scheduled_time_str:
+        return JsonResponse({'error': 'No scheduled_time provided'}, status=400)
+
+    # Default to UTC if no or invalid timezone provided
+    try:
+        current_tz = pytz.timezone(user_tz_str) if user_tz_str else pytz.UTC
+    except pytz.UnknownTimeZoneError:
+        current_tz = pytz.UTC
+
+    naive_dt = None
+    # Try ISO 8601 format first (e.g. "2025-08-10T19:10:00")
+    try:
+        naive_dt = datetime.fromisoformat(scheduled_time_str)
+    except ValueError:
+        # Fall back to your previous custom formats:
+        try:
+            naive_dt = datetime.strptime(scheduled_time_str, '%Y-%m-%d %I:%M:%S %p')  # 12-hour format with AM/PM
+        except ValueError:
+            try:
+                naive_dt = datetime.strptime(scheduled_time_str, '%Y-%m-%d %H:%M:%S')  # 24-hour format
+            except ValueError:
+                return JsonResponse({'error': 'Invalid datetime format'}, status=400)
+
+    # Localize naive datetime to user's timezone (if naive_dt is naive)
+    if naive_dt.tzinfo is None:
+        scheduled_time = current_tz.localize(naive_dt)
+    else:
+        scheduled_time = naive_dt.astimezone(current_tz)
+
+    # Convert to UTC for comparison
+    scheduled_time_utc = scheduled_time.astimezone(pytz.UTC)
+
+    # Check if current time (UTC) is after or equal to scheduled time
+    is_sent = timezone.now() >= scheduled_time_utc
+
+    return JsonResponse({'is_sent': is_sent})
