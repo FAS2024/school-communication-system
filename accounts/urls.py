@@ -114,5 +114,9 @@ urlpatterns = [
     path('communications/drafts/<int:pk>/edit/', views.EditDraftMessageView.as_view(), name='edit_draft_message'),
     path('communications/drafts/<int:pk>/delete/', views.delete_draft_message, name='delete_draft_message'),
     path('communications/drafts/delete_all/', views.DeleteAllDraftMessagesView.as_view(), name='delete_all_draft_messages'),
+
+    # ////////////////////////////////////
+    path('communications/create/', views.CommunicationCreateEditView.as_view(), name='communication_create'),
+    path('communications/<int:pk>/edit/', views.CommunicationCreateEditView.as_view(), name='communication_edit_draft'),
 ]
 
